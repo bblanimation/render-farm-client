@@ -462,33 +462,6 @@ def getRenderFiles():
 
 
 
-# def clearRenderFolder(forceClear=False):
-#     global frameStart
-#     global frameEnd
-# 
-#     if forceClear:
-#         subprocess.call('''ssh ''' + hostServer + ''' "cd ''' + serverFilePath + '''; find . -type f ! -name '*.blend' -delete"''', shell=True)
-#         frameStart = ""
-#         frameEnd   = ""
-#     else:
-#         confirmation = raw_input( "Permanently delete all render files for project '" + projectName[:-6] + "' on " + defaultHostServer + "? [yes/no] => " )
-#         while ( confirmation != "yes" and confirmation != "no" and confirmation != "" and confirmation != "m" ):
-#             confirmation = raw_input("Whoops! Invalid input. Please enter 'yes' or 'no' => ")
-#         if ( confirmation == "yes" ):
-#             print "You brought this on yourself..."
-#             print ""
-#             print "cleaning render folder for '" + projectName[:-6] + "'..."
-#             subprocess.call('''ssh ''' + hostServer + ''' "cd ''' + serverFilePath + '''; find . -type f ! -name '*.blend'; find . -type f ! -name '*.blend' -delete"''', shell=True)
-#             frameStart = ""
-#             frameEnd   = ""
-#             return True
-#         else:
-#             return False
-
-
-
-
-
 
 
 
@@ -550,9 +523,6 @@ def runMainMenu():
                 if junk == "":
                     print "\nrunning getRenderFiles script..."
                     getRenderFiles()
-                    if ( testing and projectName == "_test.blend"):
-                        clearRenderFolder(True)
-                        print "\nBecause this was a test, render files have been cleared from the server"
                     junk = raw_input("\nprocess completed. Press enter for main menu...")
             subprocess.call("clear", shell=True)
         elif (menuSelection == "g" or menuSelection == "3" ):

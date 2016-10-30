@@ -16,6 +16,8 @@ Scripts and associated files for rendering from Blender files on CSE remote serv
         * integrate 'sendSpecificFiles.py', 'iterateThruAvailServers.py', 'fetchFromServers.py', and 'killBlenderOnAvailServers.py' into interactive menu.
         * improve '-v' settings. Right now, random things print in verbose. This could be much more helpful if carfully examined.
         * add user input for samples and size %
+        * maybe refactor some of the functions in this code into external scripts?
+        * refactor directory defaults to an external 'txt' document.
     * Imports:
         * subprocess, sys
     * Options:
