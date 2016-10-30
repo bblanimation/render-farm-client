@@ -37,8 +37,8 @@ def fetchFromServers(hosts, unreachable):
     print "Unreachable hosts => " + str(unreachable)
     print "Hosts in queue    => " + str(hosts) + "\n"
     for host in hosts:
-        print "fetching frames from server " + host
-        subprocess.call("rsync -v -ae 'ssh -o StrictHostKeyChecking=no' --ignore-existing 'cgearhar@" + host + ".cse.taylor.edu:/tmp/cgearhar/" + projectName +  "/render/' '/Users/cgear13/filmmaking/files_for_render_farm/renderedFrames/" + projectName + "/'",shell=True)
+        print "fetching all rendered frames from server " + host
+        subprocess.call("rsync -v --exclude='*.blend' -ae 'ssh -o StrictHostKeyChecking=no' --ignore-existing 'cgearhar@" + host + ".cse.taylor.edu:/tmp/cgearhar/' '/Users/cgear13/filmmaking/files_for_render_farm/renderedFrames/directFetchesFromServers/'",shell=True)
         print""
 
 def main():
