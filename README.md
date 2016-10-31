@@ -18,6 +18,10 @@ Scripts and associated files for rendering from Blender files on CSE remote serv
         * add user input for samples and size %
         * maybe refactor some of the functions in this code into external scripts?
         * refactor directory defaults to an external 'txt' document.
+        * implement menu system into blender with a plugin
+        * implement single-frame distributed processing 
+            * multiple renders at low (seeded) sampling averaged out.
+            * render many portions of the whole frame at the full sample size.
     * Imports:
         * subprocess, sys
     * Options:
