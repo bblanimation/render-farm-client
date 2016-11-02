@@ -1,0 +1,3 @@
+defaultBasePath       = "/Users/cgear13/Documents/filmmaking/files_for_render_farm/"
+defaultHostServer     = "cgearhar@asahel.cse.taylor.edu"
+defaultServerFilePath = "/tmp/cgearhar/"

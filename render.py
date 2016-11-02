@@ -2,6 +2,9 @@
 
 import subprocess
 import sys
+import os
+import os, numpy, PIL
+from PIL import Image
 
 print "running 'sendToRenderFarm.py'..."
 
@@ -18,6 +21,7 @@ defaultBasePath       = "/Users/cgear13/Documents/filmmaking/files_for_render_fa
 # create ssh redirect here so I can use this code remotely
 defaultHostServer     = "cgearhar@asahel.cse.taylor.edu"
 defaultServerFilePath = "/tmp/cgearhar/"
+dumpLocationBase      = defaultBasePath + "renderedFrames/"
 
 # GLOBAL VARIABLES
 hostServer     = ""
@@ -76,7 +80,7 @@ def setProjectFileOnOpen():
     global serverFilePath
 
     if testing:
-        projectName = "_test.blend"
+        projectName = "_testFile.blend"
         serverFilePath = defaultServerFilePath + projectName[:-6] + "/"
         print ""
         return projectName
@@ -111,18 +115,12 @@ def setServer():
 def getFrameStart():
     global frameStart
     while True:
-        if testing:
-            frameStart = raw_input("frame start => ")
-            if frameStart == "":
-                frameStart = 1
-            elif frameStart == "m":
-                runMainMenu()
-                sys.exit()
-        else: 
-            frameStart = raw_input("frame start => ")
-            if frameStart == "m":
-                runMainMenu()
-                sys.exit()
+        frameStart = raw_input("frame start => ")
+        if testing and frameStart == "":
+            frameStart = 1
+        elif frameStart == "m":
+            runMainMenu()
+            sys.exit()
         try: 
             frameStart = int(frameStart)
             break;
@@ -136,24 +134,39 @@ def getFrameStart():
 def getFrameEnd():
     global frameEnd
     while True:
-        if testing:
-            frameEnd = raw_input("frame end => ")
-            if frameEnd == "":
-                frameEnd = 25
-            elif frameEnd == "m":
-                runMainMenu()
-                sys.exit()
-        else: 
-            frameEnd = raw_input("frame end => ")
-            if frameEnd == "m":
-                runMainMenu()
-                sys.exit()
+        frameEnd = raw_input("frame end => ")
+        if testing and frameEnd == "":
+            frameEnd = 25
+        elif frameEnd == "m":
+            runMainMenu()
+            sys.exit()
         try: 
             frameEnd = int(frameEnd)
             break;
         except ValueError:
             print "Whoops! That was no valid number. Try again..."
     return frameEnd
+
+
+
+
+def getSampleSize():
+    while True:
+        samplesIn = raw_input("Render Samples => ")
+        if samplesIn == "":
+            if testing:
+                samplesIn = 50
+            else:
+                samplesIn = 100
+        elif samplesIn == "m":
+            runMainMenu()
+            sys.exit()
+        try: 
+            samplesIn = int(samplesIn)
+            break;
+        except ValueError:
+            print "Whoops! That was no valid number. Try again..."
+    return samplesIn
 
 
 
@@ -206,9 +219,19 @@ def verifyFramesPresent(dumpLocation, boundsSpecified):
         print "no files present."
         return
 
+    # NEEDS OPTIMIZATION, and eventually logic improvement. Checks if any files have seeds; if so, don't check if files present
+    seeded = False
+    for curFile in renderFilesList:
+        if "_seed-" in curFile:
+            seeded = True
+
     # trim the render file strings in renderFilesList to integers (e.g. 'demo_0001.png' becomes 1)
     for idx,string in enumerate(renderFilesList):
-        renderFilesList[idx] = int(string.split('.')[0][-4:])
+        try:
+            renderFilesList[idx] = int(string.split('.')[0][-4:])
+        except:
+            print "Whoops! There was a problem verifying the frames; it seems a frame was present that didn't conform to to the '*####.*' pattern, where # is any valid number 0-9."
+            return
 
     # init skippedImages
     skippedFrames = []
@@ -222,11 +245,15 @@ def verifyFramesPresent(dumpLocation, boundsSpecified):
                 skippedFrames.append(currentFrame)
                 currentFrame += 1
             currentFrame += 1
+    elif seeded:
+        print "TEMP ALERT: There are seeded frames in the dumpLocation. Please rewrite this secion of code in VerifyFramesPresent() to account for such files"
+        print "frames not verified"
+        return
     else:
         # if frame starts line up, this for loop is skipped
         for i in range(frameStart,renderFilesList[0]):
             skippedFrames.append(i)
-        
+
         # append to skippedFrames any number excluded from list in its own bounds
         currentFrame = renderFilesList[0]
         for renderFrame in renderFilesList:
@@ -347,6 +374,52 @@ def setProjectFile():
 
 
 
+def averageFrames():
+    print "running averageFrames()... (currently only supports '.png' and '.tga')"
+    allfiles=os.listdir(dumpLocationBase + projectName[:-6] + "/")
+    imlist=[filename for filename in allfiles if  (filename[-4:] in [".tga",".TGA"] and filename[-5] != "e" and filename[:-10] == projectName[:-6] + "_seed-")]
+    for i in range(len(imlist)):
+        imlist[i] = dumpLocationBase + projectName[:-6] + "/" + imlist[i]
+
+    if len(imlist) == 0:
+        print "There were no image files to average..."
+        return;
+
+    # Assuming all images are the same size, get dimensions of first image
+    print "Averaging the following images:"
+    for image in imlist:
+        print image
+    w,h=Image.open(imlist[0]).size
+    N=len(imlist)
+
+    # Create a numpy array of floats to store the average (assume RGB images)
+    arr=numpy.zeros((h,w,3),numpy.float)
+
+    # Build up average pixel intensities, casting each image as an array of floats
+    for im in imlist:
+        # load image
+        imarr=numpy.array(Image.open(im),dtype=numpy.float)
+        try:
+            arr=arr+imarr/N
+        except:
+            print "It seems your image may have an alpha value. This is not currently supported by this script; please either add support for alpha channels to the averageFrames() function, or try another image."
+
+    # Round values in array and cast as 8-bit integer
+    arr=numpy.array(numpy.round(arr),dtype=numpy.uint8)
+
+    # Print details
+    print "Averaged successfully!"
+
+    # Generate, save and preview final image
+    out=Image.fromarray(arr,mode="RGB")
+    print "saving averaged image..."
+    out.save(dumpLocationBase + projectName[:-6] + "/" + projectName[:-6] + "_average.tga")
+
+
+
+
+
+
 def setProjectFileRecursive():
     global serverFilePath
     global projectPath
@@ -399,8 +472,9 @@ def sendToHostServer():
     userChoice = "b"
     getFrameStart()
     getFrameEnd()
+    #sampleSize = getSampleSize()
     numFrames = frameEnd - frameStart + 1
-    userChoice = raw_input("Press ENTER to render " + str(numFrames) + " frames of '" + projectName[:-6] + "' => ")
+    userChoice = raw_input("Press ENTER to render " + str(numFrames) + " frames of '" + projectName[:-6] + "'? => ") # at " + str(sampleSize) + " samples => ")
     while ( userChoice != 'm' and userChoice != '' ):
         userChoice = raw_input("Whoops! Press ENTER to confirm ('m' for main menu) => ")
     if userChoice == 'm':
@@ -419,10 +493,7 @@ def sendToHostServer():
 
     # run blender command to render given range from the remote server
     print "opening connection to " + hostServer + "..."
-    if verbose:
-        subprocess.call("ssh " + hostServer + " 'blender_task.py -v -n " + projectName[:-6] + " -s " + str(frameStart) + " -e " + str(frameEnd) + "'", shell=True)
-    else:
-        subprocess.call("ssh " + hostServer + " 'blender_task.py -n " + projectName[:-6] + " -s " + str(frameStart) + " -e " + str(frameEnd) + "'", shell=True)
+    subprocess.call("ssh " + hostServer + " 'blender_task.py -n " + projectName[:-6] + " -s " + str(frameStart) + " -e " + str(frameEnd) + "'", shell=True)
 
     return True
 
@@ -430,15 +501,16 @@ def sendToHostServer():
 
 
 def getRenderFiles():
-    dumpLocation   = defaultBasePath + "renderedFrames/" + projectName[:-6] + "/" # local directory
+    dumpLocation = dumpLocationBase + projectName[:-6] + "/"
     if verbose:
         print dumpLocation
 
     print "verifying local directory..."
-    subprocess.call("mkdir -p " + dumpLocation, shell=True)
+    subprocess.call("mkdir -p " + dumpLocation + "backups/", shell=True)
 
     print "cleaning up local directory..."
     subprocess.call("find " + dumpLocation + ".. ! -name '" + projectName[:-6] + "' -empty -type d -delete", shell=True)
+    subprocess.call("rsync --remove-source-files " + dumpLocation + "* " + dumpLocation + "backups/",shell=True)
 
     print "verifying remote directory..."
     if verbose:
@@ -446,8 +518,6 @@ def getRenderFiles():
     subprocess.call("ssh " + hostServer + " 'mkdir -p " + serverFilePath + ";'", shell=True)
 
     print "copying files from server...\n"
-    if verbose:
-        print ""
     subprocess.call("rsync --exclude='*.blend' '" + hostServer + ":" + serverFilePath + "*' '" + dumpLocation + "'",shell=True)
 
     print "verifying all render frames present",
@@ -496,9 +566,10 @@ def runMainMenu():
         print "1.   n: newProjectFile"
         print "2.   s: sendToRenderFarm (DEFAULT)"
         print "3.   g: getRenderFiles"
-        print "4.   q: quit"
+        print "4.   a: averageFrames"
+        print "5.   q: quit"
         if testing:
-            print "5.   d: openDefaultFile"
+            print "6.   d: openDefaultFile"
         print ""
         if( projectName == "" ): print "no project file set."
         else:                    print "projectFile = " + projectName
@@ -519,10 +590,12 @@ def runMainMenu():
             if ( sendToHostServer() ):
                 junk = raw_input("\nPress ENTER to get render files => ")
                 while (junk != "" and junk != "m"):
-                    junk = raw_input("\nWhoops! you entered '" + "'. Press ENTER to continue => ")
+                    junk = raw_input("\nWhoops! you entered '" + junk + "'. Press ENTER to continue => ")
                 if junk == "":
                     print "\nrunning getRenderFiles script..."
                     getRenderFiles()
+                    print ""
+                    averageFrames()
                     junk = raw_input("\nprocess completed. Press enter for main menu...")
             subprocess.call("clear", shell=True)
         elif (menuSelection == "g" or menuSelection == "3" ):
@@ -532,9 +605,13 @@ def runMainMenu():
             getRenderFiles()
             junk = raw_input("\nprocess completed. Press enter for main menu...")
             subprocess.call("clear", shell=True)
-        elif (menuSelection == "q" or menuSelection == "4" ):
+        elif (menuSelection == "a" or menuSelection == "4" ):
+            averageFrames()
+            junk = raw_input("\nprocess completed. Press enter for main menu...")
+            subprocess.call("clear", shell=True)
+        elif (menuSelection == "q" or menuSelection == "5" ):
             continueRunning = False
-        elif (testing and (menuSelection == "d" or menuSelection == "5") ):
+        elif (testing and (menuSelection == "d" or menuSelection == "6") ):
             projectName = setProjectFileOnOpen()
         else:
             print "Whoops! Invalid input."
