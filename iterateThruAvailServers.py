@@ -7,9 +7,9 @@ import ast
 
 def importCSE_HOSTS():
     try:
-        f = open("CSE_HOSTS.txt", "r")
+        f = open("HOSTS.txt", "r")
     except:
-        print "Whoops! File could not be opened. Make sure 'CSE_HOSTS.txt' is in the same directory as this script file."
+        print "Whoops! File could not be opened. Make sure 'HOSTS.txt' is in the same directory as this script file."
 
     CSE_HOSTS = ast.literal_eval(f.readline())
 

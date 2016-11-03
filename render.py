@@ -1,8 +1,7 @@
-#!/usr/bin/python
+#/usr/bin/python
 
 import subprocess
 import sys
-import os
 import os, numpy, PIL
 from PIL import Image
 
@@ -60,13 +59,13 @@ def handleArgs():
             print ""
             print "Accepted arguments:"
             print ">  -v  => run in verbose mode. In verbose mode, rsync files are called with -v, and blender_task.py (written by nwhite, stored on asahel) is called with -v."
-            print ">  -t  => run in testing mode. In testing mode, nearly all inputs have non-destructive, non-taxing default values set for carriage return, and '_test.blend' is opened automatically."
+            print ">  -t  => run in testing mode. In testing mode, nearly all inputs have non-destructive, non-taxing default values set for carriage return, and '_testFile.blend' is opened automatically."
             print ">  -r  => run in recursive mode. In recursive mode, getNewProjectFile searches through ~/filmmaking/, so that all respective '*.blend' files are available"
             print ""
             sys.exit()
         args += sys.argv.pop()
 
-    if "t" in args: 
+    if "t" in args:
         testing = True
     if "v" in args:
         verbose = True
@@ -121,7 +120,7 @@ def getFrameStart():
         elif frameStart == "m":
             runMainMenu()
             sys.exit()
-        try: 
+        try:
             frameStart = int(frameStart)
             break;
         except ValueError:
@@ -140,7 +139,7 @@ def getFrameEnd():
         elif frameEnd == "m":
             runMainMenu()
             sys.exit()
-        try: 
+        try:
             frameEnd = int(frameEnd)
             break;
         except ValueError:
@@ -161,7 +160,7 @@ def getSampleSize():
         elif samplesIn == "m":
             runMainMenu()
             sys.exit()
-        try: 
+        try:
             samplesIn = int(samplesIn)
             break;
         except ValueError:
@@ -173,7 +172,7 @@ def getSampleSize():
 
 def formatter(start, end):
     return '{}-{}'.format(start, end)
-    
+
 
 
 
@@ -306,7 +305,7 @@ def chooseProjectFile(filesList):
             userChoice = raw_input("USE FILE => ")
             if ( testing and userChoice == "" ):
                 userChoice = 1
-            try: 
+            try:
                 userChoice = int(userChoice)
                 break;
             except ValueError:
@@ -317,7 +316,7 @@ def chooseProjectFile(filesList):
                 userChoice = raw_input("USE FILE (default=1) => ")
                 if ( testing and userChoice == "" ):
                     userChoice = 1
-                try: 
+                try:
                     userChoice = int(userChoice)
                     break;
                 except ValueError:
@@ -325,7 +324,7 @@ def chooseProjectFile(filesList):
 
         return userChoice-1
 
-    
+
 
 
 
@@ -346,7 +345,7 @@ def setProjectFile():
     global serverFilePath
 
     # save list of files in defaultBasePath to 'filesList.txt' and readlines into variable filesList
-    subprocess.call("cd " + defaultBasePath + ";ls *.blend | grep -v '_test.blend' > filesList.txt", shell=True)
+    subprocess.call("cd " + defaultBasePath + ";ls *.blend | grep -v '_testFile.blend' > filesList.txt", shell=True)
     f = open(defaultBasePath + "filesList.txt", "r")
     filesList = f.read().splitlines()
     # close 'filesList.txt' and delete it
@@ -358,7 +357,7 @@ def setProjectFile():
         print "run 'render' again once you've done this.\n"
         sys.exit()
     chosenIndex = chooseProjectFile(filesList)
-    
+
     # set user choice to projectName
     projectName    = filesList[chosenIndex]
     if " " in projectName:
@@ -425,7 +424,7 @@ def setProjectFileRecursive():
     global projectPath
 
     # save list of files in '~/filmmaking/' to 'defaultBasePath/filesPathsList.txt' and readlines into variable filesList
-    subprocess.call("cd ~/filmmaking; find . -type f \( -name '*.blend' ! -name '_test.blend' \)  > " + defaultBasePath + "filesPathsList.txt", shell=True)
+    subprocess.call("cd ~/filmmaking; find . -type f \( -name '*.blend' ! -name '_testFile.blend' \)  > " + defaultBasePath + "filesPathsList.txt", shell=True)
     f = open(defaultBasePath + "filesPathsList.txt", "r")
     filesPathsList = f.read().splitlines()
     filesList = []
@@ -545,7 +544,7 @@ def getRenderFiles():
 
 def runMainMenu():
     global projectName
-    
+
     continueRunning = True
     while(continueRunning):
         subprocess.call("clear", shell=True)
@@ -639,7 +638,7 @@ def main():
     # if arguments were passed, handle them
     if len(sys.argv) > 1:
         handleArgs()
-    
+
     # set up global variable "hostServer"
     hostServer = setServer()
 
