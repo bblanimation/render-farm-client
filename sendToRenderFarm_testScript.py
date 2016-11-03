@@ -256,7 +256,7 @@ class renderPanelLayout(View3DPanel, Panel):
         row = layout.row(align=True)
         if(renderStatus == "Complete!"):
             row.operator("scene.open_rendered_image", text="Open Rendered Image", icon="FILE_IMAGE")
-        
+         
 #        row = layout.row(align=True)
 #        row = layout.row(align=True)
 #        row = layout.row(align=True)
