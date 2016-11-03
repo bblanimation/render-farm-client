@@ -63,11 +63,11 @@ def getFrames():
     return process
 
 def averageFrames():
-    process = subprocess.Popen("python ~/my_scripts/averageFrames.py " + projectPath + " _" + projectName, stdout=subprocess.PIPE, shell=True)
+    process = subprocess.Popen("python ~/my_scripts/averageFrames.py " + projectPath + " " + projectName, stdout=subprocess.PIPE, shell=True)
     return process
    
 def renderFrames(startFrame, endFrame):
-    bpy.ops.wm.save_as_mainfile(copy=True)
+    bpy.ops.wm.save_mainfile()
     
     print("verifying remote directory...")
     subprocess.call("ssh " + hostServer + " 'mkdir -p " + serverFilePath + ";'", shell=True)
@@ -75,10 +75,10 @@ def renderFrames(startFrame, endFrame):
     # set up project folder in remote server
     print("copying blender project files...")
     subprocess.call("rsync -a --copy-links --include=" + projectName + ".blend --exclude='*' '" + projectPath + "' '" + hostServer + ":" + serverFilePath + "'", shell=True)
-    
+
     # run blender command to render given range from the remote server
     print("opening connection to " + hostServer + "...")
-    process = subprocess.cal("ssh " + hostServer + " 'nohup blender_task.py -v -n " + projectName + " -s " + str(startFrame) + " -e " + str(endFrame) + " &'", shell=True)
+    process = subprocess.Popen("ssh " + hostServer + " 'nohup blender_task.py -n " + projectName + " -s " + str(startFrame) + " -e " + str(endFrame) + " &'",stdout=subprocess.PIPE, shell=True)
     #subprocess.call("ssh " + hostServer + " 'nohup blender_task.py -n " + projectName + " -s " + str(startFrame) + " -e " + str(endFrame) + " &'", shell=True)
     print("Process sent to remote servers!\n")
     
@@ -108,18 +108,12 @@ class sendAnimationToRenderFarm(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}                   # enable undo for the operator.
 
     def execute(self, context):
-        global projectName
-        projectName = bpy.path.display_name_from_filepath(bpy.data.filepath)
-        if projectName == "":
-            self.report({'WARNING'}, "You have not saved your project file. Please save it before attempting to render.")
-            return{'FINISHED'}
-#        
-#        startFrame = bpy.data.scenes["Scene"].frame_start
-#        endFrame   = bpy.data.scenes["Scene"].frame_end
+        startFrame = bpy.data.scenes["Scene"].frame_start
+        endFrame   = bpy.data.scenes["Scene"].frame_end
 
-#        renderFrames(startFrame, endFrame)
+        renderFrames(startFrame, endFrame)
 
-#        return{'FINISHED'}
+        return{'FINISHED'}
 
 class sendFrameToRenderFarm(bpy.types.Operator):
     """Send to Render Farm"""                               # blender will use this as a tooltip for menu items and buttons.
@@ -163,7 +157,7 @@ class sendFrameToRenderFarm(bpy.types.Operator):
                     setRenderStatus("Complete!")
                     return{'FINISHED'}
                 else:
-                    self.report({'WARNING'}, "ERROR: Current state not recognized.")
+                    self.report({'INFO'}, "ERROR: Current state not recognized.")
                     setRenderStatus("ERROR")
                     return{'FINISHED'}
         
@@ -171,17 +165,6 @@ class sendFrameToRenderFarm(bpy.types.Operator):
 
     def execute(self, context):
         print()
-        
-        global projectName
-        global projectPath
-        global serverFilePath
-        projectName = bpy.path.display_name_from_filepath(bpy.data.filepath)
-        serverFilePath = "/tmp/cgearhar/" + projectName + "/"
-
-        if projectName == "":
-            self.report({'WARNING'}, "You have not saved your project file. Please save it before attempting to render.")
-            return{'FINISHED'}
-        
         curFrame = bpy.data.scenes["Scene"].frame_current
 
         # change context for bpy.ops.image
@@ -193,7 +176,7 @@ class sendFrameToRenderFarm(bpy.types.Operator):
         self._timer = wm.event_timer_add(0.1, context.window)
         wm.modal_handler_add(self)
         
-        self.process = renderFrames(curFrame, curFrame)
+        self.process = renderFrames(curFrame,curFrame)
         self.state   = 1
         
         self.report({'INFO'}, "Starting render on all available remote servers...")
@@ -239,7 +222,7 @@ class openRenderedImageInUI(bpy.types.Operator):
         area.type = 'IMAGE_EDITOR'
                 
         # open rendered image
-        averaged_image_filepath = projectPath + "render-dump/_" + projectName + "_average.tga"
+        averaged_image_filepath = projectPath + "render-dump/" + projectName + "_average.tga"
         bpy.ops.image.open(filepath=averaged_image_filepath)
         
         return{'FINISHED'}
@@ -281,9 +264,6 @@ class renderPanelLayout(View3DPanel, Panel):
         row = col.row(align=True)
         row.label('Available Servers: ' + str(len(scn['availableServers'])) + " / " + str(len(scn['availableServers']) + len(scn['offlineServers'])))
         row.operator("scene.refresh_num_available_servers", text="", icon="FILE_REFRESH")
-        
-        
-        
 #        row = layout.row(align=True)
 #        row = layout.row(align=True)
 #        row = layout.row(align=True)
