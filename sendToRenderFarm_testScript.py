@@ -3,9 +3,11 @@ import subprocess
 import telnetlib
 import sys
 import os, numpy
+import time
 from bpy.types import Menu, Panel, UIList
 from bpy.props import *
 
+renderStatus   = "None"
 projectPath    = bpy.path.abspath("//")         # the full project path, including <projectName>.blend
 projectName    = bpy.path.display_name_from_filepath(bpy.data.filepath)
 hostServer     = "cgearhar@asahel.cse.taylor.edu"
@@ -43,7 +45,6 @@ def checkNumAvailServers(scn):
 checkNumAvailServers(bpy.context.scene)
 
 def getFrames():
-    print()
     print("Getting frames...")
 
     print("verifying local directory...")
@@ -56,13 +57,14 @@ def getFrames():
     subprocess.call("ssh " + hostServer + " 'mkdir -p " + serverFilePath + ";'", shell=True)
 
     print("copying files from server...\n")
-    subprocess.call("rsync --exclude='*.blend' '" + hostServer + ":" + serverFilePath + "*' '" + dumpLocation + "'",shell=True)
+    process = subprocess.Popen("rsync --exclude='*.blend' '" + hostServer + ":" + serverFilePath + "*' '" + dumpLocation + "'", stdout=subprocess.PIPE, shell=True)
 
     print("Success!")
-    return
+    return process
 
 def averageFrames():
-    subprocess.call("python ~/my_scripts/averageFrames.py " + projectPath + " " + projectName, shell=True)
+    process = subprocess.Popen("python ~/my_scripts/averageFrames.py " + projectPath + " " + projectName, stdout=subprocess.PIPE, shell=True)
+    return process
    
 def renderFrames(startFrame, endFrame):
     bpy.ops.wm.save_mainfile()
@@ -76,9 +78,18 @@ def renderFrames(startFrame, endFrame):
 
     # run blender command to render given range from the remote server
     print("opening connection to " + hostServer + "...")
-    subprocess.call("ssh " + hostServer + " 'nohup blender_task.py -n " + projectName + " -s " + str(startFrame) + " -e " + str(endFrame) + " &'", shell=True)
+    process = subprocess.Popen("ssh " + hostServer + " 'nohup blender_task.py -n " + projectName + " -s " + str(startFrame) + " -e " + str(endFrame) + " &'",stdout=subprocess.PIPE, shell=True)
+    #subprocess.call("ssh " + hostServer + " 'nohup blender_task.py -n " + projectName + " -s " + str(startFrame) + " -e " + str(endFrame) + " &'", shell=True)
+    print("Process sent to remote servers!\n")
+    
+    return process
 
-    getFrames()
+def setRenderStatus(status):
+    global renderStatus
+    renderStatus = status
+
+def getRenderStatus():
+    return renderStatus
 
 class refreshNumAvailableServers(bpy.types.Operator):
     """Send to Render Farm"""                           # blender will use this as a tooltip for menu items and buttons.
@@ -110,28 +121,78 @@ class sendFrameToRenderFarm(bpy.types.Operator):
     bl_label   = "Render Current Frame on Remote Servers"   # display name in the interface.
     bl_options = {'REGISTER', 'UNDO'}                       # enable undo for the operator.
 
+    def modal(self, context, event):
+        if event.type in {'ESC'}:
+            self.cancel(context)
+            return {'CANCELLED'}
+
+        if event.type == 'TIMER':
+            self.process.poll()
+            
+            #reportedLine = self.process.stdout.readline()
+            #if reportedLine != "...":
+            #    self.report({'INFO'}, str(reportedLine))
+            
+            if self.process.returncode != None:
+                print("Render completed on remote servers!\n")
+                
+                # get rendered frames from remote servers
+                if(self.state == 1):
+                    self.report({'INFO'}, "Servers finished the render. Getting render files...")
+                    setRenderStatus("Fetching render files...")
+                    self.process = getFrames()
+                    self.state +=1
+                    return{'PASS_THROUGH'}
+                
+                # average the rendered frames
+                elif(self.state == 2):
+                    self.report({'INFO'}, "Averaging frames...")
+                    setRenderStatus("Averaging frames...")
+                    self.process = averageFrames()
+                    self.state += 1
+                    return{'PASS_THROUGH'}
+                
+                elif(self.state == 3):
+                    self.report({'INFO'}, "Render completed! View the rendered image in your UV/Image_Editor")
+                    setRenderStatus("Complete!")
+                    return{'FINISHED'}
+                else:
+                    self.report({'INFO'}, "ERROR: Current state not recognized.")
+                    setRenderStatus("ERROR")
+                    return{'FINISHED'}
+        
+        return{'PASS_THROUGH'}
+
     def execute(self, context):
         print()
         curFrame = bpy.data.scenes["Scene"].frame_current
 
-        renderFrames(curFrame,curFrame)
-        averageFrames()
-
-        averaged_image_filepath = projectPath + "render-dump/" + projectName + "_average.tga"
-        
         # change context for bpy.ops.image
-        area = bpy.context.area
-        old_type = area.type
-        area.type = 'IMAGE_EDITOR'
+        #area = bpy.context.area
+        #area.type = 'INFO'
         
-        bpy.ops.image.open(filepath=averaged_image_filepath)
+        # create timer for modal
+        wm = context.window_manager
+        self._timer = wm.event_timer_add(0.1, context.window)
+        wm.modal_handler_add(self)
+        
+        self.process = renderFrames(curFrame,curFrame)
+        self.state   = 1
+        
+        self.report({'INFO'}, "Starting render on all available remote servers...")
+        setRenderStatus("Rendering...")
 
-        return{'FINISHED'}
+        return{'RUNNING_MODAL'}
+    
+    def cancel(self, context):
+        wm = context.window_manager
+        wm.event_timer_remove(self._timer)
+        self.process.kill()
 
 class getRenderedFrames(bpy.types.Operator):
     """Get Rendered Frames"""                           # blender will use this as a tooltip for menu items and buttons.
     bl_idname  = "scene.get_rendered_frames"            # unique identifier for buttons and menu items to reference.
-    bl_label   = "Render Animation on Remote Servers"   # display name in the interface.
+    bl_label   = "render animation on remote servers"   # display name in the interface.
     bl_options = {'REGISTER', 'UNDO'}                   # enable undo for the operator.
 
     def execute(self, context):
@@ -139,13 +200,31 @@ class getRenderedFrames(bpy.types.Operator):
         return{'FINISHED'}
 
 class averageRenderedFrames(bpy.types.Operator):
-    """Average Rendered Frames"""                               # blender will use this as a tooltip for menu items and buttons.
-    bl_idname  = "scene.average_frames"            # unique identifier for buttons and menu items to reference.
-    bl_label   = "Render Current Frame on Remote Servers"   # display name in the interface.
+    """Average Rendered Frames"""                           # blender will use this as a tooltip for menu items and buttons.
+    bl_idname  = "scene.average_frames"                     # unique identifier for buttons and menu items to reference.
+    bl_label   = "Render current frame on remote servers"   # display name in the interface.
     bl_options = {'REGISTER', 'UNDO'}                       # enable undo for the operator.
 
     def execute(self, context):
         averageFrames()
+        return{'FINISHED'}
+
+class openRenderedImageInUI(bpy.types.Operator):
+    """Average Rendered Frames"""                                       # blender will use this as a tooltip for menu items and buttons.
+    bl_idname  = "scene.open_rendered_image"                            # unique identifier for buttons and menu items to reference.
+    bl_label   = "Open the average rendered frame in the Blender UI"    # display name in the interface.
+    bl_options = {'REGISTER', 'UNDO'}                                   # enable undo for the operator.
+    
+    def execute(self, context):
+        # change context for bpy.ops.image
+        area = bpy.context.area
+        old_type = area.type
+        area.type = 'IMAGE_EDITOR'
+                
+        # open rendered image
+        averaged_image_filepath = projectPath + "render-dump/" + projectName + "_average.tga"
+        bpy.ops.image.open(filepath=averaged_image_filepath)
+        
         return{'FINISHED'}
 
 class renderPanelLayout(View3DPanel, Panel):
@@ -157,6 +236,7 @@ class renderPanelLayout(View3DPanel, Panel):
         layout = self.layout
         scn = context.scene
         #layout.label("First row")
+        renderStatus = getRenderStatus()
 
         row = layout.row(align=True)
         row.label('Available Servers: ' + str(len(scn['availableServers'])) + " / " + str(len(scn['availableServers']) + len(scn['offlineServers'])))
@@ -170,11 +250,18 @@ class renderPanelLayout(View3DPanel, Panel):
         row.operator("scene.render_animation_on_servers", text="Animation", icon="RENDER_ANIMATION")
 
         row = layout.row(align=True)
-
-
+        if(renderStatus != "None"):
+            row.label('Render Status: ' + renderStatus)
+        
         row = layout.row(align=True)
-        row.operator("scene.get_rendered_frames", text="Get Frames", icon="IMAGE_DATA")
-        row.operator("scene.average_frames", text="Average Frames", icon="IMAGE_DATA")
+        if(renderStatus == "Complete!"):
+            row.operator("scene.open_rendered_image", text="Open Rendered Image", icon="FILE_IMAGE")
+        
+#        row = layout.row(align=True)
+#        row = layout.row(align=True)
+#        row = layout.row(align=True)
+#        row.operator("scene.get_rendered_frames", text="Get Frames", icon="IMAGE_DATA")
+#        row.operator("scene.average_frames", text="Average Frames", icon="IMAGE_DATA")
 
 def register():
     bpy.utils.register_module(__name__)
