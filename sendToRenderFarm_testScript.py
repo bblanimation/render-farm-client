@@ -78,8 +78,8 @@ def renderFrames(startFrame, endFrame):
 
     # run blender command to render given range from the remote server
     print("opening connection to " + hostServer + "...")
-    process = subprocess.Popen("ssh " + hostServer + " 'nohup blender_task.py -n " + projectName + " -s " + str(startFrame) + " -e " + str(endFrame) + " &'",stdout=subprocess.PIPE, shell=True)
-    #subprocess.call("ssh " + hostServer + " 'nohup blender_task.py -n " + projectName + " -s " + str(startFrame) + " -e " + str(endFrame) + " &'", shell=True)
+    process = subprocess.call("ssh " + hostServer + " 'nohup blender_task.py -p -n " + projectName + " -s " + str(startFrame) + " -e " + str(endFrame) + " &'", shell=True)
+    #subprocess.call("ssh " + hostServer + " 'nohup blender_task.py -p -n " + projectName + " -s " + str(startFrame) + " -e " + str(endFrame) + " &'", shell=True)
     print("Process sent to remote servers!\n")
     
     return process
@@ -166,6 +166,11 @@ class sendFrameToRenderFarm(bpy.types.Operator):
     def execute(self, context):
         print()
         curFrame = bpy.data.scenes["Scene"].frame_current
+        
+        if(len(bpy.data.cameras) == 0):
+            self.report({'WARNING'}, "RENDER FAILED: No camera in scene.")
+            setRenderStatus("Failed")
+
 
         # change context for bpy.ops.image
         #area = bpy.context.area

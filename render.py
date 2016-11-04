@@ -492,7 +492,7 @@ def sendToHostServer():
 
     # run blender command to render given range from the remote server
     print "opening connection to " + hostServer + "..."
-    subprocess.call("ssh " + hostServer + " 'blender_task.py -n " + projectName[:-6] + " -s " + str(frameStart) + " -e " + str(frameEnd) + "'", shell=True)
+    subprocess.call("ssh " + hostServer + " 'blender_task.py -p -n " + projectName[:-6] + " -s " + str(frameStart) + " -e " + str(frameEnd) + "'", shell=True)
 
     return True
 
