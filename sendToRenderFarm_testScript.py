@@ -8,7 +8,7 @@ from bpy.types import Menu, Panel, UIList
 from bpy.props import *
 
 renderStatus   = "None"
-projectPath    = bpy.path.abspath("//")         # the full project path, including <projectName>.blend
+projectPath    = bpy.path.abspath("//")
 projectName    = bpy.path.display_name_from_filepath(bpy.data.filepath)
 hostServer     = "cgearhar@asahel.cse.taylor.edu"
 serverFilePath = "/tmp/cgearhar/" + projectName + "/"
@@ -67,7 +67,7 @@ def averageFrames():
     return process
    
 def renderFrames(startFrame, endFrame):
-    bpy.ops.wm.save_mainfile()
+    bpy.ops.wm.save_as_mainfile(copy=True)
     
     print("verifying remote directory...")
     subprocess.call("ssh " + hostServer + " 'mkdir -p " + serverFilePath + ";'", shell=True)
@@ -78,8 +78,13 @@ def renderFrames(startFrame, endFrame):
 
     # run blender command to render given range from the remote server
     print("opening connection to " + hostServer + "...")
+<<<<<<< HEAD
     process = subprocess.call("ssh " + hostServer + " 'nohup blender_task.py -p -n " + projectName + " -s " + str(startFrame) + " -e " + str(endFrame) + " &'", shell=True)
     #subprocess.call("ssh " + hostServer + " 'nohup blender_task.py -p -n " + projectName + " -s " + str(startFrame) + " -e " + str(endFrame) + " &'", shell=True)
+=======
+    #process = subprocess.Popen("ssh " + hostServer + " 'nohup blender_task.py -p -n " + projectName + " -s " + str(startFrame) + " -e " + str(endFrame) + " &'", stdout=subprocess.PIPE, shell=True)
+    process = subprocess.Popen("ssh " + hostServer + " 'nohup blender_task.py -p -n " + projectName + " -s " + str(startFrame) + " -e " + str(endFrame) + " &'", shell=True)
+>>>>>>> development
     print("Process sent to remote servers!\n")
     
     return process
@@ -157,7 +162,7 @@ class sendFrameToRenderFarm(bpy.types.Operator):
                     setRenderStatus("Complete!")
                     return{'FINISHED'}
                 else:
-                    self.report({'INFO'}, "ERROR: Current state not recognized.")
+                    self.report({'WARNING'}, "ERROR: Current state not recognized.")
                     setRenderStatus("ERROR")
                     return{'FINISHED'}
         
@@ -165,6 +170,23 @@ class sendFrameToRenderFarm(bpy.types.Operator):
 
     def execute(self, context):
         print()
+        
+        global projectName
+        global projectPath
+        global serverFilePath
+        projectName = bpy.path.display_name_from_filepath(bpy.data.filepath)
+        serverFilePath = "/tmp/cgearhar/" + projectName + "/"
+ 
+        if projectName == "":
+            self.report({'WARNING'}, "You have not saved your project file. Please save it before attempting to render.")
+            setRenderStatus("Failed")
+            return{'FINISHED'}
+        
+        if bpy.context.scene.camera is None:
+            self.report({'WARNING'}, "RENDER FAILED: No camera in scene.")
+            setRenderStatus("Failed")
+            return{'FINISHED'}
+            
         curFrame = bpy.data.scenes["Scene"].frame_current
         
         if(len(bpy.data.cameras) == 0):
@@ -182,7 +204,7 @@ class sendFrameToRenderFarm(bpy.types.Operator):
         self._timer = wm.event_timer_add(0.1, context.window)
         wm.modal_handler_add(self)
         
-        self.process = renderFrames(curFrame,curFrame)
+        self.process = renderFrames(curFrame, curFrame)
         self.state   = 1
         
         self.report({'INFO'}, "Starting render on all available remote servers...")
@@ -243,32 +265,44 @@ class renderPanelLayout(View3DPanel, Panel):
         scn = context.scene
         #layout.label("First row")
         renderStatus = getRenderStatus()
-
+        
+              
         row = layout.row(align=True)
         row.label('Available Servers: ' + str(len(scn['availableServers'])) + " / " + str(len(scn['availableServers']) + len(scn['offlineServers'])))
         row.operator("scene.refresh_num_available_servers", text="", icon="FILE_REFRESH")
 
-        row = layout.row(align=True)
+        col = layout.column(align=True)
 
-        row = layout.row(align=True)
+        row = col.row(align=True)
         row.alignment = 'EXPAND'
         row.operator("scene.render_frame_on_servers", text="Render", icon="RENDER_STILL")
         row.operator("scene.render_animation_on_servers", text="Animation", icon="RENDER_ANIMATION")
-
-        row = layout.row(align=True)
+ 
+        col = layout.column(align=True)
+         
+        row = col.row(align=True)
+        row.label('Render Samples: ' + str((bpy.data.scenes['Scene'].cycles.samples)*len(scn['availableServers'])))
+         
+ 
         if(renderStatus != "None"):
             row.label('Render Status: ' + renderStatus)
-        
-        row = layout.row(align=True)
+         
         if(renderStatus == "Complete!"):
+            row = layout.row(align=True)
             row.operator("scene.open_rendered_image", text="Open Rendered Image", icon="FILE_IMAGE")
          
+<<<<<<< HEAD
 #        row = layout.row(align=True)
 #        row = layout.row(align=True)
 #        row = layout.row(align=True)
 #        row.operator("scene.get_rendered_frames", text="Get Frames", icon="IMAGE_DATA")
 #        row.operator("scene.average_frames", text="Average Frames", icon="IMAGE_DATA")
 
+=======
+        col = layout.column(align=True)
+         
+        
+>>>>>>> development
 def register():
     bpy.utils.register_module(__name__)
 
