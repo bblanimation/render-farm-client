@@ -170,6 +170,7 @@ class sendFrameToRenderFarm(bpy.types.Operator):
         if(len(bpy.data.cameras) == 0):
             self.report({'WARNING'}, "RENDER FAILED: No camera in scene.")
             setRenderStatus("Failed")
+            return{'FINISHED'}
 
 
         # change context for bpy.ops.image
