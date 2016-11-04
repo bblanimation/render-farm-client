@@ -78,13 +78,8 @@ def renderFrames(startFrame, endFrame):
 
     # run blender command to render given range from the remote server
     print("opening connection to " + hostServer + "...")
-<<<<<<< HEAD
-    process = subprocess.call("ssh " + hostServer + " 'nohup blender_task.py -p -n " + projectName + " -s " + str(startFrame) + " -e " + str(endFrame) + " &'", shell=True)
-    #subprocess.call("ssh " + hostServer + " 'nohup blender_task.py -p -n " + projectName + " -s " + str(startFrame) + " -e " + str(endFrame) + " &'", shell=True)
-=======
-    #process = subprocess.Popen("ssh " + hostServer + " 'nohup blender_task.py -p -n " + projectName + " -s " + str(startFrame) + " -e " + str(endFrame) + " &'", stdout=subprocess.PIPE, shell=True)
-    process = subprocess.Popen("ssh " + hostServer + " 'nohup blender_task.py -p -n " + projectName + " -s " + str(startFrame) + " -e " + str(endFrame) + " &'", shell=True)
->>>>>>> development
+    process = subprocess.Popen("ssh " + hostServer + " 'nohup blender_task.py -p -n " + projectName + " -s " + str(startFrame) + " -e " + str(endFrame) + " &'", stdout=subprocess.PIPE, shell=True)
+    #process = subprocess.Popen("ssh " + hostServer + " 'nohup blender_task.py -p -n " + projectName + " -s " + str(startFrame) + " -e " + str(endFrame) + " &'", shell=True)
     print("Process sent to remote servers!\n")
     
     return process
@@ -290,19 +285,7 @@ class renderPanelLayout(View3DPanel, Panel):
         if(renderStatus == "Complete!"):
             row = layout.row(align=True)
             row.operator("scene.open_rendered_image", text="Open Rendered Image", icon="FILE_IMAGE")
-         
-<<<<<<< HEAD
-#        row = layout.row(align=True)
-#        row = layout.row(align=True)
-#        row = layout.row(align=True)
-#        row.operator("scene.get_rendered_frames", text="Get Frames", icon="IMAGE_DATA")
-#        row.operator("scene.average_frames", text="Average Frames", icon="IMAGE_DATA")
 
-=======
-        col = layout.column(align=True)
-         
-        
->>>>>>> development
 def register():
     bpy.utils.register_module(__name__)
 
