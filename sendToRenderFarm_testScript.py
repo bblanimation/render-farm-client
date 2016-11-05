@@ -1,9 +1,4 @@
-import bpy
-import subprocess
-import telnetlib
-import sys
-import os, numpy
-import time
+import bpy, subprocess, telnetlib, sys, os, numpy, time, json
 from bpy.types import Menu, Panel, UIList
 from bpy.props import *
 
@@ -13,7 +8,19 @@ projectName    = bpy.path.display_name_from_filepath(bpy.data.filepath)
 hostServer     = "cgearhar@asahel.cse.taylor.edu"
 serverFilePath = "/tmp/cgearhar/" + projectName + "/"
 dumpLocation   = projectPath + "render-dump/"
-servers        = { 'cse218': ['cse21801','cse21802','cse21803','cse21804','cse21805','cse21806','cse21807','cse21808','cse21809','cse21810','cse21811','cse21812'], 'cse217': ['cse21701','cse21702','cse21703','cse21704','cse21705','cse21706','cse21707','cse21708','cse21709','cse21710','cse21711','cse21712','cse21713','cse21715','cse21716']}
+servers = {'cse21801group':    ['cse21801','cse21802','cse21803','cse21804','cse21805','cse21806','cse21807',
+                                'cse21808','cse21809','cse21810','cse21811','cse21812','cse21701','cse21702',
+                                'cse21703','cse21704','cse21705','cse21706','cse21707','cse21708','cse21709',
+                                'cse21710','cse21711','cse21712','cse21713','cse21714','cse21715','cse21716',
+                                'cse10301','cse10302','cse10303','cse10304','cse10305','cse10306','cse10307',
+                                'cse10309','cse10310','cse10311','cse10312','cse10315','cse10316','cse10317',
+                                'cse10318','cse10319','cse103podium',
+                                'cse20101','cse20102','cse20103','cse20104','cse20105','cse20106','cse20107',
+                                'cse20108','cse20109','cse20110','cse20111','cse20112','cse20113','cse20114',
+                                'cse20116','cse20117','cse20118','cse20119','cse20120','cse20121','cse20122',
+                                'cse20123','cse20124','cse20125','cse20126','cse20127','cse20128','cse20129',
+                                'cse20130','cse20131','cse20132','cse20133','cse20134','cse20135','cse20136'
+                                ]}
 
 class View3DPanel():
     bl_space_type  = "VIEW_3D"
@@ -58,8 +65,6 @@ def getFrames():
 
     print("copying files from server...\n")
     process = subprocess.Popen("rsync --exclude='*.blend' '" + hostServer + ":" + serverFilePath + "*' '" + dumpLocation + "'", stdout=subprocess.PIPE, shell=True)
-
-    print("Success!")
     return process
 
 def averageFrames():
@@ -78,8 +83,9 @@ def renderFrames(startFrame, endFrame):
 
     # run blender command to render given range from the remote server
     print("opening connection to " + hostServer + "...")
-    process = subprocess.Popen("ssh " + hostServer + " 'nohup blender_task.py -p -n " + projectName + " -s " + str(startFrame) + " -e " + str(endFrame) + " &'", stdout=subprocess.PIPE, shell=True)
-    #process = subprocess.Popen("ssh " + hostServer + " 'nohup blender_task.py -p -n " + projectName + " -s " + str(startFrame) + " -e " + str(endFrame) + " &'", shell=True)
+    process = subprocess.Popen("ssh " + hostServer + " 'nohup blender_task.py -p -n " + projectName + " -s " + str(startFrame) + " -e " + str(endFrame) + " &'", shell=True)
+    # To see output from 'blender_task.py', uncomment the following line and comment out the line above.
+    #subprocess.call("ssh " + hostServer + " 'nohup blender_task.py -p -n " + projectName + " -s " + str(startFrame) + " -e " + str(endFrame) + " &'", shell=True)
     print("Process sent to remote servers!\n")
     
     return process
@@ -124,30 +130,27 @@ class sendFrameToRenderFarm(bpy.types.Operator):
     def modal(self, context, event):
         if event.type in {'ESC'}:
             self.cancel(context)
+            self.report({'INFO'}, "Render process cancelled")
+            print("Process cancelled")
+            setRenderStatus("Cancelled")
             return {'CANCELLED'}
 
         if event.type == 'TIMER':
-            self.process.poll()
-            
-            #reportedLine = self.process.stdout.readline()
-            #if reportedLine != "...":
-            #    self.report({'INFO'}, str(reportedLine))
-            
+            self.process.poll()            
+                
             if self.process.returncode != None:
-                print("Render completed on remote servers!\n")
+                print("Process " + str(self.state) + " finished!\n")
                 
                 # get rendered frames from remote servers
                 if(self.state == 1):
-                    self.report({'INFO'}, "Servers finished the render. Getting render files...")
-                    setRenderStatus("Fetching render files...")
+                    print("Fetching render files...")
                     self.process = getFrames()
                     self.state +=1
                     return{'PASS_THROUGH'}
                 
                 # average the rendered frames
                 elif(self.state == 2):
-                    self.report({'INFO'}, "Averaging frames...")
-                    setRenderStatus("Averaging frames...")
+                    print("Averaging frames...")
                     self.process = averageFrames()
                     self.state += 1
                     return{'PASS_THROUGH'}
@@ -173,14 +176,19 @@ class sendFrameToRenderFarm(bpy.types.Operator):
         serverFilePath = "/tmp/cgearhar/" + projectName + "/"
  
         if projectName == "":
-            self.report({'WARNING'}, "You have not saved your project file. Please save it before attempting to render.")
+            self.report({'WARNING'}, "RENDER FAILED: You have not saved your project file. Please save it before attempting to render.")
             setRenderStatus("Failed")
             return{'FINISHED'}
-        
-        if bpy.context.scene.camera is None:
+        elif bpy.context.scene.camera is None:
             self.report({'WARNING'}, "RENDER FAILED: No camera in scene.")
             setRenderStatus("Failed")
             return{'FINISHED'}
+        elif not bpy.context.scene.render.image_settings.color_mode == 'RGB':
+            self.report({'WARNING'}, "RENDER FAILED: Due to current lack of functionality, this script only runs with 'RGB' color mode.")
+            setRenderStatus("Failed")
+            return{'FINISHED'}
+        else:
+            self.report({'INFO'}, "Rendering current frame on " + str(len(context.scene['availableServers'])) + " servers.")
             
         curFrame = bpy.data.scenes["Scene"].frame_current
         
@@ -199,6 +207,7 @@ class sendFrameToRenderFarm(bpy.types.Operator):
         self._timer = wm.event_timer_add(0.1, context.window)
         wm.modal_handler_add(self)
         
+        self.fiveSecTimer = 0
         self.process = renderFrames(curFrame, curFrame)
         self.state   = 1
         
@@ -280,11 +289,11 @@ class renderPanelLayout(View3DPanel, Panel):
          
  
         if(renderStatus != "None"):
+            row = col.row(align=True)
             row.label('Render Status: ' + renderStatus)
-         
-        if(renderStatus == "Complete!"):
-            row = layout.row(align=True)
-            row.operator("scene.open_rendered_image", text="Open Rendered Image", icon="FILE_IMAGE")
+            if(renderStatus == "Complete!"):
+                row = layout.row(align=True)
+                row.operator("scene.open_rendered_image", text="Open Rendered Image", icon="FILE_IMAGE")
 
 def register():
     bpy.utils.register_module(__name__)

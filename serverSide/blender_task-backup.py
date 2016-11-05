@@ -1,53 +1,15 @@
 #!/usr/bin/env python
 
-from __future__ import print_function
 import argparse
 import os,getpass,sys
 import subprocess
 import threading
 import telnetlib
-import json
-import re
-import fnmatch
 
-parser = argparse.ArgumentParser()
-parser.add_argument('-s','--start',action='store',default='1')
-parser.add_argument('-e','--end',action='store',default='1')
-parser.add_argument('-f','--project_file',action='store',default=False) # /full/path/to/project.blend
-parser.add_argument('-n','--project_name',action='store',default=False) # just projectname. default path will be in /tmp/blenderProjects
-parser.add_argument('-o','--output_file',action='store',default=False,help='local output file to rsync files back into when done')
-parser.add_argument('-v','--verbose',action=verbose_action,nargs='?',default=0)
-parser.add_argument('-S','--samples',action='store',default='50')
-parser.add_argument('-p','--progress',action='store_true',help='prints the progress to stdout as a json object')
 
-CSE_HOSTS = {'cse21801group': ['cse21801','cse21802','cse21803','cse21804','cse21805','cse21806','cse21807',
-                                'cse21808','cse21809','cse21810','cse21811','cse21812','cse21701','cse21702',
-                                'cse21703','cse21704','cse21705','cse21706','cse21707','cse21708','cse21709',
-                                'cse21710','cse21711','cse21712','cse21713','cse21715','cse21716',
-                                'cse10301','cse10302','cse10303','cse10304','cse10305','cse10306','cse10307',
-                                'cse10309','cse10310','cse10311','cse10312','cse10315','cse10316','cse10317',
-                                'cse10318','cse10319','cse103podium',
-                                'cse20101','cse20102','cse20103','cse20104','cse20105','cse20106','cse20107',
-                                'cse20108','cse20109','cse20110','cse20111','cse20112','cse20113','cse20114',
-                                'cse20116','cse20117','cse20118','cse20119','cse20120','cse20121','cse20122',
-                                'cse20123','cse20124','cse20125','cse20126','cse20127','cse20128','cse20129',
-                                'cse20130','cse20131','cse20132','cse20133','cse20134','cse20135','cse20136',
-                                'cse201podium'
-                                ]}
-status_regex = r"Fra:(\d)\s.*Time:(\d{2}:\d{2}\.\d{2}).*Remaining:(\d{2}:\d{2}\.\d{2})\s.*"
-
-def process_blender_output(hostname,line):
-    """ Fra:1 Mem:48.87M (0.00M, Peak 144.75M) | Time:00:05.29 | Remaining:00:02.06 | Mem:32.41M, Peak:128.29M | Scene, RenderLayer | Path Tracing Tile 1470/2040 """
-    matches = re.finditer(status_regex, line)
-    for matchNum, match in enumerate(matches):
-        matchNum = matchNum + 1
-        frame = match.group(1)
-        elapsed = match.group(2)
-        remainingTime = match.group(3)
-        # I realize this is kind of unnecessary, but I wanted the validation of json here.
-        json_obj = json.loads("{{ \"{hostname}\" : {{ \"rt\" : \"{remainingTime}\", \"cf\" : \"{frame}\", \"et\" : \"{elapsed}\" }} }}".format( hostname=hostname ,elapsed = elapsed,frame = frame,remainingTime = remainingTime))
-        print("##JSON##" + json.dumps(json_obj) + "##JSON##")
-        sys.stdout.flush()
+# DEFAULT_PROJECT_PATH = '/tmp/blenderProjects'
+# PROJECT_NAME = 'demo'
+# OUTPUT_PROJECT_PATH = '/tmp/%s/' % (PROJECT_NAME)
 
 # Thanks to: http://stackoverflow.com/questions/6076690/verbose-level-with-argparse-and-multiple-v-options
 class verbose_action(argparse.Action):
@@ -59,6 +21,17 @@ class verbose_action(argparse.Action):
         except ValueError:
             values = values.count('v')+1
         setattr(args,self.dest,values)
+
+parser = argparse.ArgumentParser()
+parser.add_argument('-s','--start',action='store',default='1')
+parser.add_argument('-e','--end',action='store',default='1')
+parser.add_argument('-f','--project_file',action='store',default=False) # /full/path/to/project.blend
+parser.add_argument('-n','--project_name',action='store',default=False) # just projectname. default path will be in /tmp/blenderProjects
+parser.add_argument('-o','--output_file',action='store',default=False,help='local output file to rsync files back into when done')
+parser.add_argument('-v','--verbose',action=verbose_action,nargs='?',default=0)
+parser.add_argument('-S','--samples',action='store',default='50')
+
+CSE_HOSTS = {'cse21801group': ['cse21801','cse21802','cse21803','cse21804','cse21805','cse21806','cse21807','cse21808','cse21809','cse21810','cse21811','cse21812','cse21701','cse21702','cse21703','cse21704','cse21705','cse21706','cse21707','cse21708','cse21709','cse21710','cse21711','cse21712','cse21713','cse21715','cse21716']}
 
 # This way if we come up with a good dynamic way to figure out the hosts we have to use we are using a function anyway.
 def get_hosts(groupName=None):
@@ -77,7 +50,7 @@ def rsync_files_string(username,hostname,projectName,projectPath):
     projectFullPath = "%s/%s.blend" % (projectPath,projectName)
     return ssh_command_string(username,hostname,"mkdir -p /tmp/%s/%s;rsync -a %s %s@%s:/tmp/%s/%s" % (username,projectName,projectFullPath,username,hostname,username,projectName))
 
-def start_blender_tasks(projectName,projectPath,projectFullPath,hostname,username,jobString,projectOutuptFile,jobStatus,startFrame,endFrame,verbose=0,progress=False):
+def start_blender_tasks(projectName,projectPath,projectFullPath,hostname,username,jobString,projectOutuptFile,jobStatus,startFrame,endFrame,verbose=0):
     print("Starting thread. Rendering from %s to %s on %s" % (startFrame,endFrame,hostname))
     sys.stdout.flush()
     # First copy the files over using rsync
@@ -92,28 +65,21 @@ def start_blender_tasks(projectName,projectPath,projectFullPath,hostname,usernam
     if(verbose >= 2):
         print("Returned from rsync command: %d" % (p))
         sys.stdout.flush()
-        if(p == 0): print ("Success!")
+        if(p == 0): print "Success!"
     # Now start the blender command
     if(verbose >= 2):
-        print ("blender command: %s" % (blendString))
+        print "blender command: %s" % (blendString)
 
-    # with open(os.devnull, "w") as f:
-    print(blendString.split())
-    q = subprocess.Popen(blendString.split(),stdout=subprocess.PIPE)
-    # This blocks til q is done
-    while(type(q.poll()) == type(None)):
-        # This blocks til there is something to read
-        line = q.stdout.readline()
-        if(progress):
-            process_blender_output(hostname,line)
+    with open(os.devnull, "w") as f:
+        q = subprocess.call(blendString,stdout=f,shell=True)
 
-    if( q.returncode == 0 ):
-        print ("Successfully completed render for frames (%d-%d) on hostname %s." % (startFrame,endFrame,hostname))
+    if( q == 0 ):
+        print "Successfully completed render for frames (%d-%d) on hostname %s." % (startFrame,endFrame,hostname)
         jobStatus[jobString] = dict()
         jobStatus[jobString]['blend'] = 0
         sys.stdout.flush()
     else:
-        print("blender error: %d" % (q.returncode))
+        print("blender error: %d" % (q))
 
     # Now rsync the files in /tmp/<name>/render back to this host.
     rsyncPullFiles = "mkdir -p %s;rsync -atu --remove-source-files %s@%s:/tmp/%s/%s/render/%s* %s." % (projectOutuptFile,username,hostname,username,projectName,projectName,projectOutuptFile)
@@ -121,7 +87,7 @@ def start_blender_tasks(projectName,projectPath,projectFullPath,hostname,usernam
         print("rsync command: %s" % (rsyncPullFiles))
     r = subprocess.call(rsyncPullFiles,shell=True)
 
-    if( r == 0 and q.returncode == 0 ):
+    if( r == 0 and q == 0 ):
         jobStatus[jobString]['rsync'] = 0
         print( "Render frames (%d-%d) have been copied back from hostname %s" % (startFrame,endFrame,hostname))
         sys.stdout.flush()
@@ -171,7 +137,7 @@ def main():
     sys.stdout.flush()
 
     if(args.verbose >= 2):
-        print (args)
+        print args
     username    = getpass.getuser()
 
     if(args.project_name):
@@ -220,11 +186,6 @@ def main():
 
     if(not(args.output_file)):
         projectOutuptFile = "/tmp/%s/%s/" % ( username,projectName )
-        for file in os.listdir(projectOutuptFile):
-            if( fnmatch.fnmatch(file,'*_seed-*') or fnmatch.fnmatch(file,'*.tga') ):
-                if( args.verbose > 1 ):
-                    print('Removing %s from project dir.' % (projectOutuptFile + file))
-                os.remove(projectOutuptFile + file)
 
     print ("Rendering from %s to %s in %s" % (args.start,args.end,projectName))
     sys.stdout.flush()
@@ -244,8 +205,8 @@ def main():
     numHosts = len(hosts)
 
     print ("")
-    print ("Could not reach the following hosts: ",unreachable)
-    print ("Using the following %d hosts: " % (numHosts), hosts)
+    print "Could not reach the following hosts: ",unreachable
+    print "Using the following %d hosts: " % (numHosts), hosts
     print ("")
 
     sys.stdout.flush()
@@ -255,8 +216,8 @@ def main():
     jobStrings  = buildJobStrings(frames,projectName,username)
 
     if(args.verbose >= 2):
-        print ("Frames: ", frames)
-        print ("Blender Commands: ", jobStrings)
+        print "Frames: ", frames
+        print "Blender Commands: ", jobStrings
 
     rsync_threads = []
     jobStatus = {}
@@ -271,7 +232,6 @@ def main():
             'hostname': hostname,
             'username': username,
             'verbose': args.verbose,
-            'progress': args.progress,
             'projectOutuptFile' : projectOutuptFile,
             'jobString' : jobString,
             'jobStatus' : jobStatus,
