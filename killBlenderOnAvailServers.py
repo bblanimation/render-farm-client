@@ -10,6 +10,7 @@ def importCSE_HOSTS():
         f = open("HOSTS.txt", "r")
     except:
         print "Whoops! File could not be opened. Make sure 'CSE_HOSTS.txt' is in the same directory as this script file."
+        return ""
 
     CSE_HOSTS = ast.literal_eval(f.readline())
 
@@ -56,6 +57,8 @@ def killBlenderOnAvailServers(hosts):
 
 def main():
     CSE_HOSTS = importCSE_HOSTS()
+    if CSE_HOSTS == "":
+        sys.exit()
     hosts = getAvailableHosts(CSE_HOSTS)
     killBlenderOnAvailServers(hosts)
 
