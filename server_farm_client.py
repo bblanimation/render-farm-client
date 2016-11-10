@@ -2,7 +2,7 @@
 bl_info = {
     "name"        : "Server Farm Client",
     "author"      : "Christopher Gearhart <chris@bblanimation.com>",
-    "version"     : (0, 4, 0),
+    "version"     : (0, 4, 1),
     "blender"     : (2, 76, 0),
     "description" : "Render your scene on a remote server farm with this addon.",
     "warning"     : "",
@@ -30,8 +30,8 @@ servers = {'cse218':    ['cse21801','cse21802','cse21803','cse21804','cse21805',
                          'cse21715','cse21716'],
            'cse103':    ['cse10301','cse10302','cse10303','cse10304','cse10305','cse10306','cse10307',
                          'cse10309','cse10310','cse10311','cse10312','cse10315','cse10316','cse10317',
-                         'cse10318','cse10319','cse103podium',
-                         'cse20101','cse20102','cse20103','cse20104','cse20105','cse20106','cse20107',
+                         'cse10318','cse10319','cse103podium'],
+           'cse201':    ['cse20101','cse20102','cse20103','cse20104','cse20105','cse20106','cse20107',
                          'cse20108','cse20109','cse20110','cse20111','cse20112','cse20113','cse20114',
                          'cse20116','cse20117','cse20118','cse20119','cse20120','cse20121','cse20122',
                          'cse20123','cse20124','cse20125','cse20126','cse20127','cse20128','cse20129',
@@ -68,6 +68,9 @@ def jobIsValid(jobType):
     if projectName == "":
         setRenderStatus(jobType, "Failed")
         return {"valid":False, "errorType":"ERROR", "errorMessage":"RENDER FAILED: You have not saved your project file. Please save it before attempting to render."}
+    elif " " in projectName:
+        setRenderStatus(jobType, "Failed")
+        return {"valid":False, "errorType":"ERROR", "errorMessage":"RENDER ABORTED: Please remove ' ' (spaces) from the project file name."}
     elif bpy.context.scene.camera is None:
         setRenderStatus(jobType, "Failed")
         return {"valid":False, "errorType":"ERROR", "errorMessage":"RENDER FAILED: No camera in scene."}
@@ -93,14 +96,14 @@ def getFrames():
     subprocess.call("ssh " + hostServer + " 'mkdir -p " + serverFilePath + ";'", shell=True)
 
     print("copying files from server...\n")
-    process = subprocess.Popen("rsync --exclude='*.blend' '" + hostServer + ":" + serverFilePath + "*' '" + dumpLocation + "'", stdout=subprocess.PIPE, shell=True)
+    process = subprocess.Popen("rsync --remove-source-files --exclude='*.blend' '" + hostServer + ":" + serverFilePath + "*' '" + dumpLocation + "'", stdout=subprocess.PIPE, shell=True)
     return process
 
 def averageFrames():
     process = subprocess.Popen("python ~/my_scripts/averageFrames.py " + projectPath + " " + projectName, stdout=subprocess.PIPE, shell=True)
     return process
 
-def renderFrames(startFrame, endFrame):
+def cleanLocalDirectoryForGetFrames():
     bpy.ops.wm.save_as_mainfile(copy=True)
 
     print("verifying remote directory...")
@@ -108,15 +111,15 @@ def renderFrames(startFrame, endFrame):
 
     # set up project folder in remote server
     print("copying blender project files...")
-    subprocess.call("rsync -a --copy-links --include=" + projectName + ".blend --exclude='*' '" + projectPath + "' '" + hostServer + ":" + serverFilePath + "'", shell=True)
+    process = subprocess.Popen("rsync -a --copy-links --include=" + projectName + ".blend --exclude='*' '" + projectPath + "' '" + hostServer + ":" + serverFilePath + "'", shell=True)
+    return process
 
+def renderFrames(startFrame, endFrame):
     # run blender command to render given range from the remote server
     print("opening connection to " + hostServer + "...")
     process = subprocess.Popen("ssh " + hostServer + " 'nohup blender_task.py -n " + projectName + " -s " + str(startFrame) + " -e " + str(endFrame) + " &'", shell=True)
-    # To see output from 'blender_task.py', uncomment the following line and comment out the line above.
-    #subprocess.call("ssh " + hostServer + " 'nohup blender_task.py -p -n " + projectName + " -s " + str(startFrame) + " -e " + str(endFrame) + " &'", shell=True)
+    # To see output from 'blender_task.py', add the -p tag to the 'blender_task.py' call above
     print("Process sent to remote servers!\n")
-
     return process
 
 def setRenderStatus(key, status):
@@ -152,6 +155,8 @@ def setGlobalProjectVars():
     projectName    = bpy.path.display_name_from_filepath(bpy.data.filepath)
     serverFilePath = "/tmp/cgearhar/" + projectName + "/"
     dumpLocation   = projectPath + "render-dump/"
+    print(projectPath)
+    print(projectName)
 
 
 def killAllBlender():
@@ -189,28 +194,35 @@ class sendFrameToRenderFarm(bpy.types.Operator):
             if self.process.returncode != None:
                 print("Process " + str(self.state) + " finished!\n")
 
-                # prepare local dump location, and move previous files to backup subdirectory
+                # start render process at current frame
                 if(self.state == 1):
-                    print("Preparing local directory...")
-                    self.process = cleanLocalDirectoryForGetFrames()
+                    self.process = renderFrames(self.curFrame, self.curFrame)
                     self.state += 1
                     return{'PASS_THROUGH'}
 
+                # prepare local dump location, and move previous files to backup subdirectory
+                if(self.state == 2):
+                    print("Preparing local directory...")
+                    self.process = cleanLocalDirectoryForGetFrames()
+                    self.state += 1
+                    setRenderStatus("image", "Finishing...")
+                    return{'PASS_THROUGH'}
+
                 # get rendered frames from remote servers
-                elif(self.state == 2):
+                elif(self.state == 3):
                     print("Fetching render files...")
                     self.process = getFrames()
                     self.state += 1
                     return{'PASS_THROUGH'}
 
                 # average the rendered frames
-                elif(self.state == 3):
+                elif(self.state == 4):
                     print("Averaging frames...")
                     self.process = averageFrames()
                     self.state += 1
                     return{'PASS_THROUGH'}
 
-                elif(self.state == 4):
+                elif(self.state == 5):
                     self.report({'INFO'}, "Render completed! View the rendered image in your UV/Image_Editor")
                     setRenderStatus("image", "Complete!")
                     appendViewable("image")
@@ -228,24 +240,24 @@ class sendFrameToRenderFarm(bpy.types.Operator):
             self.report({'WARNING'}, "Render in progress...")
             return{'FINISHED'}
 
+        # init global project variables
+        setGlobalProjectVars()
+
         # ensure the job won't break the script
         jobValidityDict = jobIsValid("image")
         if not jobValidityDict["valid"]:
             self.report({jobValidityDict["errorType"]}, jobValidityDict["errorMessage"])
             return{'FINISHED'}
 
-        # init global project variables
-        setGlobalProjectVars()
-
         # create timer for modal
         wm = context.window_manager
         self._timer = wm.event_timer_add(0.1, context.window)
         wm.modal_handler_add(self)
 
-        # start render process at current frame and initialize state
-        curFrame = context.scene.frame_current
-        self.process = renderFrames(curFrame, curFrame)
-        self.state   = 1
+        # start initial render process
+        self.curFrame = context.scene.frame_current
+        self.process = cleanLocalDirectoryForGetFrames()
+        self.state   = 1  # initializes state for modal
 
         self.report({'INFO'}, "Rendering current frame on " + str(len(context.scene['availableServers'])) + " servers.")
         setRenderStatus("image", "Rendering...")
@@ -277,21 +289,28 @@ class sendAnimationToRenderFarm(bpy.types.Operator):
             if self.process.returncode != None:
                 print("Process " + str(self.state) + " finished!\n")
 
-                # prepare local dump location, and move previous files to backup subdirectory
+                # start render process from the defined start and end frames
                 if(self.state == 1):
-                    print("Preparing local directory...")
-                    self.process = cleanLocalDirectoryForGetFrames()
+                    self.process = renderFrames(self.startFrame, self.endFrame)
                     self.state += 1
                     return{'PASS_THROUGH'}
 
+                # prepare local dump location, and move previous files to backup subdirectory
+                if(self.state == 2):
+                    print("Preparing local directory...")
+                    self.process = cleanLocalDirectoryForGetFrames()
+                    self.state += 1
+                    setRenderStatus("animation", "Finishing...")
+                    return{'PASS_THROUGH'}
+
                 # get rendered frames from remote servers
-                elif(self.state == 2):
+                elif(self.state == 3):
                     print("Fetching render files...")
                     self.process = getFrames()
                     self.state +=1
                     return{'PASS_THROUGH'}
 
-                elif(self.state == 3):
+                elif(self.state == 4):
                     self.report({'INFO'}, "Render completed! View the rendered animation in '//render/'")
                     setRenderStatus("animation", "Complete!")
                     appendViewable("animation")
@@ -308,25 +327,25 @@ class sendAnimationToRenderFarm(bpy.types.Operator):
             self.report({'WARNING'}, "Render in progress...")
             return{'FINISHED'}
 
+        # init global project variables
+        setGlobalProjectVars()
+
         # ensure the job won't break the script
         jobValidityDict = jobIsValid("animation")
         if not jobValidityDict["valid"]:
             self.report({jobValidityDict["errorType"]}, jobValidityDict["errorMessage"])
             return{'FINISHED'}
 
-        # init global project variables
-        setGlobalProjectVars()
-
         # create timer for modal
         wm = context.window_manager
         self._timer = wm.event_timer_add(0.1, context.window)
         wm.modal_handler_add(self)
 
-        # start render process at the defined start and end frames
-        startFrame = context.scene.frame_start
-        endFrame   = context.scene.frame_end
-        self.process = renderFrames(startFrame, endFrame)
-        self.state   = 1   # initializes state for modal
+        # start initial render process
+        self.startFrame = context.scene.frame_start
+        self.endFrame   = context.scene.frame_end
+        self.process    = cleanLocalDirectoryForGetFrames()
+        self.state      = 1   # initializes state for modal
 
         self.report({'INFO'}, "Rendering animation on " + str(len(context.scene['availableServers'])) + " servers.")
         setRenderStatus("animation", "Rendering...")
