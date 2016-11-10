@@ -25,7 +25,7 @@ def importCSE_HOSTS():
     f.close()
 
     return CSE_HOSTS
-        
+
 
 def getAvailableHosts(CSE_HOSTS):
     hosts       = []
@@ -38,7 +38,7 @@ def getAvailableHosts(CSE_HOSTS):
             except:
                 unreachable.append(host)
     return { 'hosts':hosts, 'unreachable':unreachable }
-        
+
 def handleArguments():
     global testing
 
@@ -56,7 +56,7 @@ def handleArguments():
         else:
             testing = True
             frames = list(set(sys.argv[2].replace("[", "").replace("]", "").split(",")))
-        
+
         #check to make sure argument list items are valid
         for i in range(len(frames)-1, -1, -1):
             # handles ranges in argument
@@ -105,7 +105,11 @@ def getAvailableHosts(CSE_HOSTS):
             except:
                 unreachable.append(host)
     return { 'hosts':hosts, 'unreachable':unreachable }
-        
+
+"[1,3,10-25,83]"
+
+[1,3,10,11,...,25,83]
+
 def sendSpecificFrames(hosts, unreachable, frames):
     if testing:
         print "running sendSpecificFrames in TESTING mode..."

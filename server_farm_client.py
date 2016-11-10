@@ -2,14 +2,13 @@
 bl_info = {
     "name"        : "Server Farm Client",
     "author"      : "Christopher Gearhart <chris@bblanimation.com>",
-    "version"     : (0, 4, 1),
+    "version"     : (0, 4, 3),
     "blender"     : (2, 76, 0),
     "description" : "Render your scene on a remote server farm with this addon.",
     "warning"     : "",
     "wiki_url"    : "",
     "tracker_url" : "",
-    "category"    : "Render",
-}
+    "category"    : "Render"}
 
 import bpy, subprocess, telnetlib, sys, os, numpy, time, json, math
 from bpy.types import (Menu, Panel, UIList, Operator, AddonPreferences, PropertyGroup)
@@ -103,7 +102,37 @@ def averageFrames():
     process = subprocess.Popen("python ~/my_scripts/averageFrames.py " + projectPath + " " + projectName, stdout=subprocess.PIPE, shell=True)
     return process
 
-def cleanLocalDirectoryForGetFrames():
+def buildFrameRangesString(frameRanges):
+    #frameRanges = "1,3,10-13, 20"
+    frameRanges = frameRanges.replace(" ", "")
+    #frameRanges = "1,3,10-13,20"
+    frameRangeList = frameRanges.split(",")
+    #frameRangeList = ["1","3","10-13","20"]
+    newFrameRangeList = []
+    for string in frameRangeList:
+        try:
+            newInt = int(string)
+            if newInt not in newFrameRangeList:
+                newFrameRangeList.append(newInt)
+        except:
+            if "-" in string:
+                newString = string.split("-")
+                if len(newString) > 2:
+                    return { "valid":False, "string":None }
+                try:
+                    newInt1 = int(newString[0])
+                    newInt2 = int(newString[1])
+                    if newInt1 <= newInt2:
+                        newFrameRangeList.append([newInt1,newInt2])
+                    else:
+                        return { "valid":False, "string":None }
+                except:
+                    return { "valid":False, "string":None }
+            else:
+                return { "valid":False, "string":None }
+    return { "valid":True, "string":str(newFrameRangeList).replace(" ","") }
+
+def cleanLocalDirectoryForRenderFrames():
     bpy.ops.file.pack_all()
     bpy.ops.wm.save_as_mainfile(copy=True)
 
@@ -159,7 +188,6 @@ def setGlobalProjectVars():
     print(projectPath)
     print(projectName)
 
-
 def killAllBlender():
     setKillingStatus("running...")
     process = subprocess.Popen("python ~/my_scripts/killAllBlender.py", stdout=subprocess.PIPE, shell=True)
@@ -199,6 +227,7 @@ class sendFrameToRenderFarm(bpy.types.Operator):
                 if(self.state == 1):
                     self.process = renderFrames("[" + str(self.curFrame) + "]")
                     self.state += 1
+                    setRenderStatus("image", "Rendering...")
                     return{'PASS_THROUGH'}
 
                 # prepare local dump location, and move previous files to backup subdirectory
@@ -237,7 +266,7 @@ class sendFrameToRenderFarm(bpy.types.Operator):
 
     def execute(self, context):
         # ensure no other image render processes are running
-        if(getRenderStatus("image") == "Rendering..."):
+        if(getRenderStatus("image") in ["Rendering...", "Preparing files..."]):
             self.report({'WARNING'}, "Render in progress...")
             return{'FINISHED'}
 
@@ -257,11 +286,11 @@ class sendFrameToRenderFarm(bpy.types.Operator):
 
         # start initial render process
         self.curFrame = context.scene.frame_current
-        self.process = cleanLocalDirectoryForGetFrames()
+        self.process = cleanLocalDirectoryForRenderFrames()
         self.state   = 1  # initializes state for modal
 
         self.report({'INFO'}, "Rendering current frame on " + str(len(context.scene['availableServers'])) + " servers.")
-        setRenderStatus("image", "Rendering...")
+        setRenderStatus("image", "Preparing files...")
 
         return{'RUNNING_MODAL'}
 
@@ -278,7 +307,7 @@ class sendAnimationToRenderFarm(bpy.types.Operator):
 
     def modal(self, context, event):
         scn = context.scene
-        
+
         if event.type in {'ESC'}:
             self.cancel(context)
             self.report({'INFO'}, "Render process cancelled")
@@ -297,7 +326,14 @@ class sendAnimationToRenderFarm(bpy.types.Operator):
                     if scn.frameRanges == "":
                         self.process = renderFrames("[" + str(self.startFrame) + "-" + str(self.endFrame) + "]")
                     else:
-                        self.process = renderFrames("[" + scn.frameRanges + "]")
+                        frameRangesDict = buildFrameRangesString(scn.frameRanges)
+                        if(frameRangesDict["valid"]):
+                            self.process = renderFrames(frameRangesDict["string"])
+                        else:
+                            self.report({'ERROR'}, "ERROR: Invalid frame ranges given.")
+                            setRenderStatus("animation", "ERROR")
+                            return{'FINISHED'}
+                    setRenderStatus("animation", "Rendering...")
                     self.state += 1
                     return{'PASS_THROUGH'}
 
@@ -329,7 +365,7 @@ class sendAnimationToRenderFarm(bpy.types.Operator):
         return{'PASS_THROUGH'}
 
     def execute(self, context):# ensure no other animation render processes are running
-        if(getRenderStatus("animation") == "Rendering..."):
+        if(getRenderStatus("animation") in ["Rendering...","Preparing files..."]):
             self.report({'WARNING'}, "Render in progress...")
             return{'FINISHED'}
 
@@ -350,11 +386,11 @@ class sendAnimationToRenderFarm(bpy.types.Operator):
         # start initial render process
         self.startFrame = context.scene.frame_start
         self.endFrame   = context.scene.frame_end
-        self.process    = cleanLocalDirectoryForGetFrames()
+        self.process    = cleanLocalDirectoryForRenderFrames()
         self.state      = 1   # initializes state for modal
 
         self.report({'INFO'}, "Rendering animation on " + str(len(context.scene['availableServers'])) + " servers.")
-        setRenderStatus("animation", "Rendering...")
+        setRenderStatus("animation", "Preparing files...")
 
         return{'RUNNING_MODAL'}
 
@@ -608,12 +644,11 @@ class drawFrameRangePanel(View3DPanel, Panel):
     bl_idname   = "VIEW3D_PT_frame_range"
     bl_context  = "objectmode"
     bl_category = "Render"
-    bl_options = {'DEFAULT_CLOSED'}
 
     def draw(self, context):
         layout = self.layout
         scn = context.scene
-        
+
         col = layout.column(align=True)
         row = col.row(align=True)
         row.prop(scn, "frameRanges")
@@ -646,13 +681,13 @@ class drawAdminOptionsPanel(View3DPanel, Panel):
 
 def register():
     # initialize check box for displaying render sampling details
-    bpy.types.Scene.boolTool = bpy.props.BoolProperty(
+    bpy.types.Scene.boolTool = BoolProperty(
         name="Show Details",
         description="Display details for render sample settings",
         default = False)
-    
-    # initialize frame range string text box    
-    bpy.types.Scene.frameRanges = bpy.props.StringProperty(
+
+    # initialize frame range string text box
+    bpy.types.Scene.frameRanges = StringProperty(
         name = "Frames")
 
     bpy.utils.register_module(__name__)
