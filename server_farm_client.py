@@ -104,6 +104,7 @@ def averageFrames():
     return process
 
 def cleanLocalDirectoryForGetFrames():
+    bpy.ops.file.pack_all()
     bpy.ops.wm.save_as_mainfile(copy=True)
 
     print("verifying remote directory...")
@@ -114,10 +115,10 @@ def cleanLocalDirectoryForGetFrames():
     process = subprocess.Popen("rsync -a --copy-links --include=" + projectName + ".blend --exclude='*' '" + projectPath + "' '" + hostServer + ":" + serverFilePath + "'", shell=True)
     return process
 
-def renderFrames(startFrame, endFrame):
+def renderFrames(frameRange):
     # run blender command to render given range from the remote server
     print("opening connection to " + hostServer + "...")
-    process = subprocess.Popen("ssh " + hostServer + " 'nohup blender_task.py -n " + projectName + " -s " + str(startFrame) + " -e " + str(endFrame) + " &'", shell=True)
+    process = subprocess.Popen("ssh " + hostServer + " 'nohup blender_task.py -n " + projectName + " -l " + frameRange + " &'", shell=True)
     # To see output from 'blender_task.py', add the -p tag to the 'blender_task.py' call above
     print("Process sent to remote servers!\n")
     return process
@@ -196,7 +197,7 @@ class sendFrameToRenderFarm(bpy.types.Operator):
 
                 # start render process at current frame
                 if(self.state == 1):
-                    self.process = renderFrames(self.curFrame, self.curFrame)
+                    self.process = renderFrames("[" + str(self.curFrame) + "]")
                     self.state += 1
                     return{'PASS_THROUGH'}
 
@@ -276,6 +277,8 @@ class sendAnimationToRenderFarm(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}                   # enable undo for the operator.
 
     def modal(self, context, event):
+        scn = context.scene
+        
         if event.type in {'ESC'}:
             self.cancel(context)
             self.report({'INFO'}, "Render process cancelled")
@@ -291,7 +294,10 @@ class sendAnimationToRenderFarm(bpy.types.Operator):
 
                 # start render process from the defined start and end frames
                 if(self.state == 1):
-                    self.process = renderFrames(self.startFrame, self.endFrame)
+                    if scn.frameRanges == "":
+                        self.process = renderFrames("[" + str(self.startFrame) + "-" + str(self.endFrame) + "]")
+                    else:
+                        self.process = renderFrames("[" + scn.frameRanges + "]")
                     self.state += 1
                     return{'PASS_THROUGH'}
 
@@ -605,11 +611,12 @@ class drawFrameRangePanel(View3DPanel, Panel):
     bl_options = {'DEFAULT_CLOSED'}
 
     def draw(self, context):
-        col = layout.col(align=True)
+        layout = self.layout
+        scn = context.scene
+        
+        col = layout.column(align=True)
         row = col.row(align=True)
-        row.label('Frame Range:')
-        # include option to type in frame range here
-
+        row.prop(scn, "frameRanges")
 
 class drawAdminOptionsPanel(View3DPanel, Panel):
     bl_label    = "Admin Tasks"
@@ -643,6 +650,10 @@ def register():
         name="Show Details",
         description="Display details for render sample settings",
         default = False)
+    
+    # initialize frame range string text box    
+    bpy.types.Scene.frameRanges = bpy.props.StringProperty(
+        name = "Frames")
 
     bpy.utils.register_module(__name__)
 
