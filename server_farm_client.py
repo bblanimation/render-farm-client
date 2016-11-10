@@ -1,40 +1,50 @@
+#!BPY
+bl_info = {
+    "name"        : "Server Farm Client",
+    "author"      : "Christopher Gearhart <chris@bblanimation.com>",
+    "version"     : (0, 4, 0),
+    "blender"     : (2, 76, 0),
+    "description" : "Render your scene on a remote server farm with this addon.",
+    "warning"     : "",
+    "wiki_url"    : "",
+    "tracker_url" : "",
+    "category"    : "Render",
+}
+
 import bpy, subprocess, telnetlib, sys, os, numpy, time, json, math
 from bpy.types import (Menu, Panel, UIList, Operator, AddonPreferences, PropertyGroup)
 from bpy.props import *
 
 renderStatus   = {"animation":"None", "image":"None"}
 killingStatus  = "None"
-projectPath    = bpy.path.abspath("//")
-projectName    = bpy.path.display_name_from_filepath(bpy.data.filepath)
+projectPath    = ""
+projectName    = ""
 hostServer     = "cgearhar@asahel.cse.taylor.edu"
-serverFilePath = "/tmp/cgearhar/" + projectName + "/"
-dumpLocation   = projectPath + "render-dump/"
+serverFilePath = ""
+dumpLocation   = ""
 renderType     = []
-servers = {'cse21801group':    ['cse21801','cse21802','cse21803','cse21804','cse21805','cse21806','cse21807',
-                                'cse21808','cse21809','cse21810','cse21811','cse21812','cse21701','cse21702',
-                                'cse21703','cse21704','cse21705','cse21706','cse21707','cse21708','cse21709',
-                                'cse21710','cse21711','cse21712','cse21713','cse21714','cse21715','cse21716',
-                                'cse10301','cse10302','cse10303','cse10304','cse10305','cse10306','cse10307',
-                                'cse10309','cse10310','cse10311','cse10312','cse10315','cse10316','cse10317',
-                                'cse10318','cse10319','cse103podium',
-                                'cse20101','cse20102','cse20103','cse20104','cse20105','cse20106','cse20107',
-                                'cse20108','cse20109','cse20110','cse20111','cse20112','cse20113','cse20114',
-                                'cse20116','cse20117','cse20118','cse20119','cse20120','cse20121','cse20122',
-                                'cse20123','cse20124','cse20125','cse20126','cse20127','cse20128','cse20129',
-                                'cse20130','cse20131','cse20132','cse20133','cse20134','cse20135','cse20136'
-                                ]}
+servers = {'cse218':    ['cse21801','cse21802','cse21803','cse21804','cse21805','cse21806','cse21807',
+                         'cse21808','cse21809','cse21810','cse21811','cse21812'],
+           'cse217':    ['cse21701','cse21702','cse21703','cse21704','cse21705','cse21706','cse21707',
+                         'cse21708','cse21709','cse21710','cse21711','cse21712','cse21713','cse21714',
+                         'cse21715','cse21716'],
+           'cse103':    ['cse10301','cse10302','cse10303','cse10304','cse10305','cse10306','cse10307',
+                         'cse10309','cse10310','cse10311','cse10312','cse10315','cse10316','cse10317',
+                         'cse10318','cse10319','cse103podium',
+                         'cse20101','cse20102','cse20103','cse20104','cse20105','cse20106','cse20107',
+                         'cse20108','cse20109','cse20110','cse20111','cse20112','cse20113','cse20114',
+                         'cse20116','cse20117','cse20118','cse20119','cse20120','cse20121','cse20122',
+                         'cse20123','cse20124','cse20125','cse20126','cse20127','cse20128','cse20129',
+                         'cse20130','cse20131','cse20132','cse20133','cse20134','cse20135','cse20136'
+                         ]}
 
 class View3DPanel():
     bl_space_type  = "VIEW_3D"
     bl_region_type = "TOOLS"
 
 def checkNumAvailServers(scn):
-    global availableServers
-
-    bpy.types.Scene.availableServers   = StringProperty(
-        name = "Available Servers")
-    bpy.types.Scene.offlineServers = StringProperty(
-        name = "Offline Servers")
+    bpy.types.Scene.availableServers = StringProperty(name = "Available Servers")
+    bpy.types.Scene.offlineServers   = StringProperty(name = "Offline Servers")
 
     hosts       = []
     unreachable = []
@@ -49,29 +59,26 @@ def checkNumAvailServers(scn):
     scn['availableServers'] = hosts
     scn['offlineServers']   = unreachable
 
+    for a in bpy.context.screen.areas:
+        a.tag_redraw()
+
     return
 
-checkNumAvailServers(bpy.context.scene)
-
-def jobIsValid():
+def jobIsValid(jobType):
     if projectName == "":
-        self.report({'ERROR'}, "RENDER FAILED: You have not saved your project file. Please save it before attempting to render.")
-        setRenderStatus("Failed")
-        return False
+        setRenderStatus(jobType, "Failed")
+        return {"valid":False, "errorType":"ERROR", "errorMessage":"RENDER FAILED: You have not saved your project file. Please save it before attempting to render."}
     elif bpy.context.scene.camera is None:
-        self.report({'ERROR'}, "RENDER FAILED: No camera in scene.")
-        setRenderStatus("Failed")
-        return False
+        setRenderStatus(jobType, "Failed")
+        return {"valid":False, "errorType":"ERROR", "errorMessage":"RENDER FAILED: No camera in scene."}
     elif not bpy.context.scene.render.image_settings.color_mode == 'RGB':
-        self.report({'ERROR'}, "RENDER FAILED: Due to current lack of functionality, this script only runs with 'RGB' color mode.")
-        setRenderStatus("Failed")
-        return False
+        setRenderStatus(jobType, "Failed")
+        return {"valid":False, "errorType":"ERROR", "errorMessage":"RENDER FAILED: Due to current lack of functionality, this script only runs with 'RGB' color mode."}
     elif not bpy.context.scene.cycles.progressive == 'BRANCHED_PATH':
-        self.report({'WARNING'}, "RENDER ABORTED: Please use the 'Branched Path Tracing' sampling option for an accurate threaded render.")
-        setRenderStatus("Failed")
-        return False
+        setRenderStatus(jobType, "Failed")
+        return {"valid":False, "errorType":"WARNING", "errorMessage":"RENDER ABORTED: Please use the 'Branched Path Tracing' sampling option for an accurate threaded render."}
     else:
-        return True
+        return {"valid":True, "errorType":None, "errorMessage":None}
 
 def cleanLocalDirectoryForGetFrames():
     print("verifying local directory...")
@@ -92,10 +99,10 @@ def getFrames():
 def averageFrames():
     process = subprocess.Popen("python ~/my_scripts/averageFrames.py " + projectPath + " " + projectName, stdout=subprocess.PIPE, shell=True)
     return process
-   
+
 def renderFrames(startFrame, endFrame):
     bpy.ops.wm.save_as_mainfile(copy=True)
-    
+
     print("verifying remote directory...")
     subprocess.call("ssh " + hostServer + " 'mkdir -p " + serverFilePath + ";'", shell=True)
 
@@ -109,7 +116,7 @@ def renderFrames(startFrame, endFrame):
     # To see output from 'blender_task.py', uncomment the following line and comment out the line above.
     #subprocess.call("ssh " + hostServer + " 'nohup blender_task.py -p -n " + projectName + " -s " + str(startFrame) + " -e " + str(endFrame) + " &'", shell=True)
     print("Process sent to remote servers!\n")
-    
+
     return process
 
 def setRenderStatus(key, status):
@@ -117,7 +124,7 @@ def setRenderStatus(key, status):
     renderStatus[key] = status
     for a in bpy.context.screen.areas:
         a.tag_redraw()
-        
+
 def getRenderStatus(key):
     return renderStatus[key]
 
@@ -126,7 +133,7 @@ def setKillingStatus(status):
     killingStatus = status
     for a in bpy.context.screen.areas:
         a.tag_redraw()
-        
+
 def getKillingStatus():
     return killingStatus
 
@@ -136,10 +143,16 @@ def appendViewable(typeOfRender):
         renderType.append(typeOfRender)
 
 def setGlobalProjectVars():
+    global projectPath
     global projectName
     global serverFilePath
+    global dumpLocation
+
+    projectPath    = bpy.path.abspath("//")
     projectName    = bpy.path.display_name_from_filepath(bpy.data.filepath)
     serverFilePath = "/tmp/cgearhar/" + projectName + "/"
+    dumpLocation   = projectPath + "render-dump/"
+
 
 def killAllBlender():
     setKillingStatus("running...")
@@ -153,86 +166,8 @@ class refreshNumAvailableServers(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}                   # enable undo for the operator.
 
     def execute(self, context):
-        process = checkNumAvailServers(bpy.context.scene)
+        checkNumAvailServers(context.scene)
         return {'FINISHED'}
-
-class sendAnimationToRenderFarm(bpy.types.Operator):
-    """Render animation on remote servers"""            # blender will use this as a tooltip for menu items and buttons.
-    bl_idname  = "scene.render_animation_on_servers"    # unique identifier for buttons and menu items to reference.
-    bl_label   = "Render animation on remote servers"   # display name in the interface.
-    bl_options = {'REGISTER', 'UNDO'}                   # enable undo for the operator.
-
-    def modal(self, context, event):
-        if event.type in {'ESC'}:
-            self.cancel(context)
-            self.report({'INFO'}, "Render process cancelled")
-            print("Process cancelled")
-            setRenderStatus("animation", "Cancelled")
-            return {'CANCELLED'}
-
-        if event.type == 'TIMER':
-            self.process.poll()            
-                
-            if self.process.returncode != None:
-                print("Process " + str(self.state) + " finished!\n")
-                
-                # prepare local dump location, and move previous files to backup subdirectory
-                if(self.state == 1):
-                    print("Preparing local directory...")
-                    self.process = cleanLocalDirectoryForGetFrames()
-                    self.state += 1
-                    return{'PASS_THROUGH'}
-                
-                # get rendered frames from remote servers
-                elif(self.state == 2):
-                    print("Fetching render files...")
-                    self.process = getFrames()
-                    self.state +=1
-                    return{'PASS_THROUGH'}
-                
-                elif(self.state == 3):
-                    self.report({'INFO'}, "Render completed! View the rendered animation in '//render/'")
-                    setRenderStatus("animation", "Complete!")
-                    appendViewable("animation")
-                    return{'FINISHED'}
-                else:
-                    self.report({'ERROR'}, "ERROR: Current state not recognized.")
-                    setRenderStatus("animation", "ERROR")
-                    return{'FINISHED'}
-        
-        return{'PASS_THROUGH'}
-
-    def execute(self, context):
-        if(getRenderStatus("animation") == "Rendering..."):
-            self.report({'WARNING'}, "Render in progress...")
-            return{'FINISHED'}
-
-        setGlobalProjectVars()
-        
-        # ensure the job won't break the script
-        if not jobIsValid():
-            return{'FINISHED'}
- 
-        # create timer for modal
-        wm = context.window_manager
-        self._timer = wm.event_timer_add(0.1, context.window)
-        wm.modal_handler_add(self)
-        
-        # start render process at the defined start and end frames
-        startFrame = bpy.context.scene.frame_start
-        endFrame   = bpy.context.scene.frame_end
-        self.process = renderFrames(startFrame, endFrame)
-        self.state   = 1   # initializes state for modal
-        
-        self.report({'INFO'}, "Rendering animation on " + str(len(context.scene['availableServers'])) + " servers.")
-        setRenderStatus("animation", "Rendering...")
-
-        return{'RUNNING_MODAL'}
-    
-    def cancel(self, context):
-        wm = context.window_manager
-        wm.event_timer_remove(self._timer)
-        self.process.kill()
 
 class sendFrameToRenderFarm(bpy.types.Operator):
     """Render current frame on remote servers"""            # blender will use this as a tooltip for menu items and buttons.
@@ -249,32 +184,32 @@ class sendFrameToRenderFarm(bpy.types.Operator):
             return {'CANCELLED'}
 
         if event.type == 'TIMER':
-            self.process.poll()            
-                
+            self.process.poll()
+
             if self.process.returncode != None:
                 print("Process " + str(self.state) + " finished!\n")
-                
+
                 # prepare local dump location, and move previous files to backup subdirectory
                 if(self.state == 1):
                     print("Preparing local directory...")
                     self.process = cleanLocalDirectoryForGetFrames()
                     self.state += 1
                     return{'PASS_THROUGH'}
-                
+
                 # get rendered frames from remote servers
                 elif(self.state == 2):
                     print("Fetching render files...")
                     self.process = getFrames()
                     self.state += 1
                     return{'PASS_THROUGH'}
-                
+
                 # average the rendered frames
                 elif(self.state == 3):
                     print("Averaging frames...")
                     self.process = averageFrames()
                     self.state += 1
                     return{'PASS_THROUGH'}
-                
+
                 elif(self.state == 4):
                     self.report({'INFO'}, "Render completed! View the rendered image in your UV/Image_Editor")
                     setRenderStatus("image", "Complete!")
@@ -284,34 +219,120 @@ class sendFrameToRenderFarm(bpy.types.Operator):
                     self.report({'ERROR'}, "ERROR: Current state not recognized.")
                     setRenderStatus("image", "ERROR")
                     return{'FINISHED'}
-        
+
         return{'PASS_THROUGH'}
 
     def execute(self, context):
+        # ensure no other image render processes are running
         if(getRenderStatus("image") == "Rendering..."):
             self.report({'WARNING'}, "Render in progress...")
             return{'FINISHED'}
-        setGlobalProjectVars()
-        
+
         # ensure the job won't break the script
-        if not jobIsValid():
+        jobValidityDict = jobIsValid("image")
+        if not jobValidityDict["valid"]:
+            self.report({jobValidityDict["errorType"]}, jobValidityDict["errorMessage"])
             return{'FINISHED'}
- 
+
+        # init global project variables
+        setGlobalProjectVars()
+
         # create timer for modal
         wm = context.window_manager
         self._timer = wm.event_timer_add(0.1, context.window)
         wm.modal_handler_add(self)
-        
+
         # start render process at current frame and initialize state
-        curFrame = bpy.context.scene.frame_current
+        curFrame = context.scene.frame_current
         self.process = renderFrames(curFrame, curFrame)
         self.state   = 1
-        
+
         self.report({'INFO'}, "Rendering current frame on " + str(len(context.scene['availableServers'])) + " servers.")
         setRenderStatus("image", "Rendering...")
 
         return{'RUNNING_MODAL'}
-    
+
+    def cancel(self, context):
+        wm = context.window_manager
+        wm.event_timer_remove(self._timer)
+        self.process.kill()
+
+class sendAnimationToRenderFarm(bpy.types.Operator):
+    """Render animation on remote servers"""            # blender will use this as a tooltip for menu items and buttons.
+    bl_idname  = "scene.render_animation_on_servers"    # unique identifier for buttons and menu items to reference.
+    bl_label   = "Render animation on remote servers"   # display name in the interface.
+    bl_options = {'REGISTER', 'UNDO'}                   # enable undo for the operator.
+
+    def modal(self, context, event):
+        if event.type in {'ESC'}:
+            self.cancel(context)
+            self.report({'INFO'}, "Render process cancelled")
+            print("Process cancelled")
+            setRenderStatus("animation", "Cancelled")
+            return {'CANCELLED'}
+
+        if event.type == 'TIMER':
+            self.process.poll()
+
+            if self.process.returncode != None:
+                print("Process " + str(self.state) + " finished!\n")
+
+                # prepare local dump location, and move previous files to backup subdirectory
+                if(self.state == 1):
+                    print("Preparing local directory...")
+                    self.process = cleanLocalDirectoryForGetFrames()
+                    self.state += 1
+                    return{'PASS_THROUGH'}
+
+                # get rendered frames from remote servers
+                elif(self.state == 2):
+                    print("Fetching render files...")
+                    self.process = getFrames()
+                    self.state +=1
+                    return{'PASS_THROUGH'}
+
+                elif(self.state == 3):
+                    self.report({'INFO'}, "Render completed! View the rendered animation in '//render/'")
+                    setRenderStatus("animation", "Complete!")
+                    appendViewable("animation")
+                    return{'FINISHED'}
+                else:
+                    self.report({'ERROR'}, "ERROR: Current state not recognized.")
+                    setRenderStatus("animation", "ERROR")
+                    return{'FINISHED'}
+
+        return{'PASS_THROUGH'}
+
+    def execute(self, context):# ensure no other animation render processes are running
+        if(getRenderStatus("animation") == "Rendering..."):
+            self.report({'WARNING'}, "Render in progress...")
+            return{'FINISHED'}
+
+        # ensure the job won't break the script
+        jobValidityDict = jobIsValid("animation")
+        if not jobValidityDict["valid"]:
+            self.report({jobValidityDict["errorType"]}, jobValidityDict["errorMessage"])
+            return{'FINISHED'}
+
+        # init global project variables
+        setGlobalProjectVars()
+
+        # create timer for modal
+        wm = context.window_manager
+        self._timer = wm.event_timer_add(0.1, context.window)
+        wm.modal_handler_add(self)
+
+        # start render process at the defined start and end frames
+        startFrame = context.scene.frame_start
+        endFrame   = context.scene.frame_end
+        self.process = renderFrames(startFrame, endFrame)
+        self.state   = 1   # initializes state for modal
+
+        self.report({'INFO'}, "Rendering animation on " + str(len(context.scene['availableServers'])) + " servers.")
+        setRenderStatus("animation", "Rendering...")
+
+        return{'RUNNING_MODAL'}
+
     def cancel(self, context):
         wm = context.window_manager
         wm.event_timer_remove(self._timer)
@@ -342,41 +363,41 @@ class openRenderedImageInUI(bpy.types.Operator):
     bl_idname  = "scene.open_rendered_image"                            # unique identifier for buttons and menu items to reference.
     bl_label   = "Open the average rendered frame in the Blender UI"    # display name in the interface.
     bl_options = {'REGISTER', 'UNDO'}                                   # enable undo for the operator.
-    
+
     def execute(self, context):
         # change context for bpy.ops.image
-        area = bpy.context.area
+        area = context.area
         old_type = area.type
         area.type = 'IMAGE_EDITOR'
-                
+
         # open rendered image
         averaged_image_filepath = projectPath + "render-dump/" + projectName + "_average.tga"
         bpy.ops.image.open(filepath=averaged_image_filepath)
-        
+
         return{'FINISHED'}
-    
+
 class openRenderedAnimationInUI(bpy.types.Operator):
     """Average Rendered Animation"""                                    # blender will use this as a tooltip for menu items and buttons.
     bl_idname  = "scene.open_rendered_animation"                        # unique identifier for buttons and menu items to reference.
     bl_label   = "Open the rendered animation in image sequence node and display in Blender's UI" # display name in the interface.
     bl_options = {'REGISTER', 'UNDO'}                                   # enable undo for the operator.
-    
+
     def execute(self, context):
         # create image node and import all pngs in sequence
         # set the node to an image sequence
         # ???
-        
+
         # change context for bpy.ops.image
-        area = bpy.context.area
+        area = context.area
         old_type = area.type
         area.type = 'IMAGE_EDITOR'
-        
+
         self.report({'WARNING'}, "'Open Rendered Animation' functionality currently not supported")
-                
+
         # open rendered image
         # averaged_image_filepath = projectPath + "render-dump/" + projectName + "_average.tga"
         # bpy.ops.image.open(filepath=averaged_image_filepath)
-        
+
         return{'FINISHED'}
 
 class killBlender(bpy.types.Operator):
@@ -393,27 +414,27 @@ class killBlender(bpy.types.Operator):
             return {'CANCELLED'}
 
         if event.type == 'TIMER':
-            self.process.poll()            
-                
+            self.process.poll()
+
             if self.process.returncode != None:
                 self.report({'INFO'}, "Kill All Blender Process Finished!")
                 setKillingStatus("Finished")
                 return{'FINISHED'}
-        
+
         return{'PASS_THROUGH'}
-        
+
 
     def execute(self, context):
         # create timer for modal
         wm = context.window_manager
         self._timer = wm.event_timer_add(0.1, context.window)
         wm.modal_handler_add(self)
-        
+
         # start killAllBlender process
         self.process = killAllBlender()
-        
+
         self.report({'INFO'}, "Killing blender processes on " + str(len(context.scene['availableServers'])) + " servers...")
-        
+
         return{'RUNNING_MODAL'}
 
     def cancel(self, context):
@@ -421,13 +442,13 @@ class killBlender(bpy.types.Operator):
         wm.event_timer_remove(self._timer)
         self.process.kill()
 
-class renderPanelLayout(View3DPanel, Panel):
-    bl_label    = "Send to Servers"
-    bl_idname   = "VIEW3D_PT_tools_send_to_servers"
+class drawRenderOnServersPanel(View3DPanel, Panel):
+    bl_label    = "Render on Servers"
+    bl_idname   = "VIEW3D_PT_tools_render_on_servers"
     bl_context  = "objectmode"
     bl_category = "Render"
 
-    
+
     my_bool = BoolProperty(
         name="Enable or Disable",
         description="Display details for final calculated render samples",
@@ -439,64 +460,18 @@ class renderPanelLayout(View3DPanel, Panel):
         scn = context.scene
         imRenderStatus = getRenderStatus("image")
         animRenderStatus = getRenderStatus("animation")
-        
-        # Available Servers Info      
-        row = layout.row(align=True)
-        row.label('Available Servers: ' + str(len(scn['availableServers'])) + " / " + str(len(scn['availableServers']) + len(scn['offlineServers'])))
-        row.operator("scene.refresh_num_available_servers", text="", icon="FILE_REFRESH")
+
+        # Available Servers Info
+        col = layout.column(align=True)
+        row = col.row(align=True)
+        availableServerString = 'Available Servers: ' + str(len(scn['availableServers'])) + " / " + str(len(scn['availableServers']) + len(scn['offlineServers']))
+        row.operator("scene.refresh_num_available_servers", text=availableServerString, icon="FILE_REFRESH")
 
         # Render Buttons
-        col = layout.column(align=True)
         row = col.row(align=True)
         row.alignment = 'EXPAND'
         row.operator("scene.render_frame_on_servers", text="Render", icon="RENDER_STILL")
         row.operator("scene.render_animation_on_servers", text="Animation", icon="RENDER_ANIMATION")
- 
-        # Basic Render Samples Info
-        col = layout.column(align=True)
-        row = col.row(align=True)
-        aaSampleSize = scn.cycles.aa_samples
-        squared = False
-        if(scn.cycles.use_square_samples):
-            squared = True
-            aaSampleSize = aaSampleSize**2
-        row.label('AA Samples: ' + str(math.floor(aaSampleSize*len(scn['availableServers']) * 2 / 3)))
-        
-        # Show/Hide Details Checkbox
-        row.prop(scn, "boolTool")
-        
-        # Shown/Hidden Details
-        if(scn.boolTool):
-            if(squared):
-                diff  = math.floor(aaSampleSize*(scn.cycles.diffuse_samples**2)*len(scn['availableServers']) * 2 / 3)
-                glos  = math.floor(aaSampleSize*(scn.cycles.glossy_samples**2)*len(scn['availableServers']) * 2 / 3)
-                tran  = math.floor(aaSampleSize*(scn.cycles.transmission_samples**2)*len(scn['availableServers']) * 2 / 3)
-                ao    = math.floor(aaSampleSize*(scn.cycles.ao_samples**2)*len(scn['availableServers']) * 2 / 3)
-                meshL = math.floor(aaSampleSize*(scn.cycles.mesh_light_samples**2)*len(scn['availableServers']) * 2 / 3)
-                sub   = math.floor(aaSampleSize*(scn.cycles.subsurface_samples**2)*len(scn['availableServers']) * 2 / 3)
-                vol   = math.floor(aaSampleSize*(scn.cycles.volume_samples**2)*len(scn['availableServers']) * 2 / 3)
-            else:
-                diff  = math.floor(aaSampleSize*(scn.cycles.diffuse_samples)*len(scn['availableServers']) * 2 / 3)
-                glos  = math.floor(aaSampleSize*(scn.cycles.glossy_samples)*len(scn['availableServers']) * 2 / 3)
-                tran  = math.floor(aaSampleSize*(scn.cycles.transmission_samples)*len(scn['availableServers']) * 2 / 3)
-                ao    = math.floor(aaSampleSize*(scn.cycles.ao_samples)*len(scn['availableServers']) * 2 / 3)
-                meshL = math.floor(aaSampleSize*(scn.cycles.mesh_light_samples)*len(scn['availableServers']) * 2 / 3)
-                sub   = math.floor(aaSampleSize*(scn.cycles.subsurface_samples)*len(scn['availableServers']) * 2 / 3)
-                vol   = math.floor(aaSampleSize*(scn.cycles.volume_samples)*len(scn['availableServers']) * 2 / 3)
-            row = col.row(align=True)    
-            row.label('• Diffuse: ' + str(diff))
-            row = col.row(align=True)
-            row.label('• Glossy: ' + str(glos))
-            row = col.row(align=True)
-            row.label('• Transmission: ' + str(tran))
-            row = col.row(align=True)
-            row.label('• AO: ' + str(ao))
-            row = col.row(align=True)
-            row.label('• Mesh Light: ' + str(meshL))
-            row = col.row(align=True)
-            row.label('• Subsurface: ' + str(sub))
-            row = col.row(align=True)
-            row.label('• Volume: ' + str(vol))
 
         # Render Status Info
         if(imRenderStatus != "None" and animRenderStatus != "None"):
@@ -511,7 +486,7 @@ class renderPanelLayout(View3DPanel, Panel):
             layout.separator()
             row = col.row(align=True)
             row.label('Render Status: ' + animRenderStatus)
-        
+
 
         # display buttons to view render(s)
         row = layout.row(align=True)
@@ -520,24 +495,121 @@ class renderPanelLayout(View3DPanel, Panel):
         if "animation" in renderType:
             row.operator("scene.open_rendered_animation", text="View Animation", icon="FILE_MOVIE")
 
-class renderPanelLayout(View3DPanel, Panel):
-    bl_label    = "Admin Options"
+    def invoke(self, context, layout):
+        checkNumAvailServers(context.scene)
+        return{'RUNNING_MODAL'}
+
+class drawSamplesPanel(View3DPanel, Panel):
+    bl_label    = "Sampling"
+    bl_idname   = "VIEW3D_PT_sampling"
+    bl_context  = "objectmode"
+    bl_category = "Render"
+
+    def draw(self, context):
+        layout = self.layout
+        scn = context.scene
+
+        # Basic Render Samples Info
+        col = layout.column(align=True)
+        row = col.row(align=True)
+
+        if not context.scene.cycles.progressive == 'BRANCHED_PATH':
+            sampleSize = scn.cycles.samples
+            if(scn.cycles.use_square_samples):
+                sampleSize = sampleSize**2
+            if sampleSize < 8:
+                row.label('Samples: Too few samples')
+            else:
+                row.label("Samples: " + str(math.floor(sampleSize*len(scn['availableServers']) * 2 / 3)) + " (Switch to 'Branched Path Tracing')")
+        else:
+            # find AA sample size first (this affects other sample sizes)
+            aaSampleSize = scn.cycles.aa_samples
+            squared = False
+            if(scn.cycles.use_square_samples):
+                squared = True
+                aaSampleSize = aaSampleSize**2
+
+            # Show/Hide Details Checkbox
+            #row.prop(scn, "boolTool")
+
+            # Shown/Hidden Details
+            #if(scn.boolTool):
+            if(squared):
+                aa    = math.floor(aaSampleSize*len(scn['availableServers']) * 2 / 3)
+                diff  = math.floor(aaSampleSize*(scn.cycles.diffuse_samples**2)*len(scn['availableServers']) * 2 / 3)
+                glos  = math.floor(aaSampleSize*(scn.cycles.glossy_samples**2)*len(scn['availableServers']) * 2 / 3)
+                tran  = math.floor(aaSampleSize*(scn.cycles.transmission_samples**2)*len(scn['availableServers']) * 2 / 3)
+                ao    = math.floor(aaSampleSize*(scn.cycles.ao_samples**2)*len(scn['availableServers']) * 2 / 3)
+                meshL = math.floor(aaSampleSize*(scn.cycles.mesh_light_samples**2)*len(scn['availableServers']) * 2 / 3)
+                sub   = math.floor(aaSampleSize*(scn.cycles.subsurface_samples**2)*len(scn['availableServers']) * 2 / 3)
+                vol   = math.floor(aaSampleSize*(scn.cycles.volume_samples**2)*len(scn['availableServers']) * 2 / 3)
+            else:
+                aa    = math.floor(aaSampleSize*len(scn['availableServers']) * 2 / 3)
+                diff  = math.floor(aaSampleSize*(scn.cycles.diffuse_samples)*len(scn['availableServers']) * 2 / 3)
+                glos  = math.floor(aaSampleSize*(scn.cycles.glossy_samples)*len(scn['availableServers']) * 2 / 3)
+                tran  = math.floor(aaSampleSize*(scn.cycles.transmission_samples)*len(scn['availableServers']) * 2 / 3)
+                ao    = math.floor(aaSampleSize*(scn.cycles.ao_samples)*len(scn['availableServers']) * 2 / 3)
+                meshL = math.floor(aaSampleSize*(scn.cycles.mesh_light_samples)*len(scn['availableServers']) * 2 / 3)
+                sub   = math.floor(aaSampleSize*(scn.cycles.subsurface_samples)*len(scn['availableServers']) * 2 / 3)
+                vol   = math.floor(aaSampleSize*(scn.cycles.volume_samples)*len(scn['availableServers']) * 2 / 3)
+
+            row = col.row(align=True)
+            row.label('AA:')
+            row.label(str(aa))
+            row = col.row(align=True)
+            row.label('Diffuse:')
+            row.label(str(diff))
+            row = col.row(align=True)
+            row.label('Glossy:')
+            row.label(str(glos))
+            row = col.row(align=True)
+            row.label('Transmission:')
+            row.label(str(tran))
+            row = col.row(align=True)
+            row.label('AO:')
+            row.label(str(ao))
+            row = col.row(align=True)
+            row.label('Mesh Light:')
+            row.label(str(meshL))
+            row = col.row(align=True)
+            row.label('Subsurface:')
+            row.label(str(sub))
+            row = col.row(align=True)
+            row.label('Volume:')
+            row.label(str(vol))
+
+class drawFrameRangePanel(View3DPanel, Panel):
+    bl_label    = "Frame Range"
+    bl_idname   = "VIEW3D_PT_frame_range"
+    bl_context  = "objectmode"
+    bl_category = "Render"
+    bl_options = {'DEFAULT_CLOSED'}
+
+    def draw(self, context):
+        col = layout.col(align=True)
+        row = col.row(align=True)
+        row.label('Frame Range:')
+        # include option to type in frame range here
+
+
+class drawAdminOptionsPanel(View3DPanel, Panel):
+    bl_label    = "Admin Tasks"
     bl_idname   = "VIEW3D_PT_tools_admin_options"
     bl_context  = "objectmode"
     bl_category = "Render"
     bl_options = {'DEFAULT_CLOSED'}
-    
+
     def draw(self, context):
         layout = self.layout
         scn = context.scene
         killingStatus = getKillingStatus()
-        
+
         # Render Buttons
         col = layout.column(align=True)
         row = col.row(align=True)
         row.alignment = 'EXPAND'
         row.operator("scene.kill_blender", text="Kill All Blender Processes", icon="CANCEL")
-        
+
         # Killall Blender Status
         if(killingStatus != "None"):
             row = col.row(align=True)
@@ -545,12 +617,14 @@ class renderPanelLayout(View3DPanel, Panel):
                 row.label('<placeholder> Blender processes killed!')
             else:
                 row.label('Killing blender on remote servers...')
-        
+
 def register():
+    # initialize check box for displaying render sampling details
     bpy.types.Scene.boolTool = bpy.props.BoolProperty(
         name="Show Details",
         description="Display details for render sample settings",
         default = False)
+
     bpy.utils.register_module(__name__)
 
 def unregister():
@@ -560,4 +634,4 @@ def unregister():
 if __name__ == "__main__":
     register()
 
-print("Render Farm Loaded")
+print("'sendToRenderFarm' Script Loaded")
