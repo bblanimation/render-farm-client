@@ -2,7 +2,7 @@
 bl_info = {
     "name"        : "Server Farm Client",
     "author"      : "Christopher Gearhart <chris@bblanimation.com>",
-    "version"     : (0, 4, 3),
+    "version"     : (0, 4, 4),
     "blender"     : (2, 76, 0),
     "description" : "Render your scene on a remote server farm with this addon.",
     "warning"     : "",
@@ -63,21 +63,18 @@ def checkNumAvailServers(scn):
 
     return
 
-def jobIsValid(jobType):
-    if projectName == "":
-        setRenderStatus(jobType, "Failed")
+def jobIsValid(jobType, availableServers):
+    if availableServers == 0:
+        return {"valid":False, "errorType":"ERROR", "errorMessage":"RENDER FAILED: Unable to connect to remote servers."}
+    elif projectName == "":
         return {"valid":False, "errorType":"ERROR", "errorMessage":"RENDER FAILED: You have not saved your project file. Please save it before attempting to render."}
     elif " " in projectName:
-        setRenderStatus(jobType, "Failed")
         return {"valid":False, "errorType":"ERROR", "errorMessage":"RENDER ABORTED: Please remove ' ' (spaces) from the project file name."}
     elif bpy.context.scene.camera is None:
-        setRenderStatus(jobType, "Failed")
         return {"valid":False, "errorType":"ERROR", "errorMessage":"RENDER FAILED: No camera in scene."}
     elif not bpy.context.scene.render.image_settings.color_mode == 'RGB':
-        setRenderStatus(jobType, "Failed")
         return {"valid":False, "errorType":"ERROR", "errorMessage":"RENDER FAILED: Due to current lack of functionality, this script only runs with 'RGB' color mode."}
     elif not bpy.context.scene.cycles.progressive == 'BRANCHED_PATH':
-        setRenderStatus(jobType, "Failed")
         return {"valid":False, "errorType":"WARNING", "errorMessage":"RENDER ABORTED: Please use the 'Branched Path Tracing' sampling option for an accurate threaded render."}
     else:
         return {"valid":True, "errorType":None, "errorMessage":None}
@@ -272,9 +269,10 @@ class sendFrameToRenderFarm(bpy.types.Operator):
 
         # init global project variables
         setGlobalProjectVars()
+        checkNumAvailServers(context.scene)
 
         # ensure the job won't break the script
-        jobValidityDict = jobIsValid("image")
+        jobValidityDict = jobIsValid("image", len(context.scene['availableServers']))
         if not jobValidityDict["valid"]:
             self.report({jobValidityDict["errorType"]}, jobValidityDict["errorMessage"])
             return{'FINISHED'}
@@ -371,9 +369,10 @@ class sendAnimationToRenderFarm(bpy.types.Operator):
 
         # init global project variables
         setGlobalProjectVars()
+        checkNumAvailServers(context.scene)
 
         # ensure the job won't break the script
-        jobValidityDict = jobIsValid("animation")
+        jobValidityDict = jobIsValid("animation", len(context.scene['availableServers']))
         if not jobValidityDict["valid"]:
             self.report({jobValidityDict["errorType"]}, jobValidityDict["errorMessage"])
             return{'FINISHED'}
@@ -531,6 +530,7 @@ class drawRenderOnServersPanel(View3DPanel, Panel):
         # Render Buttons
         row = col.row(align=True)
         row.alignment = 'EXPAND'
+        row.active = len(scn['availableServers']) > 0
         row.operator("scene.render_frame_on_servers", text="Render", icon="RENDER_STILL")
         row.operator("scene.render_animation_on_servers", text="Animation", icon="RENDER_ANIMATION")
 
@@ -667,8 +667,16 @@ class drawAdminOptionsPanel(View3DPanel, Panel):
 
         # Render Buttons
         col = layout.column(align=True)
+        col.alignment = 'EXPAND'
         row = col.row(align=True)
-        row.alignment = 'EXPAND'
+        row.active = len(scn['availableServers']) > 0
+        row.operator("scene.get_rendered_frames", text="Get Frames", icon="EXTERNAL_DATA")
+        row.operator("scene.average_frames", text="Average Frames", icon="SEQ_CHROMA_SCOPE")
+
+        row.separator()
+
+        row = col.row(align=True)
+        row.active = len(scn['availableServers']) > 0
         row.operator("scene.kill_blender", text="Kill All Blender Processes", icon="CANCEL")
 
         # Killall Blender Status
