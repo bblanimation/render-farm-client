@@ -1,10 +1,11 @@
-#!BPY
+#!/usr/bin/python
 bl_info = {
     "name"        : "Server Farm Client",
     "author"      : "Christopher Gearhart <chris@bblanimation.com>",
-    "version"     : (0, 4, 5),
-    "blender"     : (2, 76, 0),
+    "version"     : (0, 4, 6),
+    "blender"     : (2, 78, 0),
     "description" : "Render your scene on a remote server farm with this addon.",
+    "location"    : "View3D > Tools > Render",
     "warning"     : "",
     "wiki_url"    : "",
     "tracker_url" : "",
@@ -14,29 +15,113 @@ import bpy, subprocess, telnetlib, sys, os, numpy, time, json, math
 from bpy.types import (Menu, Panel, UIList, Operator, AddonPreferences, PropertyGroup)
 from bpy.props import *
 
+# Global variables
 renderStatus    = {"animation":"None", "image":"None"}
 killingStatus   = "None"
 projectPath     = ""
 projectName     = ""
-hostServer      = "cgearhar@asahel.cse.taylor.edu"
 serverFilePath  = ""
 dumpLocation    = ""
 renderType      = []
 frameRangesDict = {}
-servers = {'cse218':    ['cse21801','cse21802','cse21803','cse21804','cse21805','cse21806','cse21807',
-                         'cse21808','cse21809','cse21810','cse21811','cse21812'],
-           'cse217':    ['cse21701','cse21702','cse21703','cse21704','cse21705','cse21706','cse21707',
-                         'cse21708','cse21709','cse21710','cse21711','cse21712','cse21713','cse21714',
-                         'cse21715','cse21716'],
-           'cse103':    ['cse10301','cse10302','cse10303','cse10304','cse10305','cse10306','cse10307',
-                         'cse10309','cse10310','cse10311','cse10312','cse10315','cse10316','cse10317',
-                         'cse10318','cse10319','cse103podium'],
-           'cse201':    ['cse20101','cse20102','cse20103','cse20104','cse20105','cse20106','cse20107',
-                         'cse20108','cse20109','cse20110','cse20111','cse20112','cse20113','cse20114',
-                         'cse20116','cse20117','cse20118','cse20119','cse20120','cse20121','cse20122',
-                         'cse20123','cse20124','cse20125','cse20126','cse20127','cse20128','cse20129',
-                         'cse20130','cse20131','cse20132','cse20133','cse20134','cse20135','cse20136'
-                         ]}
+hostServer      = ""
+servers         = ""
+extension       = ""
+
+def getLibraryPath():
+    # Full path to "\addons\server_farm_client\" -directory
+    paths = bpy.utils.script_paths("addons")
+
+    libraryPath = 'assets'
+    for path in paths:
+        libraryPath = os.path.join(path, "server_farm_client_add-on")
+        if os.path.exists(libraryPath):
+            break
+
+    if not os.path.exists(libraryPath):
+        raise NameError('Did not find assets path from ' + libraryPath)
+    return libraryPath
+
+def importServerFiles():
+    global hostServer
+    global servers
+    global extension
+    libraryServersPath = os.path.join(getLibraryPath(), "servers")
+
+    hsFile = open(os.path.join(libraryServersPath, "hostServer.txt"),"r")
+    rsFile = open(os.path.join(libraryServersPath, "remoteServers.txt"),"r")
+
+    # TODO: Refactor the following lines of code.
+
+    # skip lines leading up to '### BEGIN SERVERS DICTIONARY ###'
+    nextLine = rsFile.readline()
+    numIters = 0
+    while(nextLine != "### BEGIN SERVERS DICTIONARY ###\n"):
+        nextLine = rsFile.readline()
+        numIters += 1
+        if numIters >= 10:
+            print("Sorry, you must have deleted the line containing the opening flag")
+            break
+
+    # read following lines leading up to '### END SERVERS DICTIONARY ###'
+    nextLine = rsFile.readline()
+    numIters = 0
+    while(nextLine != "### END SERVERS DICTIONARY ###\n"):
+        servers += nextLine.replace(" ", "").replace("\n", "")
+        nextLine = rsFile.readline()
+        numIters += 1
+        if numIters >= 100:
+            print("Sorry, you either deleted the line containing the ending flag, or there were over 100 new lines in your server declaration.")
+            break
+
+    servers = json.loads(servers.replace("\t", ""))
+
+    # skip lines leading up to '### BEGIN EXTENSION ###'
+    nextLine = rsFile.readline()
+    numIters = 0
+    while(nextLine != "### BEGIN EXTENSION ###\n"):
+        nextLine = rsFile.readline()
+        numIters += 1
+        if numIters >= 10:
+            print("Sorry, you must have deleted the line containing the opening flag")
+            break
+
+    # read following lines leading up to '### END EXTENSION ###'
+    nextLine = rsFile.readline()
+    numIters = 0
+    while(nextLine != "### END EXTENSION ###\n"):
+        extension += nextLine.replace(" ", "").replace("\n", "").replace("\"", "")
+        nextLine = rsFile.readline()
+        numIters += 1
+        if numIters >= 100:
+            print("Sorry, you either deleted the line containing the ending flag, or there were over 100 new lines in your server declaration.")
+            break
+
+    # skip lines leading up to '### BEGIN HOST SERVER STRING ###'
+    nextLine = hsFile.readline()
+    numIters = 0
+    while(nextLine != "### BEGIN HOST SERVER STRING ###\n"):
+        nextLine = hsFile.readline()
+        numIters += 1
+        if numIters >= 10:
+            print("Sorry, you must have deleted the line containing the opening flag")
+            break
+
+    # read following lines leading up to '### END HOST SERVER STRING ###'
+    nextLine = hsFile.readline()
+    numIters = 0
+    while(nextLine != "### END HOST SERVER STRING ###\n"):
+        hostServer += nextLine.replace(" ", "").replace("\n", "").replace("\"", "")
+        nextLine = hsFile.readline()
+        numIters += 1
+        if numIters >= 100:
+            print("Sorry, you either deleted the line containing the ending flag, or there were over 100 new lines in your server declaration.")
+            break
+
+def main():
+    getLibraryPath()
+    importServerFiles()
+main()
 
 class View3DPanel():
     bl_space_type  = "VIEW_3D"
@@ -61,10 +146,10 @@ def checkNumAvailServers(scn):
 
     hosts       = []
     unreachable = []
-    for hostGroupName in servers:
-        for host in servers[hostGroupName]:
+    for groupName in servers:
+        for host in servers[groupName]:
             try:
-                tn = telnetlib.Telnet(host + ".cse.taylor.edu",22,.4)
+                tn = telnetlib.Telnet(host + extension,22,.4)
                 hosts.append(host)
             except:
                 unreachable.append(host)
@@ -98,7 +183,7 @@ def cleanLocalDirectoryForGetFrames():
     subprocess.call("mkdir -p " + dumpLocation + "backups/", shell=True)
 
     print("cleaning up local directory...")
-    process = subprocess.Popen("rsync --remove-source-files --exclude='" + projectName + "_average.*'" + dumpLocation + "* " + dumpLocation + "backups/", stdout=subprocess.PIPE, shell=True)
+    process = subprocess.Popen("rsync --remove-source-files --exclude='" + projectName + "_average.*' " + dumpLocation + "* " + dumpLocation + "backups/", stdout=subprocess.PIPE, shell=True)
     return process
 
 def getFrames():
@@ -181,30 +266,30 @@ def setKillingStatus(status):
 def getKillingStatus():
     return killingStatus
 
-def appendViewable(typeOfRender):
-    global renderType
-    if(typeOfRender not in renderType):
-        renderType.append(typeOfRender)
-
 def killAllBlender():
     setKillingStatus("running...")
     process = subprocess.Popen("python ~/my_scripts/killAllBlender.py", stdout=subprocess.PIPE, shell=True)
     return process
 
-class refreshNumAvailableServers(bpy.types.Operator):
-    """Refresh number of available servers"""           # blender will use this as a tooltip for menu items and buttons.
+def appendViewable(typeOfRender):
+    global renderType
+    if(typeOfRender not in renderType):
+        renderType.append(typeOfRender)
+
+class refreshNumAvailableServers(Operator):
+    """Attempt to connect to all servers via telnet"""  # blender will use this as a tooltip for menu items and buttons.
     bl_idname  = "scene.refresh_num_available_servers"  # unique identifier for buttons and menu items to reference.
-    bl_label   = "Refresh number of available servers"   # display name in the interface.
+    bl_label   = "Refresh Available Servers"            # display name in the interface.
     bl_options = {'REGISTER', 'UNDO'}                   # enable undo for the operator.
 
     def execute(self, context):
         checkNumAvailServers(context.scene)
         return {'FINISHED'}
 
-class sendFrameToRenderFarm(bpy.types.Operator):
+class sendFrameToRenderFarm(Operator):
     """Render current frame on remote servers"""            # blender will use this as a tooltip for menu items and buttons.
     bl_idname  = "scene.render_frame_on_servers"            # unique identifier for buttons and menu items to reference.
-    bl_label   = "Render current frame on remote servers"   # display name in the interface.
+    bl_label   = "Render Current Frame"                     # display name in the interface.
     bl_options = {'REGISTER', 'UNDO'}                       # enable undo for the operator.
 
     def modal(self, context, event):
@@ -298,10 +383,10 @@ class sendFrameToRenderFarm(bpy.types.Operator):
         wm.event_timer_remove(self._timer)
         self.process.kill()
 
-class sendAnimationToRenderFarm(bpy.types.Operator):
+class sendAnimationToRenderFarm(Operator):
     """Render animation on remote servers"""            # blender will use this as a tooltip for menu items and buttons.
     bl_idname  = "scene.render_animation_on_servers"    # unique identifier for buttons and menu items to reference.
-    bl_label   = "Render animation on remote servers"   # display name in the interface.
+    bl_label   = "Render Animation"   # display name in the interface.
     bl_options = {'REGISTER', 'UNDO'}                   # enable undo for the operator.
 
     def modal(self, context, event):
@@ -400,57 +485,50 @@ class sendAnimationToRenderFarm(bpy.types.Operator):
         wm.event_timer_remove(self._timer)
         self.process.kill()
 
-class getRenderedFrames(bpy.types.Operator):
-    """Get Rendered Frames"""                           # blender will use this as a tooltip for menu items and buttons.
+class getRenderedFrames(Operator):
+    """Get rendered frames from host server"""          # blender will use this as a tooltip for menu items and buttons.
     bl_idname  = "scene.get_rendered_frames"            # unique identifier for buttons and menu items to reference.
-    bl_label   = "render animation on remote servers"   # display name in the interface.
+    bl_label   = "Get Rendered Frames"                  # display name in the interface.
     bl_options = {'REGISTER', 'UNDO'}                   # enable undo for the operator.
 
     def execute(self, context):
+        cleanLocalDirectoryForGetFrames()
         getFrames()
         return{'FINISHED'}
 
-class averageRenderedFrames(bpy.types.Operator):
-    """Average Rendered Frames"""                           # blender will use this as a tooltip for menu items and buttons.
+class averageRenderedFrames(Operator):
+    """Average pixels in rendered frames"""                 # blender will use this as a tooltip for menu items and buttons.
     bl_idname  = "scene.average_frames"                     # unique identifier for buttons and menu items to reference.
-    bl_label   = "Render current frame on remote servers"   # display name in the interface.
+    bl_label   = "Average Rendered Frames"                  # display name in the interface.
     bl_options = {'REGISTER', 'UNDO'}                       # enable undo for the operator.
 
     def execute(self, context):
         averageFrames()
         return{'FINISHED'}
 
-class openRenderedImageInUI(bpy.types.Operator):
-    """Average Rendered Frames"""                                       # blender will use this as a tooltip for menu items and buttons.
+class openRenderedImageInUI(Operator):
+    """Open rendered image"""                                       # blender will use this as a tooltip for menu items and buttons.
     bl_idname  = "scene.open_rendered_image"                            # unique identifier for buttons and menu items to reference.
-    bl_label   = "Open the average rendered frame in the Blender UI"    # display name in the interface.
+    bl_label   = "Open Rendered Image"    # display name in the interface.
     bl_options = {'REGISTER', 'UNDO'}                                   # enable undo for the operator.
 
     def execute(self, context):
-        # change context for bpy.ops.image
-        area = context.area
-        old_type = area.type
-        area.type = 'IMAGE_EDITOR'
-
         # open rendered image
+        context.area.type = 'IMAGE_EDITOR'
         averaged_image_filepath = projectPath + "render-dump/" + projectName + "_average.tga"
         bpy.ops.image.open(filepath=averaged_image_filepath)
 
         return{'FINISHED'}
 
-class openRenderedAnimationInUI(bpy.types.Operator):
-    """Average Rendered Animation"""                                    # blender will use this as a tooltip for menu items and buttons.
-    bl_idname  = "scene.open_rendered_animation"                        # unique identifier for buttons and menu items to reference.
-    bl_label   = "Open the rendered animation in image sequence node and display in Blender's UI" # display name in the interface.
-    bl_options = {'REGISTER', 'UNDO'}                                   # enable undo for the operator.
+class openRenderedAnimationInUI(Operator):
+    """Open rendered animation"""                 # blender will use this as a tooltip for menu items and buttons.
+    bl_idname  = "scene.open_rendered_animation"  # unique identifier for buttons and menu items to reference.
+    bl_label   = "Open Rendered Animation"        # display name in the interface.
+    bl_options = {'REGISTER', 'UNDO'}             # enable undo for the operator.
 
     def execute(self, context):
-        # change context for bpy.ops.image
-        area = context.area
-        old_type = area.type
-        area.type = 'CLIP_EDITOR'
-
         # open rendered image
+        context.area.type = 'CLIP_EDITOR'
         image_sequence_filepath = projectPath + "render-dump/"
         if context.scene.frameRanges == "":
             fs = context.scene.frame_start
@@ -479,10 +557,34 @@ class openRenderedAnimationInUI(bpy.types.Operator):
 
         return{'FINISHED'}
 
-class killBlender(bpy.types.Operator):
+class editRemoteServersDict(Operator):
+    """Edit the remote servers dictionary in a text editor"""                       # blender will use this as a tooltip for menu items and buttons.
+    bl_idname  = "scene.edit_servers_dict"                                          # unique identifier for buttons and menu items to reference.
+    bl_label   = "Edit Remote Servers"                                              # display name in the interface.
+    bl_options = {'REGISTER', 'UNDO'}                                               # enable undo for the operator.
+
+    def execute(self, context):
+        context.area.type = 'TEXT_EDITOR'
+        libraryServersPath = os.path.join(getLibraryPath(), "servers")
+        bpy.ops.text.open(filepath=os.path.join(libraryServersPath, "remoteServers.txt"))
+        return{'FINISHED'}
+
+class editHostServer(Operator):
+    """Change the external host server in a text editor"""   # blender will use this as a tooltip for menu items and buttons.
+    bl_idname  = "scene.edit_host_server_string"             # unique identifier for buttons and menu items to reference.
+    bl_label   = "Edit Host Server"                          # display name in the interface.
+    bl_options = {'REGISTER', 'UNDO'}                        # enable undo for the operator.
+
+    def execute(self, context):
+        context.area.type = 'TEXT_EDITOR'
+        libraryServersPath = os.path.join(getLibraryPath(), "servers")
+        bpy.ops.text.open(filepath=os.path.join(libraryServersPath, "hostServer.txt"))
+        return{'FINISHED'}
+
+class killBlender(Operator):
     """Kill all blender processes on all remote servers"""              # blender will use this as a tooltip for menu items and buttons.
     bl_idname  = "scene.kill_blender"                                   # unique identifier for buttons and menu items to reference.
-    bl_label   = "Kill all blender processes on all remote servers"     # display name in the interface.
+    bl_label   = "Kill All Blender Processes"     # display name in the interface.
     bl_options = {'REGISTER', 'UNDO'}                                   # enable undo for the operator.
 
     def modal(self, context, event):
@@ -501,7 +603,6 @@ class killBlender(bpy.types.Operator):
                 return{'FINISHED'}
 
         return{'PASS_THROUGH'}
-
 
     def execute(self, context):
         # create timer for modal
@@ -563,7 +664,6 @@ class drawRenderOnServersPanel(View3DPanel, Panel):
             row = col.row(align=True)
             row.label('Render Status: ' + imRenderStatus)
         elif(animRenderStatus != "None"):
-            layout.separator()
             row = col.row(align=True)
             row.label('Render Status: ' + animRenderStatus)
 
@@ -672,6 +772,23 @@ class drawFrameRangePanel(View3DPanel, Panel):
         row = col.row(align=True)
         row.prop(scn, "frameRanges")
 
+class drawServersPanel(View3DPanel, Panel):
+    bl_label    = "Servers"
+    bl_idname   = "VIEW3D_PT_servers"
+    bl_context  = "objectmode"
+    bl_category = "Render"
+    bl_options = {'DEFAULT_CLOSED'}
+
+    def draw(self, context):
+        layout = self.layout
+        scn = context.scene
+
+        col = layout.column(align=True)
+        row = col.row(align=True)
+        row.operator("scene.edit_host_server_string", text="Edit Host Server", icon="TEXT")
+        row = col.row(align=True)
+        row.operator("scene.edit_servers_dict", text="Edit Remote Servers", icon="TEXT")
+
 class drawAdminOptionsPanel(View3DPanel, Panel):
     bl_label    = "Admin Tasks"
     bl_idname   = "VIEW3D_PT_tools_admin_options"
@@ -717,12 +834,17 @@ def register():
     bpy.types.Scene.frameRanges = StringProperty(
         name = "Frames")
 
+    # initialize host server string text box
+    bpy.types.Scene.hostServer = StringProperty(
+        name = "Host Server")
+
     bpy.utils.register_module(__name__)
 
 def unregister():
     bpy.utils.unregister_module(__name__)
     del bpy.types.Scene.boolTool
     del bpy.types.Scene.frameRanges
+    del bpy.types.Scene.hostServer
 
 if __name__ == "__main__":
     register()

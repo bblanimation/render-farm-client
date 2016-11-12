@@ -4,7 +4,24 @@ Scripts and associated files for rendering from Blender files on CSE remote serv
 
 ## FEATURES:
 
+* "Server Farm Client" Add-On for Blender
+    * Features:
+        * Clean UI for sending frames to servers and viewing them within Blender
+
+    * Future improvements:
+        * write instructions in './servers/hostServer.txt' and './servers/remoteServers.txt'
+        * don't rely on scripts that run on python 2 (averageFrames)
+        * go through and remove any part of the code that is customized to my computer
+        * implement killAll Blender process into plugin (currently called via subprocess)
+        * flush self.report() statements so that they appear when they are called
+        * complete listed TODOs
+        * refactor
+    * Imports:
+        * bpy, subprocess, telnetlib, sys, os, numpy, time, json, math
+        * /servers/*
+
 * $ python render.py [options]
+    * Code is highly outdated.
     * Features:
         * interactive menu
         * sendToRenderFarm
@@ -51,14 +68,6 @@ Scripts and associated files for rendering from Blender files on CSE remote serv
         * subprocess, sys, telnetlib, ast
 
 
-* $ python fetchFromServers.py
-    * Fetches render files directly from the host servers (bypassing asahel)
-    * This is useful if render failed, but some render files were completed and stored in the hosts' /tmp/ folders
-    * Imports:
-        * CSE_HOSTS.txt
-        * subprocess, sys, telnetlib, ast
-
-
 * $ python iterateThruAvailServers.py
     * Opens terminal for each available host one by one, in case I need to run commands or check something on all servers.
     * Imports:
@@ -70,10 +79,7 @@ Scripts and associated files for rendering from Blender files on CSE remote serv
 ## Server-side improvements to be made:
 * Add elapsed time to 'render completed successfully!' message
 * Give user some sort of status for the render (e.g. 5% done)
-* Add user input for samples and size %
 * Notify user when an individual file has been rendered
-* Sync files one by one (in case of host failure)
-* Fix unknown host failures bugs found when running overnight
 * Optimize default render settings
 * Re-render failed frames automatically
-* Quit blender if process aborted
+* Currently doesn’t read blender\_p.py
