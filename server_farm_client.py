@@ -2,7 +2,7 @@
 bl_info = {
     "name"        : "Server Farm Client",
     "author"      : "Christopher Gearhart <chris@bblanimation.com>",
-    "version"     : (0, 4, 4),
+    "version"     : (0, 4, 5),
     "blender"     : (2, 76, 0),
     "description" : "Render your scene on a remote server farm with this addon.",
     "warning"     : "",
@@ -14,14 +14,15 @@ import bpy, subprocess, telnetlib, sys, os, numpy, time, json, math
 from bpy.types import (Menu, Panel, UIList, Operator, AddonPreferences, PropertyGroup)
 from bpy.props import *
 
-renderStatus   = {"animation":"None", "image":"None"}
-killingStatus  = "None"
-projectPath    = ""
-projectName    = ""
-hostServer     = "cgearhar@asahel.cse.taylor.edu"
-serverFilePath = ""
-dumpLocation   = ""
-renderType     = []
+renderStatus    = {"animation":"None", "image":"None"}
+killingStatus   = "None"
+projectPath     = ""
+projectName     = ""
+hostServer      = "cgearhar@asahel.cse.taylor.edu"
+serverFilePath  = ""
+dumpLocation    = ""
+renderType      = []
+frameRangesDict = {}
 servers = {'cse218':    ['cse21801','cse21802','cse21803','cse21804','cse21805','cse21806','cse21807',
                          'cse21808','cse21809','cse21810','cse21811','cse21812'],
            'cse217':    ['cse21701','cse21702','cse21703','cse21704','cse21705','cse21706','cse21707',
@@ -40,6 +41,19 @@ servers = {'cse218':    ['cse21801','cse21802','cse21803','cse21804','cse21805',
 class View3DPanel():
     bl_space_type  = "VIEW_3D"
     bl_region_type = "TOOLS"
+
+def setGlobalProjectVars():
+    global projectPath
+    global projectName
+    global serverFilePath
+    global dumpLocation
+
+    projectPath    = bpy.path.abspath("//")
+    projectName    = bpy.path.display_name_from_filepath(bpy.data.filepath)
+    serverFilePath = "/tmp/cgearhar/" + projectName + "/"
+    dumpLocation   = projectPath + "render-dump/"
+    print(projectPath)
+    print(projectName)
 
 def checkNumAvailServers(scn):
     bpy.types.Scene.availableServers = StringProperty(name = "Available Servers")
@@ -171,19 +185,6 @@ def appendViewable(typeOfRender):
     global renderType
     if(typeOfRender not in renderType):
         renderType.append(typeOfRender)
-
-def setGlobalProjectVars():
-    global projectPath
-    global projectName
-    global serverFilePath
-    global dumpLocation
-
-    projectPath    = bpy.path.abspath("//")
-    projectName    = bpy.path.display_name_from_filepath(bpy.data.filepath)
-    serverFilePath = "/tmp/cgearhar/" + projectName + "/"
-    dumpLocation   = projectPath + "render-dump/"
-    print(projectPath)
-    print(projectName)
 
 def killAllBlender():
     setKillingStatus("running...")
@@ -324,6 +325,7 @@ class sendAnimationToRenderFarm(bpy.types.Operator):
                     if scn.frameRanges == "":
                         self.process = renderFrames("[" + str(self.startFrame) + "-" + str(self.endFrame) + "]")
                     else:
+                        global frameRangesDict
                         frameRangesDict = buildFrameRangesString(scn.frameRanges)
                         if(frameRangesDict["valid"]):
                             self.process = renderFrames(frameRangesDict["string"])
@@ -443,20 +445,37 @@ class openRenderedAnimationInUI(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}                                   # enable undo for the operator.
 
     def execute(self, context):
-        # create image node and import all pngs in sequence
-        # set the node to an image sequence
-        # ???
-
         # change context for bpy.ops.image
         area = context.area
         old_type = area.type
-        area.type = 'IMAGE_EDITOR'
-
-        self.report({'WARNING'}, "'Open Rendered Animation' functionality currently not supported")
+        area.type = 'CLIP_EDITOR'
 
         # open rendered image
-        # averaged_image_filepath = projectPath + "render-dump/" + projectName + "_average.tga"
-        # bpy.ops.image.open(filepath=averaged_image_filepath)
+        image_sequence_filepath = projectPath + "render-dump/"
+        if context.scene.frameRanges == "":
+            fs = context.scene.frame_start
+        else:
+            if frameRangesDict["valid"]:
+                fr = json.loads(frameRangesDict["string"])[0]
+                if type(fr) == list:
+                    fs = fr[0]
+                else:
+                    fs = fr
+            else:
+                self.report({'ERROR'}, "ERROR: Invalid frame ranges given.")
+                return{'FINISHED'}
+
+        # zero pad the value
+        if fs < 10:
+            fs = "000" + str(fs)
+        elif fs < 100:
+            fs = "00" + str(fs)
+        elif fs < 1000:
+            fs = "0" + str(fs)
+
+        image_filename = projectName + "_" + fs + ".tga"
+        print(image_filename)
+        bpy.ops.clip.open(directory=image_sequence_filepath, files=[{"name":image_filename}])
 
         return{'FINISHED'}
 
@@ -703,6 +722,7 @@ def register():
 def unregister():
     bpy.utils.unregister_module(__name__)
     del bpy.types.Scene.boolTool
+    del bpy.types.Scene.frameRanges
 
 if __name__ == "__main__":
     register()
