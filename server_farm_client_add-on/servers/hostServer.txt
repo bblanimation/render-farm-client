@@ -1,5 +1,0 @@
-TODO: write instructions for future users on how to edit this file, including how to save it in the text editor.
-
-### BEGIN HOST SERVER STRING ###
-cgearhar@asahel.cse.taylor.edu
-### END HOST SERVER STRING ###

@@ -2,7 +2,7 @@
 bl_info = {
     "name"        : "Server Farm Client",
     "author"      : "Christopher Gearhart <chris@bblanimation.com>",
-    "version"     : (0, 4, 6),
+    "version"     : (0, 4, 7),
     "blender"     : (2, 78, 0),
     "description" : "Render your scene on a remote server farm with this addon.",
     "location"    : "View3D > Tools > Render",
@@ -27,6 +27,7 @@ frameRangesDict = {}
 hostServer      = ""
 servers         = ""
 extension       = ""
+username        = ""
 
 def getLibraryPath():
     # Full path to "\addons\server_farm_client\" -directory
@@ -42,81 +43,45 @@ def getLibraryPath():
         raise NameError('Did not find assets path from ' + libraryPath)
     return libraryPath
 
+def readFileFor(f, flagName):
+    readLines = ""
+
+    # skip lines leading up to '### BEGIN flagName ###'
+    nextLine = f.readline()
+    numIters = 0
+    while(nextLine != "### BEGIN " + flagName + " ###\n"):
+        nextLine = f.readline()
+        numIters += 1
+        if numIters >= 100:
+            print("Sorry, you must have deleted the line containing the opening flag")
+            break
+
+    # read following lines leading up to '### END flagName ###'
+    nextLine = f.readline()
+    numIters = 0
+    while(nextLine != "### END " + flagName + " ###\n"):
+        readLines += nextLine.replace(" ", "").replace("\n", "").replace("\t", "")
+        nextLine = f.readline()
+        numIters += 1
+        if numIters >= 150:
+            print("Sorry, you either deleted the line containing the ending flag, or there were over 100 new lines in your server declaration.")
+            break
+
+    return readLines
+
 def importServerFiles():
     global hostServer
     global servers
     global extension
+    global username
+
     libraryServersPath = os.path.join(getLibraryPath(), "servers")
+    serverFile = open(os.path.join(libraryServersPath, "remoteServers.txt"),"r")
 
-    hsFile = open(os.path.join(libraryServersPath, "hostServer.txt"),"r")
-    rsFile = open(os.path.join(libraryServersPath, "remoteServers.txt"),"r")
-
-    # TODO: Refactor the following lines of code.
-
-    # skip lines leading up to '### BEGIN SERVERS DICTIONARY ###'
-    nextLine = rsFile.readline()
-    numIters = 0
-    while(nextLine != "### BEGIN SERVERS DICTIONARY ###\n"):
-        nextLine = rsFile.readline()
-        numIters += 1
-        if numIters >= 10:
-            print("Sorry, you must have deleted the line containing the opening flag")
-            break
-
-    # read following lines leading up to '### END SERVERS DICTIONARY ###'
-    nextLine = rsFile.readline()
-    numIters = 0
-    while(nextLine != "### END SERVERS DICTIONARY ###\n"):
-        servers += nextLine.replace(" ", "").replace("\n", "")
-        nextLine = rsFile.readline()
-        numIters += 1
-        if numIters >= 100:
-            print("Sorry, you either deleted the line containing the ending flag, or there were over 100 new lines in your server declaration.")
-            break
-
-    servers = json.loads(servers.replace("\t", ""))
-
-    # skip lines leading up to '### BEGIN EXTENSION ###'
-    nextLine = rsFile.readline()
-    numIters = 0
-    while(nextLine != "### BEGIN EXTENSION ###\n"):
-        nextLine = rsFile.readline()
-        numIters += 1
-        if numIters >= 10:
-            print("Sorry, you must have deleted the line containing the opening flag")
-            break
-
-    # read following lines leading up to '### END EXTENSION ###'
-    nextLine = rsFile.readline()
-    numIters = 0
-    while(nextLine != "### END EXTENSION ###\n"):
-        extension += nextLine.replace(" ", "").replace("\n", "").replace("\"", "")
-        nextLine = rsFile.readline()
-        numIters += 1
-        if numIters >= 100:
-            print("Sorry, you either deleted the line containing the ending flag, or there were over 100 new lines in your server declaration.")
-            break
-
-    # skip lines leading up to '### BEGIN HOST SERVER STRING ###'
-    nextLine = hsFile.readline()
-    numIters = 0
-    while(nextLine != "### BEGIN HOST SERVER STRING ###\n"):
-        nextLine = hsFile.readline()
-        numIters += 1
-        if numIters >= 10:
-            print("Sorry, you must have deleted the line containing the opening flag")
-            break
-
-    # read following lines leading up to '### END HOST SERVER STRING ###'
-    nextLine = hsFile.readline()
-    numIters = 0
-    while(nextLine != "### END HOST SERVER STRING ###\n"):
-        hostServer += nextLine.replace(" ", "").replace("\n", "").replace("\"", "")
-        nextLine = hsFile.readline()
-        numIters += 1
-        if numIters >= 100:
-            print("Sorry, you either deleted the line containing the ending flag, or there were over 100 new lines in your server declaration.")
-            break
+    username    = readFileFor(serverFile, "SSH USERNAME").replace("\"", "")
+    hostServer  = readFileFor(serverFile, "HOST SERVER").replace("\"", "")
+    extension   = readFileFor(serverFile, "EXTENSION").replace("\"", "")
+    servers     = json.loads(readFileFor(serverFile, "REMOTE SERVERS DICTIONARY"))
 
 def main():
     getLibraryPath()
@@ -135,15 +100,12 @@ def setGlobalProjectVars():
 
     projectPath    = bpy.path.abspath("//")
     projectName    = bpy.path.display_name_from_filepath(bpy.data.filepath)
-    serverFilePath = "/tmp/cgearhar/" + projectName + "/"
+    serverFilePath = "/tmp/" + username + "/" + projectName + "/"
     dumpLocation   = projectPath + "render-dump/"
     print(projectPath)
     print(projectName)
 
-def checkNumAvailServers(scn):
-    bpy.types.Scene.availableServers = StringProperty(name = "Available Servers")
-    bpy.types.Scene.offlineServers   = StringProperty(name = "Offline Servers")
-
+def checkNumAvailServers(scn=None):
     hosts       = []
     unreachable = []
     for groupName in servers:
@@ -154,13 +116,16 @@ def checkNumAvailServers(scn):
             except:
                 unreachable.append(host)
 
-    scn['availableServers'] = hosts
-    scn['offlineServers']   = unreachable
-
-    for a in bpy.context.screen.areas:
-        a.tag_redraw()
-
-    return
+    if scn != None:
+        bpy.types.Scene.availableServers = StringProperty(name = "Available Servers")
+        bpy.types.Scene.offlineServers   = StringProperty(name = "Offline Servers")
+        scn['availableServers'] = hosts
+        scn['offlineServers']   = unreachable
+        for a in bpy.context.screen.areas:
+            a.tag_redraw()
+        return
+    else:
+        return hosts
 
 def jobIsValid(jobType, availableServers):
     if availableServers == 0:
@@ -171,10 +136,10 @@ def jobIsValid(jobType, availableServers):
         return {"valid":False, "errorType":"ERROR", "errorMessage":"RENDER ABORTED: Please remove ' ' (spaces) from the project file name."}
     elif bpy.context.scene.camera is None:
         return {"valid":False, "errorType":"ERROR", "errorMessage":"RENDER FAILED: No camera in scene."}
-    elif not bpy.context.scene.render.image_settings.color_mode == 'RGB':
+    elif jobType == "image" and not bpy.context.scene.render.image_settings.color_mode == 'RGB':
         return {"valid":False, "errorType":"ERROR", "errorMessage":"RENDER FAILED: Due to current lack of functionality, this script only runs with 'RGB' color mode."}
-    elif not bpy.context.scene.cycles.progressive == 'BRANCHED_PATH':
-        return {"valid":False, "errorType":"WARNING", "errorMessage":"RENDER ABORTED: Please use the 'Branched Path Tracing' sampling option for an accurate threaded render."}
+    elif jobType == "image" and not bpy.context.scene.cycles.progressive == 'BRANCHED_PATH':
+        return {"valid":True, "errorType":"WARNING", "errorMessage":"RENDER ALERT: Use the 'Branched Path Tracing' sampling option for an accurate threaded render."}
     else:
         return {"valid":True, "errorType":None, "errorMessage":None}
 
@@ -188,23 +153,21 @@ def cleanLocalDirectoryForGetFrames():
 
 def getFrames():
     print("verifying remote directory...")
-    subprocess.call("ssh " + hostServer + " 'mkdir -p " + serverFilePath + ";'", shell=True)
+    subprocess.call("ssh " + username + "@" + hostServer + extension + " 'mkdir -p " + serverFilePath + ";'", shell=True)
 
     print("copying files from server...\n")
-    process = subprocess.Popen("rsync --remove-source-files --exclude='*.blend' '" + hostServer + ":" + serverFilePath + "*' '" + dumpLocation + "'", stdout=subprocess.PIPE, shell=True)
+    process = subprocess.Popen("rsync --remove-source-files --exclude='*.blend' '" + username + "@" + hostServer + extension + ":" + serverFilePath + "*' '" + dumpLocation + "'", stdout=subprocess.PIPE, shell=True)
     return process
 
 def averageFrames():
-    process = subprocess.Popen("python ~/my_scripts/averageFrames.py " + projectPath + " " + projectName, stdout=subprocess.PIPE, shell=True)
+    averageScriptPath = os.path.join(getLibraryPath(), "scripts", "averageFrames.py")
+    process = subprocess.Popen("python " + averageScriptPath + " -p " + projectPath + " -n " + projectName, stdout=subprocess.PIPE, shell=True)
     return process
 
 def buildFrameRangesString(frameRanges):
-    #frameRanges = "1,3,10-13, 20"
-    frameRanges = frameRanges.replace(" ", "")
-    #frameRanges = "1,3,10-13,20"
-    frameRangeList = frameRanges.split(",")
-    #frameRangeList = ["1","3","10-13","20"]
+    frameRangeList = frameRanges.replace(" ", "").split(",")
     newFrameRangeList = []
+    invalidDict = { "valid":False, "string":None }
     for string in frameRangeList:
         try:
             newInt = int(string)
@@ -214,18 +177,18 @@ def buildFrameRangesString(frameRanges):
             if "-" in string:
                 newString = string.split("-")
                 if len(newString) > 2:
-                    return { "valid":False, "string":None }
+                    return invalidDict
                 try:
                     newInt1 = int(newString[0])
                     newInt2 = int(newString[1])
                     if newInt1 <= newInt2:
                         newFrameRangeList.append([newInt1,newInt2])
                     else:
-                        return { "valid":False, "string":None }
+                        return invalidDict
                 except:
-                    return { "valid":False, "string":None }
+                    return invalidDict
             else:
-                return { "valid":False, "string":None }
+                return invalidDict
     return { "valid":True, "string":str(newFrameRangeList).replace(" ","") }
 
 def cleanLocalDirectoryForRenderFrames():
@@ -233,17 +196,16 @@ def cleanLocalDirectoryForRenderFrames():
     bpy.ops.wm.save_as_mainfile(copy=True)
 
     print("verifying remote directory...")
-    subprocess.call("ssh " + hostServer + " 'mkdir -p " + serverFilePath + ";'", shell=True)
+    subprocess.call("ssh " + username + "@" + hostServer + extension + " 'mkdir -p " + serverFilePath + ";'", shell=True)
 
     # set up project folder in remote server
     print("copying blender project files...")
-    process = subprocess.Popen("rsync -a --copy-links --include=" + projectName + ".blend --exclude='*' '" + projectPath + "' '" + hostServer + ":" + serverFilePath + "'", shell=True)
+    process = subprocess.Popen("rsync -a --copy-links --include=" + projectName + ".blend --exclude='*' '" + projectPath + "' '" + username + "@" + hostServer + extension + ":" + serverFilePath + "'", shell=True)
     return process
 
 def renderFrames(frameRange):
     # run blender command to render given range from the remote server
-    print("opening connection to " + hostServer + "...")
-    process = subprocess.Popen("ssh " + hostServer + " 'nohup blender_task.py -n " + projectName + " -l " + frameRange + " &'", shell=True)
+    process = subprocess.Popen("ssh " + username + "@" + hostServer + extension + " 'nohup blender_task.py -n " + projectName + " -l " + frameRange + " &'", shell=True)
     # To see output from 'blender_task.py', add the -p tag to the 'blender_task.py' call above
     print("Process sent to remote servers!\n")
     return process
@@ -268,7 +230,8 @@ def getKillingStatus():
 
 def killAllBlender():
     setKillingStatus("running...")
-    process = subprocess.Popen("python ~/my_scripts/killAllBlender.py", stdout=subprocess.PIPE, shell=True)
+    killScriptPath = os.path.join(getLibraryPath(), "scripts", "killAllBlender.py")
+    process = subprocess.Popen("python " + killScriptPath + " -s " + checkNumAvailServers() + " -e " + extension + " -u " + username, stdout=subprocess.PIPE, shell=True)
     return process
 
 def appendViewable(typeOfRender):
@@ -408,7 +371,7 @@ class sendAnimationToRenderFarm(Operator):
                 # start render process from the defined start and end frames
                 if(self.state == 1):
                     if scn.frameRanges == "":
-                        self.process = renderFrames("[" + str(self.startFrame) + "-" + str(self.endFrame) + "]")
+                        self.process = renderFrames("[[" + str(self.startFrame) + "," + str(self.endFrame) + "]]")
                     else:
                         global frameRangesDict
                         frameRangesDict = buildFrameRangesString(scn.frameRanges)
@@ -491,16 +454,68 @@ class getRenderedFrames(Operator):
     bl_label   = "Get Rendered Frames"                  # display name in the interface.
     bl_options = {'REGISTER', 'UNDO'}                   # enable undo for the operator.
 
+    def modal(self, context, event):
+        self.process.poll()
+
+        if self.process.returncode != None:
+            print("Process " + str(self.state) + " finished!\n")
+            self.report({'INFO'}, "'Get Frames' process complete.")
+
+            return{'FINISHED'}
+
+        return{'PASS_THROUGH'}
+
     def execute(self, context):
+        # create timer for modal
+        wm = context.window_manager
+        self._timer = wm.event_timer_add(0.1, context.window)
+        wm.modal_handler_add(self)
+
         cleanLocalDirectoryForGetFrames()
-        getFrames()
-        return{'FINISHED'}
+
+        # start initial render process
+        self.process    = getFrames()
+        self.state      = 1                 # initializes state for modal
+        return{'RUNNING_MODAL'}
+
+    def cancel(self, context):
+        wm = context.window_manager
+        wm.event_timer_remove(self._timer)
+        self.process.kill()
 
 class averageRenderedFrames(Operator):
     """Average pixels in rendered frames"""                 # blender will use this as a tooltip for menu items and buttons.
     bl_idname  = "scene.average_frames"                     # unique identifier for buttons and menu items to reference.
     bl_label   = "Average Rendered Frames"                  # display name in the interface.
     bl_options = {'REGISTER', 'UNDO'}                       # enable undo for the operator.
+
+    def modal(self, context, event):
+        self.process.poll()
+
+        if self.process.returncode != None:
+            print("Process " + str(self.state) + " finished!\n")
+            self.report({'INFO'}, "Frame averaging process complete.")
+
+            return{'FINISHED'}
+
+        return{'PASS_THROUGH'}
+
+    def execute(self, context):
+        # create timer for modal
+        wm = context.window_manager
+        self._timer = wm.event_timer_add(0.1, context.window)
+        wm.modal_handler_add(self)
+
+        # start initial render process
+        self.process    = averageFrames()
+        self.state      = 1                 # initializes state for modal
+
+        return{'RUNNING_MODAL'}
+
+    def cancel(self, context):
+        wm = context.window_manager
+        wm.event_timer_remove(self._timer)
+        self.process.kill()
 
     def execute(self, context):
         averageFrames()
@@ -565,20 +580,22 @@ class editRemoteServersDict(Operator):
 
     def execute(self, context):
         context.area.type = 'TEXT_EDITOR'
-        libraryServersPath = os.path.join(getLibraryPath(), "servers")
-        bpy.ops.text.open(filepath=os.path.join(libraryServersPath, "remoteServers.txt"))
+        try:
+            libraryServersPath = os.path.join(getLibraryPath(), "servers")
+            bpy.ops.text.open(filepath=os.path.join(libraryServersPath, "remoteServers.txt"))
+            self.report({'INFO'}, "Opened 'remoteServers.txt'")
+        except:
+            self.report({'ERROR'}, "ERROR: Could not open 'remoteServers.txt'")
         return{'FINISHED'}
 
-class editHostServer(Operator):
-    """Change the external host server in a text editor"""   # blender will use this as a tooltip for menu items and buttons.
-    bl_idname  = "scene.edit_host_server_string"             # unique identifier for buttons and menu items to reference.
-    bl_label   = "Edit Host Server"                          # display name in the interface.
-    bl_options = {'REGISTER', 'UNDO'}                        # enable undo for the operator.
+class commitEdits(Operator):
+    """Press this button to commit changes made to remote/host servers"""      # blender will use this as a tooltip for menu items and buttons.
+    bl_idname  = "scene.commit_edits"                                          # unique identifier for buttons and menu items to reference.
+    bl_label   = "Commit Edits"                                                # display name in the interface.
+    bl_options = {'REGISTER', 'UNDO'}                                          # enable undo for the operator.
 
     def execute(self, context):
-        context.area.type = 'TEXT_EDITOR'
-        libraryServersPath = os.path.join(getLibraryPath(), "servers")
-        bpy.ops.text.open(filepath=os.path.join(libraryServersPath, "hostServer.txt"))
+        importServerFiles()
         return{'FINISHED'}
 
 class killBlender(Operator):
@@ -628,13 +645,6 @@ class drawRenderOnServersPanel(View3DPanel, Panel):
     bl_context  = "objectmode"
     bl_category = "Render"
 
-
-    my_bool = BoolProperty(
-        name="Enable or Disable",
-        description="Display details for final calculated render samples",
-        default = False
-        )
-
     def draw(self, context):
         layout = self.layout
         scn = context.scene
@@ -680,10 +690,17 @@ class drawRenderOnServersPanel(View3DPanel, Panel):
         return{'RUNNING_MODAL'}
 
 class drawSamplesPanel(View3DPanel, Panel):
-    bl_label    = "Sampling"
+    bl_label    = "Sampling (Single Frame)"
     bl_idname   = "VIEW3D_PT_sampling"
     bl_context  = "objectmode"
     bl_category = "Render"
+
+    def calcSamples(self, scn, squared, category, multiplier):
+        if squared:
+            category = category**2
+        result = math.floor(multiplier*category*len(scn['availableServers']) * 2 / 3)
+        return result
+
 
     def draw(self, context):
         layout = self.layout
@@ -709,29 +726,15 @@ class drawSamplesPanel(View3DPanel, Panel):
                 squared = True
                 aaSampleSize = aaSampleSize**2
 
-            # Show/Hide Details Checkbox
-            #row.prop(scn, "boolTool")
-
-            # Shown/Hidden Details
-            #if(scn.boolTool):
-            if(squared):
-                aa    = math.floor(aaSampleSize*len(scn['availableServers']) * 2 / 3)
-                diff  = math.floor(aaSampleSize*(scn.cycles.diffuse_samples**2)*len(scn['availableServers']) * 2 / 3)
-                glos  = math.floor(aaSampleSize*(scn.cycles.glossy_samples**2)*len(scn['availableServers']) * 2 / 3)
-                tran  = math.floor(aaSampleSize*(scn.cycles.transmission_samples**2)*len(scn['availableServers']) * 2 / 3)
-                ao    = math.floor(aaSampleSize*(scn.cycles.ao_samples**2)*len(scn['availableServers']) * 2 / 3)
-                meshL = math.floor(aaSampleSize*(scn.cycles.mesh_light_samples**2)*len(scn['availableServers']) * 2 / 3)
-                sub   = math.floor(aaSampleSize*(scn.cycles.subsurface_samples**2)*len(scn['availableServers']) * 2 / 3)
-                vol   = math.floor(aaSampleSize*(scn.cycles.volume_samples**2)*len(scn['availableServers']) * 2 / 3)
-            else:
-                aa    = math.floor(aaSampleSize*len(scn['availableServers']) * 2 / 3)
-                diff  = math.floor(aaSampleSize*(scn.cycles.diffuse_samples)*len(scn['availableServers']) * 2 / 3)
-                glos  = math.floor(aaSampleSize*(scn.cycles.glossy_samples)*len(scn['availableServers']) * 2 / 3)
-                tran  = math.floor(aaSampleSize*(scn.cycles.transmission_samples)*len(scn['availableServers']) * 2 / 3)
-                ao    = math.floor(aaSampleSize*(scn.cycles.ao_samples)*len(scn['availableServers']) * 2 / 3)
-                meshL = math.floor(aaSampleSize*(scn.cycles.mesh_light_samples)*len(scn['availableServers']) * 2 / 3)
-                sub   = math.floor(aaSampleSize*(scn.cycles.subsurface_samples)*len(scn['availableServers']) * 2 / 3)
-                vol   = math.floor(aaSampleSize*(scn.cycles.volume_samples)*len(scn['availableServers']) * 2 / 3)
+            # calculate sample sizes for single frame renders on available servers
+            aa    = self.calcSamples(scn, squared, aaSampleSize, 1)
+            diff  = self.calcSamples(scn, squared, scn.cycles.diffuse_samples, aaSampleSize)
+            glos  = self.calcSamples(scn, squared, scn.cycles.glossy_samples, aaSampleSize)
+            tran  = self.calcSamples(scn, squared, scn.cycles.transmission_samples, aaSampleSize)
+            ao    = self.calcSamples(scn, squared, scn.cycles.ao_samples, aaSampleSize)
+            meshL = self.calcSamples(scn, squared, scn.cycles.mesh_light_samples, aaSampleSize)
+            sub   = self.calcSamples(scn, squared, scn.cycles.subsurface_samples, aaSampleSize)
+            vol   = self.calcSamples(scn, squared, scn.cycles.volume_samples, aaSampleSize)
 
             row = col.row(align=True)
             row.label('AA:')
@@ -785,9 +788,9 @@ class drawServersPanel(View3DPanel, Panel):
 
         col = layout.column(align=True)
         row = col.row(align=True)
-        row.operator("scene.edit_host_server_string", text="Edit Host Server", icon="TEXT")
-        row = col.row(align=True)
         row.operator("scene.edit_servers_dict", text="Edit Remote Servers", icon="TEXT")
+        row = col.row(align=True)
+        row.operator("scene.commit_edits", text="Commit Edits", icon="FILE_REFRESH")
 
 class drawAdminOptionsPanel(View3DPanel, Panel):
     bl_label    = "Admin Tasks"
@@ -803,23 +806,21 @@ class drawAdminOptionsPanel(View3DPanel, Panel):
 
         # Render Buttons
         col = layout.column(align=True)
-        col.alignment = 'EXPAND'
+        col.active = len(scn['availableServers']) > 0
         row = col.row(align=True)
-        row.active = len(scn['availableServers']) > 0
-        row.operator("scene.get_rendered_frames", text="Get Frames", icon="EXTERNAL_DATA")
-        row.operator("scene.average_frames", text="Average Frames", icon="SEQ_CHROMA_SCOPE")
-
-        row.separator()
+        row.operator("scene.get_rendered_frames", text="Get Frames", icon="LOAD_FACTORY")
+        row = col.row(align=True)
+        row.operator("scene.average_frames", text="Average Frames", icon="RENDERLAYERS")
 
         row = col.row(align=True)
-        row.active = len(scn['availableServers']) > 0
+        row = col.row(align=True)
         row.operator("scene.kill_blender", text="Kill All Blender Processes", icon="CANCEL")
 
         # Killall Blender Status
         if(killingStatus != "None"):
             row = col.row(align=True)
             if killingStatus == "Finished":
-                row.label('<placeholder> Blender processes killed!')
+                row.label('Blender processes killed!')
             else:
                 row.label('Killing blender on remote servers...')
 
@@ -834,17 +835,12 @@ def register():
     bpy.types.Scene.frameRanges = StringProperty(
         name = "Frames")
 
-    # initialize host server string text box
-    bpy.types.Scene.hostServer = StringProperty(
-        name = "Host Server")
-
     bpy.utils.register_module(__name__)
 
 def unregister():
     bpy.utils.unregister_module(__name__)
     del bpy.types.Scene.boolTool
     del bpy.types.Scene.frameRanges
-    del bpy.types.Scene.hostServer
 
 if __name__ == "__main__":
     register()

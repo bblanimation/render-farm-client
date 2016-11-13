@@ -36,7 +36,7 @@ Scripts and associated files for rendering from Blender files on CSE remote serv
         * maybe refactor some of the functions in this code into external scripts?
         * refactor directory defaults to an external 'txt' document.
         * implement menu system into blender with a plugin
-        * implement single-frame distributed processing 
+        * implement single-frame distributed processing
             * multiple renders at low (seeded) sampling averaged out.
             * render many portions of the whole frame at the full sample size.
     * Imports:
@@ -44,7 +44,7 @@ Scripts and associated files for rendering from Blender files on CSE remote serv
     * Options:
         * -v  // verbose (this option isn't too helpful yet...)
         * -t  // performs render in testing mode; no render processes will be queued
-        * -r  // when opening a new file, the script will search recursively through ~/filmmaking/ for all files matching '*.blend'
+        * -r  // when opening a new file, the script will search recursively through ~/filmmaking/ for all files matching '<wildcard>.blend'
 
 
 * $ python sendSpecificFiles [options] {framesList}
@@ -83,3 +83,4 @@ Scripts and associated files for rendering from Blender files on CSE remote serv
 * Optimize default render settings
 * Re-render failed frames automatically
 * Currently doesn’t read blender\_p.py
+* fix this line: rsync pull: mkdir -p /tmp/cgearhar/DeleteMe *ADD /render/ HERE* ;rsync -atu --remove-source-files cgearhar@cse10309:/tmp/cgearhar/DeleteMe/render/DeleteMe* /tmp/cgearhar/DeleteMe/.
