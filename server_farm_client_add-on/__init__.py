@@ -18,6 +18,7 @@ from bpy.props import *
 # Global variables
 renderStatus    = {"animation":"None", "image":"None"}
 killingStatus   = "None"
+event_timer_len = 0.1
 projectPath     = ""
 projectName     = ""
 serverFilePath  = ""
@@ -196,16 +197,20 @@ def cleanLocalDirectoryForRenderFrames():
     bpy.ops.wm.save_as_mainfile(copy=True)
 
     print("verifying remote directory...")
-    subprocess.call("ssh " + username + "@" + hostServer + extension + " 'mkdir -p " + serverFilePath + ";'", shell=True)
+    subprocess.call("ssh " + username + "@" + hostServer + extension + " 'mkdir -p " + serverFilePath + "/toRemote;'", shell=True)
 
     # set up project folder in remote server
     print("copying blender project files...")
     process = subprocess.Popen("rsync -a --copy-links --include=" + projectName + ".blend --exclude='*' '" + projectPath + "' '" + username + "@" + hostServer + extension + ":" + serverFilePath + "'", shell=True)
     return process
 
+def copyPythonPreferencesFile():
+    process = subprocess.Popen("rsync -a --include=blender_p.py --exclude='*' '" + getLibraryPath() + "' '" + username + "@" + hostServer + extension + ":/tmp/" + username + "/" + pojectName + "/toRemote'", shell=True)
+    return process
+
 def renderFrames(frameRange):
     # run blender command to render given range from the remote server
-    process = subprocess.Popen("ssh " + username + "@" + hostServer + extension + " 'nohup blender_task.py -n " + projectName + " -l " + frameRange + " &'", shell=True)
+    process = subprocess.Popen("ssh " + username + "@" + hostServer + extension + " 'nohup blender_task.py -n " + projectName + " -l " + frameRange + " --hosts " + str(servers) + " &'", shell=True)
     # To see output from 'blender_task.py', add the -p tag to the 'blender_task.py' call above
     print("Process sent to remote servers!\n")
     return process
@@ -269,15 +274,22 @@ class sendFrameToRenderFarm(Operator):
             if self.process.returncode != None:
                 print("Process " + str(self.state) + " finished!\n")
 
-                # start render process at current frame
+                # copy servers text file to host server
                 if(self.state == 1):
+                    print("Copying servers text file to host server...")
+                    self.process = copyPythonPreferencesFile()
+                    self.state += 1
+                    return{'PASS_THROUGH'}
+
+                # start render process at current frame
+                elif(self.state == 2):
                     self.process = renderFrames("[" + str(self.curFrame) + "]")
                     self.state += 1
                     setRenderStatus("image", "Rendering...")
                     return{'PASS_THROUGH'}
 
                 # prepare local dump location, and move previous files to backup subdirectory
-                if(self.state == 2):
+                elif(self.state == 3):
                     print("Preparing local directory...")
                     self.process = cleanLocalDirectoryForGetFrames()
                     self.state += 1
@@ -285,20 +297,20 @@ class sendFrameToRenderFarm(Operator):
                     return{'PASS_THROUGH'}
 
                 # get rendered frames from remote servers
-                elif(self.state == 3):
+                elif(self.state == 4):
                     print("Fetching render files...")
                     self.process = getFrames()
                     self.state += 1
                     return{'PASS_THROUGH'}
 
                 # average the rendered frames
-                elif(self.state == 4):
+                elif(self.state == 5):
                     print("Averaging frames...")
                     self.process = averageFrames()
                     self.state += 1
                     return{'PASS_THROUGH'}
 
-                elif(self.state == 5):
+                elif(self.state == 6):
                     self.report({'INFO'}, "Render completed! View the rendered image in your UV/Image_Editor")
                     setRenderStatus("image", "Complete!")
                     appendViewable("image")
@@ -328,7 +340,7 @@ class sendFrameToRenderFarm(Operator):
 
         # create timer for modal
         wm = context.window_manager
-        self._timer = wm.event_timer_add(0.1, context.window)
+        self._timer = wm.event_timer_add(event_timer_len, context.window)
         wm.modal_handler_add(self)
 
         # start initial render process
@@ -368,8 +380,15 @@ class sendAnimationToRenderFarm(Operator):
             if self.process.returncode != None:
                 print("Process " + str(self.state) + " finished!\n")
 
-                # start render process from the defined start and end frames
+                # copy servers text file to host server
                 if(self.state == 1):
+                    print("Copying servers text file to host server...")
+                    self.process = copyPythonPreferencesFile()
+                    self.state += 1
+                    return{'PASS_THROUGH'}
+
+                # start render process from the defined start and end frames
+                elif(self.state == 2):
                     if scn.frameRanges == "":
                         self.process = renderFrames("[[" + str(self.startFrame) + "," + str(self.endFrame) + "]]")
                     else:
@@ -386,7 +405,7 @@ class sendAnimationToRenderFarm(Operator):
                     return{'PASS_THROUGH'}
 
                 # prepare local dump location, and move previous files to backup subdirectory
-                if(self.state == 2):
+                elif(self.state == 3):
                     print("Preparing local directory...")
                     self.process = cleanLocalDirectoryForGetFrames()
                     self.state += 1
@@ -394,13 +413,13 @@ class sendAnimationToRenderFarm(Operator):
                     return{'PASS_THROUGH'}
 
                 # get rendered frames from remote servers
-                elif(self.state == 3):
+                elif(self.state == 4):
                     print("Fetching render files...")
                     self.process = getFrames()
                     self.state +=1
                     return{'PASS_THROUGH'}
 
-                elif(self.state == 4):
+                elif(self.state == 5):
                     self.report({'INFO'}, "Render completed! View the rendered animation in '//render/'")
                     setRenderStatus("animation", "Complete!")
                     appendViewable("animation")
@@ -429,7 +448,7 @@ class sendAnimationToRenderFarm(Operator):
 
         # create timer for modal
         wm = context.window_manager
-        self._timer = wm.event_timer_add(0.1, context.window)
+        self._timer = wm.event_timer_add(event_timer_len, context.window)
         wm.modal_handler_add(self)
 
         # start initial render process
@@ -468,7 +487,7 @@ class getRenderedFrames(Operator):
     def execute(self, context):
         # create timer for modal
         wm = context.window_manager
-        self._timer = wm.event_timer_add(0.1, context.window)
+        self._timer = wm.event_timer_add(event_timer_len, context.window)
         wm.modal_handler_add(self)
 
         cleanLocalDirectoryForGetFrames()
@@ -503,7 +522,7 @@ class averageRenderedFrames(Operator):
     def execute(self, context):
         # create timer for modal
         wm = context.window_manager
-        self._timer = wm.event_timer_add(0.1, context.window)
+        self._timer = wm.event_timer_add(event_timer_len, context.window)
         wm.modal_handler_add(self)
 
         # start initial render process
@@ -624,7 +643,7 @@ class killBlender(Operator):
     def execute(self, context):
         # create timer for modal
         wm = context.window_manager
-        self._timer = wm.event_timer_add(0.1, context.window)
+        self._timer = wm.event_timer_add(event_timer_len, context.window)
         wm.modal_handler_add(self)
 
         # start killAllBlender process
