@@ -2,7 +2,7 @@
 bl_info = {
     "name"        : "Server Farm Client",
     "author"      : "Christopher Gearhart <chris@bblanimation.com>",
-    "version"     : (0, 5, 0),
+    "version"     : (0, 5, 1),
     "blender"     : (2, 78, 0),
     "description" : "Render your scene on a remote server farm with this addon.",
     "location"    : "View3D > Tools > Render",
@@ -134,19 +134,34 @@ def checkNumAvailServers(scn=None):
     else:
         return hosts
 
-def jobIsValid(jobType, availableServers):
-    if availableServers == 0:
-        return {"valid":False, "errorType":"ERROR", "errorMessage":"RENDER FAILED: Unable to connect to remote servers."}
-    elif projectName == "":
+def jobIsValid(jobType):
+    if projectName == "":
         return {"valid":False, "errorType":"ERROR", "errorMessage":"RENDER FAILED: You have not saved your project file. Please save it before attempting to render."}
     elif " " in projectName:
         return {"valid":False, "errorType":"ERROR", "errorMessage":"RENDER ABORTED: Please remove ' ' (spaces) from the project file name."}
     elif bpy.context.scene.camera is None:
         return {"valid":False, "errorType":"ERROR", "errorMessage":"RENDER FAILED: No camera in scene."}
-    elif jobType == "image" and not bpy.context.scene.render.image_settings.color_mode == 'RGB':
-        return {"valid":False, "errorType":"ERROR", "errorMessage":"RENDER FAILED: Due to current lack of functionality, this script only runs with 'RGB' color mode."}
-    elif jobType == "image" and not bpy.context.scene.cycles.progressive == 'BRANCHED_PATH':
-        return {"valid":True, "errorType":"WARNING", "errorMessage":"RENDER ALERT: Use the 'Branched Path Tracing' sampling option for an accurate threaded render."}
+    elif jobType == "image":
+        if bpy.context.scene.render.image_settings.color_mode == 'BW':
+            return {"valid":False, "errorType":"ERROR", "errorMessage":"RENDER FAILED: 'BW' color mode not currently supported. Supported modes: ['RGB', 'RGBA']"}
+        if bpy.context.scene.cycles.progressive == 'PATH':
+            samples = bpy.context.scene.cycles.samples
+            if bpy.context.scene.cycles.use_square_samples:
+                samples = samples**2
+            if samples < 10:
+                return {"valid":True, "errorType":"WARNING", "errorMessage":"RENDER ALERT: Render result may be inaccurate at " + str(samples) + " samples. Try 10 or more samples for a more accurate render."}
+            else:
+                return {"valid":True, "errorType":None, "errorMessage":None}
+        elif bpy.context.scene.cycles.progressive == 'BRANCHED_PATH':
+            samples = bpy.context.scene.cycles.aa_samples
+            if bpy.context.scene.cycles.use_square_samples:
+                samples = samples**2
+            if samples < 5:
+                return {"valid":True, "errorType":"WARNING", "errorMessage":"RENDER ALERT: Render result may be inaccurate at " + str(samples) + " AA samples. Try 5 or more AA samples for a more accurate render."}
+            else:
+                return {"valid":True, "errorType":None, "errorMessage":None}
+        else:
+            return {"valid":True, "errorType":None, "errorMessage":None}
     else:
         return {"valid":True, "errorType":None, "errorMessage":None}
 
@@ -172,7 +187,7 @@ def getFrames():
 
 def averageFrames():
     averageScriptPath = os.path.join(getLibraryPath(), "scripts", "averageFrames.py")
-    runScriptCommand = "python " + averageScriptPath + " -p " + projectPath + " -n " + projectName
+    runScriptCommand = "python " + averageScriptPath.replace(" ", "\\ ") + " -p " + projectPath + " -n " + projectName
     print(runScriptCommand)
     process = subprocess.Popen(runScriptCommand, shell=True)
     return process
@@ -210,6 +225,7 @@ def cleanLocalDirectoryForRenderFrames():
 
     print("verifying remote directory...")
     sshCommand = "ssh " + hostServerLogin + " 'mkdir -p " + serverPath_toRemote + "'"
+    print(sshCommand)
     subprocess.call(sshCommand, shell=True)
 
     # set up project folder in remote server
@@ -257,7 +273,8 @@ def getKillingStatus():
 def killAllBlender():
     setKillingStatus("running...")
     killScriptPath = os.path.join(getLibraryPath(), "scripts", "killAllBlender.py")
-    runScriptCommand = "python " + killScriptPath + " -s " + checkNumAvailServers() + " -e " + extension + " -u " + username
+    runScriptCommand = "python " + killScriptPath.replace(" ", "\\ ") + " -s '" + str(checkNumAvailServers()).replace(" ","").replace("'","\"") + "' -e " + extension + " -u " + username
+    print(runScriptCommand)
     process = subprocess.Popen(runScriptCommand, stdout=subprocess.PIPE, shell=True)
     return process
 
@@ -359,12 +376,14 @@ class sendFrameToRenderFarm(Operator):
 
         # init global project variables
         setGlobalProjectVars()
-        checkNumAvailServers(context.scene)
 
         # ensure the job won't break the script
-        jobValidityDict = jobIsValid("image", len(context.scene['availableServers']))
-        if not jobValidityDict["valid"]:
+        jobValidityDict = jobIsValid("image")
+        if jobValidityDict["errorType"] != None:
             self.report({jobValidityDict["errorType"]}, jobValidityDict["errorMessage"])
+        else:
+            self.report({'INFO'}, "Rendering current frame on " + str(len(context.scene['availableServers'])) + " servers.")
+        if not jobValidityDict["valid"]:
             return{'FINISHED'}
 
         # create timer for modal
@@ -377,7 +396,6 @@ class sendFrameToRenderFarm(Operator):
         self.process = cleanLocalDirectoryForRenderFrames()
         self.state   = 1  # initializes state for modal
 
-        self.report({'INFO'}, "Rendering current frame on " + str(len(context.scene['availableServers'])) + " servers.")
         setRenderStatus("image", "Preparing files...")
 
         return{'RUNNING_MODAL'}
@@ -474,10 +492,9 @@ class sendAnimationToRenderFarm(Operator):
 
         # init global project variables
         setGlobalProjectVars()
-        checkNumAvailServers(context.scene)
 
         # ensure the job won't break the script
-        jobValidityDict = jobIsValid("animation", len(context.scene['availableServers']))
+        jobValidityDict = jobIsValid("animation")
         if not jobValidityDict["valid"]:
             self.report({jobValidityDict["errorType"]}, jobValidityDict["errorMessage"])
             return{'FINISHED'}
@@ -521,6 +538,15 @@ class getRenderedFrames(Operator):
         return{'PASS_THROUGH'}
 
     def execute(self, context):
+        # init global project variables
+        setGlobalProjectVars()
+
+        # ensure the job won't break the script
+        jobValidityDict = jobIsValid("animation")
+        if not jobValidityDict["valid"]:
+            self.report({jobValidityDict["errorType"]}, jobValidityDict["errorMessage"])
+            return{'FINISHED'}
+
         # create timer for modal
         wm = context.window_manager
         self._timer = wm.event_timer_add(event_timer_len, context.window)
@@ -538,43 +564,52 @@ class getRenderedFrames(Operator):
         wm.event_timer_remove(self._timer)
         self.process.kill()
 
-class averageRenderedFrames(Operator):
-    """Average pixels in rendered frames"""                 # blender will use this as a tooltip for menu items and buttons.
-    bl_idname  = "scene.average_frames"                     # unique identifier for buttons and menu items to reference.
-    bl_label   = "Average Rendered Frames"                  # display name in the interface.
-    bl_options = {'REGISTER', 'UNDO'}                       # enable undo for the operator.
-
-    def modal(self, context, event):
-        self.process.poll()
-
-        if self.process.returncode != None:
-            print("Process " + str(self.state) + " finished!\n")
-            self.report({'INFO'}, "Frame averaging process complete.")
-
-            return{'FINISHED'}
-
-        return{'PASS_THROUGH'}
-
-    def execute(self, context):
-        # create timer for modal
-        wm = context.window_manager
-        self._timer = wm.event_timer_add(event_timer_len, context.window)
-        wm.modal_handler_add(self)
-
-        # start initial render process
-        self.process    = averageFrames()
-        self.state      = 1                 # initializes state for modal
-
-        return{'RUNNING_MODAL'}
-
-    def cancel(self, context):
-        wm = context.window_manager
-        wm.event_timer_remove(self._timer)
-        self.process.kill()
-
-    def execute(self, context):
-        averageFrames()
-        return{'FINISHED'}
+# class averageRenderedFrames(Operator):
+#     """Average pixels in rendered frames"""                 # blender will use this as a tooltip for menu items and buttons.
+#     bl_idname  = "scene.average_frames"                     # unique identifier for buttons and menu items to reference.
+#     bl_label   = "Average Rendered Frames"                  # display name in the interface.
+#     bl_options = {'REGISTER', 'UNDO'}                       # enable undo for the operator.
+#
+#     def modal(self, context, event):
+#         self.process.poll()
+#
+#         if self.process.returncode != None:
+#             print("Process " + str(self.state) + " finished!\n")
+#             self.report({'INFO'}, "Frame averaging process complete.")
+#
+#             return{'FINISHED'}
+#
+#         return{'PASS_THROUGH'}
+#
+#     def execute(self, context):
+#         # init global project variables
+#         setGlobalProjectVars()
+#
+#         # ensure the job won't break the script
+#         jobValidityDict = jobIsValid("animation")
+#         if not jobValidityDict["valid"]:
+#             self.report({jobValidityDict["errorType"]}, jobValidityDict["errorMessage"])
+#             return{'FINISHED'}
+#
+#         # create timer for modal
+#         wm = context.window_manager
+#         self._timer = wm.event_timer_add(event_timer_len, context.window)
+#         wm.modal_handler_add(self)
+#
+#         # start initial render process
+#         self.process    = averageFrames()
+#         self.state      = 1                 # initializes state for modal
+#
+#         return{'RUNNING_MODAL'}
+#
+#     def cancel(self, context):
+#         wm = context.window_manager
+#         wm.event_timer_remove(self._timer)
+#         self.process.kill()
+#
+#     def execute(self, context):
+#         averageFrames()
+#         return{'FINISHED'}
 
 class openRenderedImageInUI(Operator):
     """Open rendered image"""                                       # blender will use this as a tooltip for menu items and buttons.
@@ -770,10 +805,10 @@ class drawSamplesPanel(View3DPanel, Panel):
             sampleSize = scn.cycles.samples
             if(scn.cycles.use_square_samples):
                 sampleSize = sampleSize**2
-            if sampleSize < 8:
+            if sampleSize < 10:
                 row.label('Samples: Too few samples')
             else:
-                row.label("Samples: " + str(math.floor(sampleSize*len(scn['availableServers']) * 2 / 3)) + " (Switch to 'Branched Path Tracing')")
+                row.label("Samples: " + str(math.floor(sampleSize*len(scn['availableServers']) * 2 / 3)))
         else:
             # find AA sample size first (this affects other sample sizes)
             aaSampleSize = scn.cycles.aa_samples
@@ -793,29 +828,32 @@ class drawSamplesPanel(View3DPanel, Panel):
             vol   = self.calcSamples(scn, squared, scn.cycles.volume_samples, aaSampleSize)
 
             row = col.row(align=True)
-            row.label('AA:')
-            row.label(str(aa))
-            row = col.row(align=True)
-            row.label('Diffuse:')
-            row.label(str(diff))
-            row = col.row(align=True)
-            row.label('Glossy:')
-            row.label(str(glos))
-            row = col.row(align=True)
-            row.label('Transmission:')
-            row.label(str(tran))
-            row = col.row(align=True)
-            row.label('AO:')
-            row.label(str(ao))
-            row = col.row(align=True)
-            row.label('Mesh Light:')
-            row.label(str(meshL))
-            row = col.row(align=True)
-            row.label('Subsurface:')
-            row.label(str(sub))
-            row = col.row(align=True)
-            row.label('Volume:')
-            row.label(str(vol))
+            if(aaSampleSize < 5):
+                row.label('AA: Too few samples')
+            else:
+                row.label('AA:')
+                row.label(str(aa))
+                row = col.row(align=True)
+                row.label('Diffuse:')
+                row.label(str(diff))
+                row = col.row(align=True)
+                row.label('Glossy:')
+                row.label(str(glos))
+                row = col.row(align=True)
+                row.label('Transmission:')
+                row.label(str(tran))
+                row = col.row(align=True)
+                row.label('AO:')
+                row.label(str(ao))
+                row = col.row(align=True)
+                row.label('Mesh Light:')
+                row.label(str(meshL))
+                row = col.row(align=True)
+                row.label('Subsurface:')
+                row.label(str(sub))
+                row = col.row(align=True)
+                row.label('Volume:')
+                row.label(str(vol))
 
 class drawFrameRangePanel(View3DPanel, Panel):
     bl_label    = "Frame Range"
@@ -865,8 +903,8 @@ class drawAdminOptionsPanel(View3DPanel, Panel):
         col.active = len(scn['availableServers']) > 0
         row = col.row(align=True)
         row.operator("scene.get_rendered_frames", text="Get Frames", icon="LOAD_FACTORY")
-        row = col.row(align=True)
-        row.operator("scene.average_frames", text="Average Frames", icon="RENDERLAYERS")
+        #row = col.row(align=True)
+        #row.operator("scene.average_frames", text="Average Frames", icon="RENDERLAYERS")
 
         row = col.row(align=True)
         row = col.row(align=True)
