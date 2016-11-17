@@ -2,7 +2,7 @@
 bl_info = {
     "name"        : "Server Farm Client",
     "author"      : "Christopher Gearhart <chris@bblanimation.com>",
-    "version"     : (0, 5, 1),
+    "version"     : (0, 6, 0),
     "blender"     : (2, 78, 0),
     "description" : "Render your scene on a remote server farm with this addon.",
     "location"    : "View3D > Tools > Render",
@@ -95,44 +95,67 @@ class View3DPanel():
     bl_space_type  = "VIEW_3D"
     bl_region_type = "TOOLS"
 
+def setHostServerLogin():
+    global hostServerLogin
+    hostServerLogin = username + "@" + hostServer + extension
+
 def setGlobalProjectVars():
     global projectPath
     global projectName
-    global hostServerLogin
     global serverFilePath
     global serverPath_toRemote
     global dumpLocation
 
     projectPath         = bpy.path.abspath("//")
     projectName         = bpy.path.display_name_from_filepath(bpy.data.filepath)
-    hostServerLogin     = username + "@" + hostServer + extension
     serverFilePath      = "/tmp/" + username + "/" + projectName + "/"
     serverPath_toRemote = serverFilePath + "toRemote/"
     dumpLocation        = projectPath + "render-dump/"
-    print(projectPath)
-    print(projectName)
+    setHostServerLogin()
+    print(projectPath + projectName)
 
 def checkNumAvailServers(scn=None):
-    hosts       = []
-    unreachable = []
-    for groupName in servers:
-        for host in servers[groupName]:
-            try:
-                tn = telnetlib.Telnet(host + extension,22,.4)
-                hosts.append(host)
-            except:
-                unreachable.append(host)
-
+    process = subprocess.Popen("ssh " + hostServerLogin + " 'blender_task.py -H'", stdout=subprocess.PIPE, shell=True)
+    process.poll()
+    while process.returncode == None:
+        time.sleep(0.1)
+        process.poll()
+    line1 = process.stdout.readline().decode('ASCII').replace("\\n", "")
+    line2 = process.stdout.readline().decode('ASCII').replace("\\n", "")
+    available = json.loads(line1.replace("'", "\""))
+    offline = json.loads(line2.replace("'", "\""))
     if scn != None:
-        bpy.types.Scene.availableServers = StringProperty(name = "Available Servers")
-        bpy.types.Scene.offlineServers   = StringProperty(name = "Offline Servers")
-        scn['availableServers'] = hosts
-        scn['offlineServers']   = unreachable
-        for a in bpy.context.screen.areas:
-            a.tag_redraw()
-        return
-    else:
-        return hosts
+         bpy.types.Scene.availableServers = StringProperty(name = "Available Servers")
+         bpy.types.Scene.offlineServers = StringProperty(name = "Offline Servers")
+
+         scn['availableServers'] = available
+         scn['offlineServers'] = offline
+         for a in bpy.context.screen.areas:
+             a.tag_redraw()
+         return
+    return available
+
+# def checkNumAvailServers(scn=None):
+#     hosts       = []
+#     unreachable = []
+#     for groupName in servers:
+#         for host in servers[groupName]:
+#             try:
+#                 tn = telnetlib.Telnet(host + extension,22,.4)
+#                 hosts.append(host)
+#             except:
+#                 unreachable.append(host)
+#
+#     if scn != None:
+#         bpy.types.Scene.availableServers = StringProperty(name = "Available Servers")
+#         bpy.types.Scene.offlineServers   = StringProperty(name = "Offline Servers")
+#         scn['availableServers'] = hosts
+#         scn['offlineServers']   = unreachable
+#         for a in bpy.context.screen.areas:
+#             a.tag_redraw()
+#         return
+#     else:
+#         return hosts
 
 def jobIsValid(jobType):
     if projectName == "":
@@ -239,14 +262,30 @@ def copyPythonPreferencesFile():
     process = subprocess.Popen(rsyncCommand, shell=True)
     return process
 
+def writeServersFile():
+    f = open(os.path.join(getLibraryPath(), "servers", "servers.txt"), "w")
+    # define serversToUse
+    scn = bpy.context.scene
+    if(scn.serverGroups == "All Servers"):
+        serversToUse = servers
+    else:
+        serversToUse = {}
+        serversToUse[scn.serverGroups] = servers[scn.serverGroups]
+    print(serversToUse)
+    f.write("### BEGIN REMOTE SERVERS DICTIONARY ###\n")
+    f.write(str(serversToUse).replace("'", "\"") + "\n")
+    f.write("### END REMOTE SERVERS DICTIONARY ###\n")
+    return
+
 def copyRemoteServersFile():
-    rsyncCommand = "rsync -a --include=remoteServers.txt --exclude='*' '" + os.path.join(getLibraryPath(), "servers") + "/' '" + hostServerLogin + ":" + serverPath_toRemote + "'"
+    writeServersFile()
+    rsyncCommand = "rsync -a --include=servers.txt --exclude='*' '" + os.path.join(getLibraryPath(), "servers") + "/' '" + hostServerLogin + ":" + serverPath_toRemote + "'"
     process = subprocess.Popen(rsyncCommand, shell=True)
     return process
 
 def renderFrames(frameRange):
     # run blender command to render given range from the remote server
-    renderCommand = "ssh " + hostServerLogin + " 'blender_task.py -p -n " + projectName + " -l " + frameRange + " --hosts_file " + serverPath_toRemote + "remoteServers.txt --local_sync " + serverPath_toRemote + "'"
+    renderCommand = "ssh " + hostServerLogin + " 'blender_task.py -p -n " + projectName + " -l " + frameRange + " --hosts_file " + serverPath_toRemote + "servers.txt --local_sync " + serverPath_toRemote + "'"
     process = subprocess.Popen(renderCommand, shell=True)
     # To see output from 'blender_task.py', add the -p tag to the 'blender_task.py' call above
     print("Process sent to remote servers!\n")
@@ -290,6 +329,7 @@ class refreshNumAvailableServers(Operator):
     bl_options = {'REGISTER', 'UNDO'}                   # enable undo for the operator.
 
     def execute(self, context):
+        setHostServerLogin()
         checkNumAvailServers(context.scene)
         return {'FINISHED'}
 
@@ -622,6 +662,7 @@ class openRenderedImageInUI(Operator):
         context.area.type = 'IMAGE_EDITOR'
         averaged_image_filepath = projectPath + "render-dump/" + projectName + "_average.tga"
         bpy.ops.image.open(filepath=averaged_image_filepath)
+        bpy.ops.image.reload()
 
         return{'FINISHED'}
 
@@ -754,17 +795,23 @@ class drawRenderOnServersPanel(View3DPanel, Panel):
         row.active = len(scn['availableServers']) > 0
         row.operator("scene.render_frame_on_servers", text="Render", icon="RENDER_STILL")
         row.operator("scene.render_animation_on_servers", text="Animation", icon="RENDER_ANIMATION")
+        col = layout.column(align=True)
+        row = col.row(align=True)
+        row.prop(scn, "serverGroups")
 
         # Render Status Info
         if(imRenderStatus != "None" and animRenderStatus != "None"):
+            col = layout.column(align=True)
             row = col.row(align=True)
             row.label('Render Status (cf): ' + imRenderStatus)
             row = col.row(align=True)
             row.label('Render Status (a):  ' + animRenderStatus)
         elif(imRenderStatus != "None"):
+            col = layout.column(align=True)
             row = col.row(align=True)
             row.label('Render Status: ' + imRenderStatus)
         elif(animRenderStatus != "None"):
+            col = layout.column(align=True)
             row = col.row(align=True)
             row.label('Render Status: ' + animRenderStatus)
 
@@ -789,7 +836,7 @@ class drawSamplesPanel(View3DPanel, Panel):
     def calcSamples(self, scn, squared, category, multiplier):
         if squared:
             category = category**2
-        result = math.floor(multiplier*category*len(scn['availableServers']) * 2 / 3)
+        result = math.floor(multiplier*category*len(scn['availableServers']))
         return result
 
 
@@ -808,7 +855,7 @@ class drawSamplesPanel(View3DPanel, Panel):
             if sampleSize < 10:
                 row.label('Samples: Too few samples')
             else:
-                row.label("Samples: " + str(math.floor(sampleSize*len(scn['availableServers']) * 2 / 3)))
+                row.label("Samples: " + str(math.floor(sampleSize*len(scn['availableServers']))))
         else:
             # find AA sample size first (this affects other sample sizes)
             aaSampleSize = scn.cycles.aa_samples
@@ -929,12 +976,25 @@ def register():
     bpy.types.Scene.frameRanges = StringProperty(
         name = "Frames")
 
+    groupNames = [("All Servers","All Servers","Render on all servers")]
+    for groupName in servers:
+        junkList = [groupName,groupName,"Render only servers on this group"]
+        groupNames.append(tuple(junkList))
+    print(groupNames)
+    bpy.types.Scene.serverGroups = EnumProperty(
+        attr="serverGroups",
+        name="Servers",
+        description="Choose which hosts to use for render processes",
+        items=groupNames,
+        default='All Servers')
+
     bpy.utils.register_module(__name__)
 
 def unregister():
     bpy.utils.unregister_module(__name__)
     del bpy.types.Scene.boolTool
     del bpy.types.Scene.frameRanges
+    del bpy.types.Scene.serverGroups
 
 if __name__ == "__main__":
     register()

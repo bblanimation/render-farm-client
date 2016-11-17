@@ -34,6 +34,7 @@ def averageFrames(projectPath, projectName):
         arr=numpy.zeros((h,w),numpy.float)
     else:
         print("ERROR: Unsupported image type. Supported types: ['RGB', 'RGBA', 'BW']")
+        sys.exit(0)
 
     # Build up average pixel intensities, casting each image as an array of floats
     for im in imlist:
