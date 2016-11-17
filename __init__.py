@@ -2,7 +2,7 @@
 bl_info = {
     "name"        : "Server Farm Client",
     "author"      : "Christopher Gearhart <chris@bblanimation.com>",
-    "version"     : (0, 4, 7),
+    "version"     : (0, 5, 0),
     "blender"     : (2, 78, 0),
     "description" : "Render your scene on a remote server farm with this addon.",
     "location"    : "View3D > Tools > Render",
@@ -16,19 +16,21 @@ from bpy.types import (Menu, Panel, UIList, Operator, AddonPreferences, Property
 from bpy.props import *
 
 # Global variables
-renderStatus    = {"animation":"None", "image":"None"}
-killingStatus   = "None"
-event_timer_len = 0.1
-projectPath     = ""
-projectName     = ""
-serverFilePath  = ""
-dumpLocation    = ""
-renderType      = []
-frameRangesDict = {}
-hostServer      = ""
-servers         = ""
-extension       = ""
-username        = ""
+renderStatus        = {"animation":"None", "image":"None"}
+killingStatus       = "None"
+event_timer_len     = 0.1
+projectPath         = ""
+projectName         = ""
+serverFilePath      = ""
+serverPath_toRemote = ""
+hostServerLogin     = ""
+dumpLocation        = ""
+renderType          = []
+frameRangesDict     = {}
+hostServer          = ""
+servers             = ""
+extension           = ""
+username            = ""
 
 def getLibraryPath():
     # Full path to "\addons\server_farm_client\" -directory
@@ -53,8 +55,8 @@ def readFileFor(f, flagName):
     while(nextLine != "### BEGIN " + flagName + " ###\n"):
         nextLine = f.readline()
         numIters += 1
-        if numIters >= 100:
-            print("Sorry, you must have deleted the line containing the opening flag")
+        if numIters >= 300:
+            print("Unable to read with over 300 preceeding lines.")
             break
 
     # read following lines leading up to '### END flagName ###'
@@ -64,8 +66,8 @@ def readFileFor(f, flagName):
         readLines += nextLine.replace(" ", "").replace("\n", "").replace("\t", "")
         nextLine = f.readline()
         numIters += 1
-        if numIters >= 150:
-            print("Sorry, you either deleted the line containing the ending flag, or there were over 100 new lines in your server declaration.")
+        if numIters >= 250:
+            print("Unable to read over 250 lines.")
             break
 
     return readLines
@@ -96,13 +98,17 @@ class View3DPanel():
 def setGlobalProjectVars():
     global projectPath
     global projectName
+    global hostServerLogin
     global serverFilePath
+    global serverPath_toRemote
     global dumpLocation
 
-    projectPath    = bpy.path.abspath("//")
-    projectName    = bpy.path.display_name_from_filepath(bpy.data.filepath)
-    serverFilePath = "/tmp/" + username + "/" + projectName + "/"
-    dumpLocation   = projectPath + "render-dump/"
+    projectPath         = bpy.path.abspath("//")
+    projectName         = bpy.path.display_name_from_filepath(bpy.data.filepath)
+    hostServerLogin     = username + "@" + hostServer + extension
+    serverFilePath      = "/tmp/" + username + "/" + projectName + "/"
+    serverPath_toRemote = serverFilePath + "toRemote/"
+    dumpLocation        = projectPath + "render-dump/"
     print(projectPath)
     print(projectName)
 
@@ -146,23 +152,29 @@ def jobIsValid(jobType, availableServers):
 
 def cleanLocalDirectoryForGetFrames():
     print("verifying local directory...")
-    subprocess.call("mkdir -p " + dumpLocation + "backups/", shell=True)
+    mkdirCommand = "mkdir -p " + dumpLocation + "backups/"
+    subprocess.call(mkdirCommand, shell=True)
 
     print("cleaning up local directory...")
-    process = subprocess.Popen("rsync --remove-source-files --exclude='" + projectName + "_average.*' " + dumpLocation + "* " + dumpLocation + "backups/", stdout=subprocess.PIPE, shell=True)
+    rsyncCommand = "rsync --remove-source-files --exclude='" + projectName + "_average.*' " + dumpLocation + "* " + dumpLocation + "backups/"
+    process = subprocess.Popen(rsyncCommand, stdout=subprocess.PIPE, shell=True)
     return process
 
 def getFrames():
     print("verifying remote directory...")
-    subprocess.call("ssh " + username + "@" + hostServer + extension + " 'mkdir -p " + serverFilePath + ";'", shell=True)
+    mkdirCommand = "ssh " + hostServerLogin + " 'mkdir -p " + serverFilePath + ";'"
+    subprocess.call(mkdirCommand, shell=True)
 
     print("copying files from server...\n")
-    process = subprocess.Popen("rsync --remove-source-files --exclude='*.blend' '" + username + "@" + hostServer + extension + ":" + serverFilePath + "*' '" + dumpLocation + "'", stdout=subprocess.PIPE, shell=True)
+    rsyncCommand = "rsync --remove-source-files --exclude='*.blend' '" + hostServerLogin + ":" + serverFilePath + "results/*' '" + dumpLocation + "'"
+    process = subprocess.Popen(rsyncCommand, stdout=subprocess.PIPE, shell=True)
     return process
 
 def averageFrames():
     averageScriptPath = os.path.join(getLibraryPath(), "scripts", "averageFrames.py")
-    process = subprocess.Popen("python " + averageScriptPath + " -p " + projectPath + " -n " + projectName, stdout=subprocess.PIPE, shell=True)
+    runScriptCommand = "python " + averageScriptPath + " -p " + projectPath + " -n " + projectName
+    print(runScriptCommand)
+    process = subprocess.Popen(runScriptCommand, shell=True)
     return process
 
 def buildFrameRangesString(frameRanges):
@@ -197,20 +209,29 @@ def cleanLocalDirectoryForRenderFrames():
     bpy.ops.wm.save_as_mainfile(copy=True)
 
     print("verifying remote directory...")
-    subprocess.call("ssh " + username + "@" + hostServer + extension + " 'mkdir -p " + serverFilePath + "/toRemote;'", shell=True)
+    sshCommand = "ssh " + hostServerLogin + " 'mkdir -p " + serverPath_toRemote + "'"
+    subprocess.call(sshCommand, shell=True)
 
     # set up project folder in remote server
     print("copying blender project files...")
-    process = subprocess.Popen("rsync -a --copy-links --include=" + projectName + ".blend --exclude='*' '" + projectPath + "' '" + username + "@" + hostServer + extension + ":" + serverFilePath + "'", shell=True)
+    rsyncCommand = "rsync -a --copy-links --include=" + projectName + ".blend --exclude='*' '" + projectPath + "' '" + hostServerLogin + ":" + serverPath_toRemote + "'"
+    process = subprocess.Popen(rsyncCommand, shell=True)
     return process
 
 def copyPythonPreferencesFile():
-    process = subprocess.Popen("rsync -a --include=blender_p.py --exclude='*' '" + getLibraryPath() + "' '" + username + "@" + hostServer + extension + ":/tmp/" + username + "/" + pojectName + "/toRemote'", shell=True)
+    rsyncCommand = "rsync -a --include=blender_p.py --exclude='*' '" + os.path.join(getLibraryPath(), "scripts") + "/' '" + hostServerLogin + ":" + serverPath_toRemote + "'"
+    process = subprocess.Popen(rsyncCommand, shell=True)
+    return process
+
+def copyRemoteServersFile():
+    rsyncCommand = "rsync -a --include=remoteServers.txt --exclude='*' '" + os.path.join(getLibraryPath(), "servers") + "/' '" + hostServerLogin + ":" + serverPath_toRemote + "'"
+    process = subprocess.Popen(rsyncCommand, shell=True)
     return process
 
 def renderFrames(frameRange):
     # run blender command to render given range from the remote server
-    process = subprocess.Popen("ssh " + username + "@" + hostServer + extension + " 'nohup blender_task.py -n " + projectName + " -l " + frameRange + " --hosts " + str(servers) + " &'", shell=True)
+    renderCommand = "ssh " + hostServerLogin + " 'blender_task.py -p -n " + projectName + " -l " + frameRange + " --hosts_file " + serverPath_toRemote + "remoteServers.txt --local_sync " + serverPath_toRemote + "'"
+    process = subprocess.Popen(renderCommand, shell=True)
     # To see output from 'blender_task.py', add the -p tag to the 'blender_task.py' call above
     print("Process sent to remote servers!\n")
     return process
@@ -236,7 +257,8 @@ def getKillingStatus():
 def killAllBlender():
     setKillingStatus("running...")
     killScriptPath = os.path.join(getLibraryPath(), "scripts", "killAllBlender.py")
-    process = subprocess.Popen("python " + killScriptPath + " -s " + checkNumAvailServers() + " -e " + extension + " -u " + username, stdout=subprocess.PIPE, shell=True)
+    runScriptCommand = "python " + killScriptPath + " -s " + checkNumAvailServers() + " -e " + extension + " -u " + username
+    process = subprocess.Popen(runScriptCommand, stdout=subprocess.PIPE, shell=True)
     return process
 
 def appendViewable(typeOfRender):
@@ -274,22 +296,29 @@ class sendFrameToRenderFarm(Operator):
             if self.process.returncode != None:
                 print("Process " + str(self.state) + " finished!\n")
 
-                # copy servers text file to host server
+                # copy python preferences file to host server
                 if(self.state == 1):
-                    print("Copying servers text file to host server...")
+                    print("Copying python preferences file to host server...")
                     self.process = copyPythonPreferencesFile()
                     self.state += 1
                     return{'PASS_THROUGH'}
 
-                # start render process at current frame
+                # copy servers text file to host server
                 elif(self.state == 2):
+                    print("Copying servers text file to host server...")
+                    self.process = copyRemoteServersFile()
+                    self.state += 1
+                    return{'PASS_THROUGH'}
+
+                # start render process at current frame
+                elif(self.state == 3):
                     self.process = renderFrames("[" + str(self.curFrame) + "]")
                     self.state += 1
                     setRenderStatus("image", "Rendering...")
                     return{'PASS_THROUGH'}
 
                 # prepare local dump location, and move previous files to backup subdirectory
-                elif(self.state == 3):
+                elif(self.state == 4):
                     print("Preparing local directory...")
                     self.process = cleanLocalDirectoryForGetFrames()
                     self.state += 1
@@ -297,20 +326,20 @@ class sendFrameToRenderFarm(Operator):
                     return{'PASS_THROUGH'}
 
                 # get rendered frames from remote servers
-                elif(self.state == 4):
+                elif(self.state == 5):
                     print("Fetching render files...")
                     self.process = getFrames()
                     self.state += 1
                     return{'PASS_THROUGH'}
 
                 # average the rendered frames
-                elif(self.state == 5):
+                elif(self.state == 6):
                     print("Averaging frames...")
                     self.process = averageFrames()
                     self.state += 1
                     return{'PASS_THROUGH'}
 
-                elif(self.state == 6):
+                elif(self.state == 7):
                     self.report({'INFO'}, "Render completed! View the rendered image in your UV/Image_Editor")
                     setRenderStatus("image", "Complete!")
                     appendViewable("image")
@@ -380,15 +409,22 @@ class sendAnimationToRenderFarm(Operator):
             if self.process.returncode != None:
                 print("Process " + str(self.state) + " finished!\n")
 
-                # copy servers text file to host server
+                # copy python preferences file to host server
                 if(self.state == 1):
-                    print("Copying servers text file to host server...")
+                    print("Copying python preferences file to host server...")
                     self.process = copyPythonPreferencesFile()
                     self.state += 1
                     return{'PASS_THROUGH'}
 
-                # start render process from the defined start and end frames
+                # copy servers text file to host server
                 elif(self.state == 2):
+                    print("Copying servers text file to host server...")
+                    self.process = copyRemoteServersFile()
+                    self.state += 1
+                    return{'PASS_THROUGH'}
+
+                # start render process from the defined start and end frames
+                elif(self.state == 3):
                     if scn.frameRanges == "":
                         self.process = renderFrames("[[" + str(self.startFrame) + "," + str(self.endFrame) + "]]")
                     else:
@@ -405,7 +441,7 @@ class sendAnimationToRenderFarm(Operator):
                     return{'PASS_THROUGH'}
 
                 # prepare local dump location, and move previous files to backup subdirectory
-                elif(self.state == 3):
+                elif(self.state == 4):
                     print("Preparing local directory...")
                     self.process = cleanLocalDirectoryForGetFrames()
                     self.state += 1
@@ -413,13 +449,13 @@ class sendAnimationToRenderFarm(Operator):
                     return{'PASS_THROUGH'}
 
                 # get rendered frames from remote servers
-                elif(self.state == 4):
+                elif(self.state == 5):
                     print("Fetching render files...")
                     self.process = getFrames()
                     self.state +=1
                     return{'PASS_THROUGH'}
 
-                elif(self.state == 5):
+                elif(self.state == 6):
                     self.report({'INFO'}, "Render completed! View the rendered animation in '//render/'")
                     setRenderStatus("animation", "Complete!")
                     appendViewable("animation")
@@ -586,8 +622,9 @@ class openRenderedAnimationInUI(Operator):
             fs = "0" + str(fs)
 
         image_filename = projectName + "_" + fs + ".tga"
-        print(image_filename)
+        print("Opening frame: " + image_filename)
         bpy.ops.clip.open(directory=image_sequence_filepath, files=[{"name":image_filename}])
+        bpy.ops.clip.reload()
 
         return{'FINISHED'}
 

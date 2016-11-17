@@ -15,7 +15,6 @@ def averageFrames(projectPath, projectName):
     imlist=[filename for filename in allfiles if  (filename[-4:] in [".tga",".TGA"] and filename[-5] != "e" and filename[:-10] == projectName + "_seed-")]
     for i in range(len(imlist)):
         imlist[i] = projectPath + "render-dump/" + imlist[i]
-
     if len(imlist) == 0:
         print "There were no image files to average..."
         return;
@@ -52,7 +51,7 @@ def averageFrames(projectPath, projectName):
 
 def main():
     parseArgs()
-    projectPath = args.project_path
+    projectPath = args.project_path.replace(" ", "\\ ")
     projectName = args.project_name
     averageFrames(projectPath, projectName)
 
