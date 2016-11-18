@@ -195,7 +195,7 @@ def cleanLocalDirectoryForGetFrames():
 
     print("cleaning up local directory...")
     rsyncCommand = "rsync --remove-source-files --exclude='" + projectName + "_average.*' " + dumpLocation + "* " + dumpLocation + "backups/"
-    process = subprocess.Popen(rsyncCommand, stdout=subprocess.PIPE, shell=True)
+    process = subprocess.Popen(rsyncCommand, shell=True)
     return process
 
 def getFrames():
@@ -205,7 +205,7 @@ def getFrames():
 
     print("copying files from server...\n")
     rsyncCommand = "rsync --remove-source-files --exclude='*.blend' '" + hostServerLogin + ":" + serverFilePath + "results/*' '" + dumpLocation + "'"
-    process = subprocess.Popen(rsyncCommand, stdout=subprocess.PIPE, shell=True)
+    process = subprocess.Popen(rsyncCommand, shell=True)
     return process
 
 def averageFrames():
@@ -314,7 +314,7 @@ def killAllBlender():
     killScriptPath = os.path.join(getLibraryPath(), "scripts", "killAllBlender.py")
     runScriptCommand = "python " + killScriptPath.replace(" ", "\\ ") + " -s '" + str(checkNumAvailServers()).replace(" ","").replace("'","\"") + "' -e " + extension + " -u " + username
     print(runScriptCommand)
-    process = subprocess.Popen(runScriptCommand, stdout=subprocess.PIPE, shell=True)
+    process = subprocess.Popen(runScriptCommand, shell=True)
     return process
 
 def appendViewable(typeOfRender):
@@ -980,7 +980,6 @@ def register():
     for groupName in servers:
         junkList = [groupName,groupName,"Render only servers on this group"]
         groupNames.append(tuple(junkList))
-    print(groupNames)
     bpy.types.Scene.serverGroups = EnumProperty(
         attr="serverGroups",
         name="Servers",
