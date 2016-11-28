@@ -771,24 +771,13 @@ class killBlender(Operator):
         wm.event_timer_remove(self._timer)
         self.process.kill()
 
-class CustomEngineRenderButtonsPanel():
-    bl_space_type = "PROPERTIES"
-    bl_region_type = "WINDOW"
-    bl_context = "render"
-    # COMPAT_ENGINES must be defined in each subclass, external engines can add themselves here
-
-    @classmethod
-    def poll(cls, context):
-        rd = context.scene.render
-        return rd.engine == 'custom_renderer' and rd.use_game_engine == False
-
-class drawRenderOnServersPanel(CustomEngineRenderButtonsPanel, Panel):
+class drawRenderOnServersPanel(Panel):
     bl_label    = "Render on Servers"
     bl_idname   = "RENDER_FARM_render_on_servers"
     bl_space_type = "PROPERTIES"
     bl_region_type = "WINDOW"
     bl_context = "render"
-    COMPAT_ENGINES = {'custom_renderer'}
+    COMPAT_ENGINES = {'CYCLES'}
 
     def draw(self, context):
         layout = self.layout
@@ -840,13 +829,13 @@ class drawRenderOnServersPanel(CustomEngineRenderButtonsPanel, Panel):
         checkNumAvailServers(context.scene)
         return{'RUNNING_MODAL'}
 
-class drawSamplesPanel(CustomEngineRenderButtonsPanel, Panel):
+class drawSamplesPanel(Panel):
     bl_label    = "Sampling (Single Frame)"
     bl_idname   = "RENDER_FARM_sampling"
     bl_space_type = "PROPERTIES"
     bl_region_type = "WINDOW"
     bl_context = "render"
-    COMPAT_ENGINES = {'custom_renderer'}
+    COMPAT_ENGINES = {'CYCLES'}
 
     def calcSamples(self, scn, squared, category, multiplier):
         if squared:
@@ -917,13 +906,13 @@ class drawSamplesPanel(CustomEngineRenderButtonsPanel, Panel):
                 row.label('Volume:')
                 row.label(str(vol))
 
-class drawFrameRangePanel(CustomEngineRenderButtonsPanel, Panel):
+class drawFrameRangePanel(Panel):
     bl_label    = "Frame Range"
     bl_idname   = "RENDER FARM_frame_range"
     bl_space_type = "PROPERTIES"
     bl_region_type = "WINDOW"
     bl_context = "render"
-    COMPAT_ENGINES = {'custom_renderer'}
+    COMPAT_ENGINES = {'CYCLES'}
 
     def draw(self, context):
         layout = self.layout
@@ -933,14 +922,14 @@ class drawFrameRangePanel(CustomEngineRenderButtonsPanel, Panel):
         row = col.row(align=True)
         row.prop(scn, "frameRanges")
 
-class drawServersPanel(CustomEngineRenderButtonsPanel, Panel):
+class drawServersPanel(Panel):
     bl_label    = "Servers"
     bl_idname   = "RENDER_FARM_servers"
     bl_space_type = "PROPERTIES"
     bl_region_type = "WINDOW"
     bl_context = "render"
     bl_options = {'DEFAULT_CLOSED'}
-    COMPAT_ENGINES = {'custom_renderer'}
+    COMPAT_ENGINES = {'CYCLES'}
 
     def draw(self, context):
         layout = self.layout
@@ -952,14 +941,14 @@ class drawServersPanel(CustomEngineRenderButtonsPanel, Panel):
         row = col.row(align=True)
         row.operator("scene.commit_edits", text="Commit Edits", icon="FILE_REFRESH")
 
-class drawAdminOptionsPanel(CustomEngineRenderButtonsPanel, Panel):
+class drawAdminOptionsPanel(Panel):
     bl_label    = "Admin Tasks"
     bl_idname   = "RENDER_FARM_admin_options"
     bl_space_type = "PROPERTIES"
     bl_region_type = "WINDOW"
     bl_context = "render"
     bl_options = {'DEFAULT_CLOSED'}
-    COMPAT_ENGINES = {'custom_renderer'}
+    COMPAT_ENGINES = {'CYCLES'}
 
     def draw(self, context):
         layout = self.layout
@@ -986,39 +975,6 @@ class drawAdminOptionsPanel(CustomEngineRenderButtonsPanel, Panel):
             else:
                 row.label('Killing blender on remote servers...')
 
-def _register_elm(elm, required=False):
-    try:
-        elm.COMPAT_ENGINES.add('LUXRENDER_RENDER')
-    except:
-        if required:
-            LuxLog('Failed to add LuxRender to ' + elm.__name__)
-
-class CustomRenderEngine(bpy.types.RenderEngine):
-    bl_label = "Custom Render Engine"
-    bl_idname = 'custom_renderer'
-    bl_use_preview = True
-
-    def __init__(self):
-        return
-    def update(self, data, scene):
-        return
-    def render(self, scene):
-        sendFrameToRenderFarm.execute()
-    def __del__(self):
-        return
-
-    def samples_menu_additions(self, context):
-        if context.scene.render.engine == 'custom_renderer':
-            pass
-    _register_elm(bl_ui.properties_render.RENDER_PT_.append(samples_menu_additions))
-
-    def render_menu_additions(self, context):
-        if context.scene.render.engine == 'custom_renderer':
-            row = self.layout.row()
-            #row.prop(context.scene, "render_engine")
-
-    _register_elm(bl_ui.properties_render.RENDER_PT_.append(samples_menu_additions))
-
 def register():
     # initialize check box for displaying render sampling details
     bpy.types.Scene.boolTool = BoolProperty(
@@ -1041,42 +997,6 @@ def register():
         description="Choose which hosts to use for render processes",
         items=groupNames,
         default='All Servers')
-
-    # Render engines enum property
-    EngineNames = [("","","")]
-    for groupName in servers:
-        junkList = [groupName,groupName,"Render only servers on this group"]
-        groupNames.append(tuple(junkList))
-    bpy.types.Scene.serverGroups = EnumProperty(
-        attr="serverGroups",
-        name="Servers",
-        description="Choose which hosts to use for render processes",
-        items=groupNames,
-        default='All Servers')
-
-    # Register Custom Render Engine
-    bpy.utils.register_class(CustomRenderEngine)
-
-    # Tell Blender we need to see the main render image button and the material
-    # preview panel.
-    from bl_ui import properties_render
-    properties_render.RENDER_PT_dimensions.COMPAT_ENGINES.add('custom_renderer')
-    properties_render.RENDER_PT_output.COMPAT_ENGINES.add('custom_renderer')
-    properties_render.RENDER_PT_freestyle.COMPAT_ENGINES.add('custom_renderer')
-    properties_render.RENDER_PT_sampling.COMPAT_ENGINES.add('custom_renderer')
-    properties_render.RENDER_PT_geometry.COMPAT_ENGINES.add('custom_renderer')
-    properties_render.RENDER_PT_light_paths.COMPAT_ENGINES.add('custom_renderer')
-    properties_render.RENDER_PT_motion_blur.COMPAT_ENGINES.add('custom_renderer')
-    properties_render.RENDER_PT_film.COMPAT_ENGINES.add('custom_renderer')
-    properties_render.RENDER_PT_performance.COMPAT_ENGINES.add('custom_renderer')
-    properties_render.RENDER_PT_post_processing.COMPAT_ENGINES.add('custom_renderer')
-    properties_render.RENDER_PT_bake.COMPAT_ENGINES.add('custom_renderer')
-    properties_render.RENDER_PT_metadata.COMPAT_ENGINES.add('custom_renderer')
-    del properties_render
-
-    from bl_ui import properties_material
-    properties_material.MATERIAL_PT_preview.COMPAT_ENGINES.add('custom_renderer')
-    del properties_material
 
     bpy.utils.register_module(__name__)
 
