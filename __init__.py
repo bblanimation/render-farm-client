@@ -2,11 +2,11 @@
 bl_info = {
     "name"        : "Server Farm Client",
     "author"      : "Christopher Gearhart <chris@bblanimation.com>",
-    "version"     : (0, 6, 0),
+    "version"     : (0, 6, 1),
     "blender"     : (2, 78, 0),
     "description" : "Render your scene on a remote server farm with this addon.",
     "location"    : "View3D > Tools > Render",
-    "warning"     : "",
+    "warning"     : "Relatively stable but still work in progress",
     "wiki_url"    : "",
     "tracker_url" : "",
     "category"    : "Render"}
@@ -108,54 +108,17 @@ def setGlobalProjectVars():
 
     projectPath         = bpy.path.abspath("//")
     projectName         = bpy.path.display_name_from_filepath(bpy.data.filepath)
-    serverFilePath      = "/tmp/" + username + "/" + projectName + "/"
+    serverFilePath      = projectName + "/"
     serverPath_toRemote = serverFilePath + "toRemote/"
     dumpLocation        = projectPath + "render-dump/"
     setHostServerLogin()
     print(projectPath + projectName)
 
-def checkNumAvailServers(scn=None):
-    process = subprocess.Popen("ssh " + hostServerLogin + " 'blender_task.py -H'", stdout=subprocess.PIPE, shell=True)
-    process.poll()
-    while process.returncode == None:
-        time.sleep(0.1)
-        process.poll()
-    line1 = process.stdout.readline().decode('ASCII').replace("\\n", "")
-    line2 = process.stdout.readline().decode('ASCII').replace("\\n", "")
-    available = json.loads(line1.replace("'", "\""))
-    offline = json.loads(line2.replace("'", "\""))
-    if scn != None:
-         bpy.types.Scene.availableServers = StringProperty(name = "Available Servers")
-         bpy.types.Scene.offlineServers = StringProperty(name = "Offline Servers")
-
-         scn['availableServers'] = available
-         scn['offlineServers'] = offline
-         for a in bpy.context.screen.areas:
-             a.tag_redraw()
-         return
-    return available
-
-# def checkNumAvailServers(scn=None):
-#     hosts       = []
-#     unreachable = []
-#     for groupName in servers:
-#         for host in servers[groupName]:
-#             try:
-#                 tn = telnetlib.Telnet(host + extension,22,.4)
-#                 hosts.append(host)
-#             except:
-#                 unreachable.append(host)
-#
-#     if scn != None:
-#         bpy.types.Scene.availableServers = StringProperty(name = "Available Servers")
-#         bpy.types.Scene.offlineServers   = StringProperty(name = "Offline Servers")
-#         scn['availableServers'] = hosts
-#         scn['offlineServers']   = unreachable
-#         for a in bpy.context.screen.areas:
-#             a.tag_redraw()
-#         return
-#     else:
-#         return hosts
+def checkNumAvailServers(scn):
+    command = "ssh " + hostServerLogin + " 'python " + scn.tempFilePath + "blender_task.py -H --hosts_file " + scn.tempFilePath + "servers.txt'"
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
+    #process = subprocess.Popen(command, shell=True)
+    return process
 
 def jobIsValid(jobType):
     if projectName == "":
@@ -198,20 +161,19 @@ def cleanLocalDirectoryForGetFrames():
     process = subprocess.Popen(rsyncCommand, stdout=subprocess.PIPE, shell=True)
     return process
 
-def getFrames():
+def getFrames(scn):
     print("verifying remote directory...")
-    mkdirCommand = "ssh " + hostServerLogin + " 'mkdir -p " + serverFilePath + ";'"
+    mkdirCommand = "ssh " + hostServerLogin + " 'mkdir -p " + scn.tempFilePath + serverFilePath + ";'"
     subprocess.call(mkdirCommand, shell=True)
 
     print("copying files from server...\n")
-    rsyncCommand = "rsync --remove-source-files --exclude='*.blend' '" + hostServerLogin + ":" + serverFilePath + "results/*' '" + dumpLocation + "'"
+    rsyncCommand = "rsync --remove-source-files --exclude='*.blend' '" + hostServerLogin + ":" + scn.tempFilePath + serverFilePath + "results/*' '" + dumpLocation + "'"
     process = subprocess.Popen(rsyncCommand, stdout=subprocess.PIPE, shell=True)
     return process
 
 def averageFrames():
     averageScriptPath = os.path.join(getLibraryPath(), "scripts", "averageFrames.py")
     runScriptCommand = "python " + averageScriptPath.replace(" ", "\\ ") + " -p " + projectPath + " -n " + projectName
-    print(runScriptCommand)
     process = subprocess.Popen(runScriptCommand, shell=True)
     return process
 
@@ -242,28 +204,27 @@ def buildFrameRangesString(frameRanges):
                 return invalidDict
     return { "valid":True, "string":str(newFrameRangeList).replace(" ","") }
 
-def cleanLocalDirectoryForRenderFrames():
+def cleanLocalDirectoryForRenderFrames(scn):
     bpy.ops.file.pack_all()
     bpy.ops.wm.save_as_mainfile(copy=True)
 
     print("verifying remote directory...")
-    sshCommand = "ssh " + hostServerLogin + " 'mkdir -p " + serverPath_toRemote + "'"
-    print(sshCommand)
+    sshCommand = "ssh " + hostServerLogin + " 'mkdir -p " + scn.tempFilePath + serverPath_toRemote + "'"
     subprocess.call(sshCommand, shell=True)
 
     # set up project folder in remote server
     print("copying blender project files...")
-    rsyncCommand = "rsync -a --copy-links --include=" + projectName + ".blend --exclude='*' '" + projectPath + "' '" + hostServerLogin + ":" + serverPath_toRemote + "'"
+    rsyncCommand = "rsync --copy-links -rqa --include=" + projectName + ".blend --exclude='*' '" + projectPath + "' '" + hostServerLogin + ":" + scn.tempFilePath + serverPath_toRemote + "'"
     process = subprocess.Popen(rsyncCommand, shell=True)
     return process
 
-def copyPythonPreferencesFile():
-    rsyncCommand = "rsync -a --include=blender_p.py --exclude='*' '" + os.path.join(getLibraryPath(), "scripts") + "/' '" + hostServerLogin + ":" + serverPath_toRemote + "'"
-    process = subprocess.Popen(rsyncCommand, shell=True)
+def copyFiles(scn):
+    rsyncCommand = "ssh " + hostServerLogin + " 'mkdir -p " + scn.tempFilePath + "'; rsync -a '" + os.path.join(getLibraryPath(), "to_host_server") + "/' '" + hostServerLogin + ":" + scn.tempFilePath + "'"
+    process = subprocess.Popen(rsyncCommand, stdout=subprocess.PIPE, shell=True)
     return process
 
 def writeServersFile():
-    f = open(os.path.join(getLibraryPath(), "servers", "servers.txt"), "w")
+    f = open(os.path.join(getLibraryPath(), "to_host_server", "servers.txt"), "w")
     # define serversToUse
     scn = bpy.context.scene
     if(scn.serverGroups == "All Servers"):
@@ -271,23 +232,15 @@ def writeServersFile():
     else:
         serversToUse = {}
         serversToUse[scn.serverGroups] = servers[scn.serverGroups]
-    print(serversToUse)
     f.write("### BEGIN REMOTE SERVERS DICTIONARY ###\n")
     f.write(str(serversToUse).replace("'", "\"") + "\n")
     f.write("### END REMOTE SERVERS DICTIONARY ###\n")
     return
 
-def copyRemoteServersFile():
-    writeServersFile()
-    rsyncCommand = "rsync -a --include=servers.txt --exclude='*' '" + os.path.join(getLibraryPath(), "servers") + "/' '" + hostServerLogin + ":" + serverPath_toRemote + "'"
-    process = subprocess.Popen(rsyncCommand, shell=True)
-    return process
-
-def renderFrames(frameRange):
+def renderFrames(frameRange, scn):
     # run blender command to render given range from the remote server
-    renderCommand = "ssh " + hostServerLogin + " 'blender_task.py -p -n " + projectName + " -l " + frameRange + " --hosts_file " + serverPath_toRemote + "servers.txt --local_sync " + serverPath_toRemote + "'"
+    renderCommand = "ssh " + hostServerLogin + " 'python " + scn.tempFilePath + "blender_task.py -p -n " + projectName + " -l " + frameRange + " --hosts_file " + scn.tempFilePath + "servers.txt --local_sync " + scn.tempFilePath + serverPath_toRemote + "'"
     process = subprocess.Popen(renderCommand, shell=True)
-    # To see output from 'blender_task.py', add the -p tag to the 'blender_task.py' call above
     print("Process sent to remote servers!\n")
     return process
 
@@ -300,38 +253,95 @@ def setRenderStatus(key, status):
 def getRenderStatus(key):
     return renderStatus[key]
 
-def setKillingStatus(status):
-    global killingStatus
-    killingStatus = status
-    for a in bpy.context.screen.areas:
-        a.tag_redraw()
-
-def getKillingStatus():
-    return killingStatus
-
-def killAllBlender():
-    setKillingStatus("running...")
-    killScriptPath = os.path.join(getLibraryPath(), "scripts", "killAllBlender.py")
-    runScriptCommand = "python " + killScriptPath.replace(" ", "\\ ") + " -s '" + str(checkNumAvailServers()).replace(" ","").replace("'","\"") + "' -e " + extension + " -u " + username
-    print(runScriptCommand)
-    process = subprocess.Popen(runScriptCommand, stdout=subprocess.PIPE, shell=True)
-    return process
-
 def appendViewable(typeOfRender):
     global renderType
     if(typeOfRender not in renderType):
         renderType.append(typeOfRender)
 
 class refreshNumAvailableServers(Operator):
-    """Attempt to connect to all servers via telnet"""  # blender will use this as a tooltip for menu items and buttons.
-    bl_idname  = "scene.refresh_num_available_servers"  # unique identifier for buttons and menu items to reference.
-    bl_label   = "Refresh Available Servers"            # display name in the interface.
-    bl_options = {'REGISTER', 'UNDO'}                   # enable undo for the operator.
+    """Attempt to connect to all servers through host server""" # blender will use this as a tooltip for menu items and buttons.
+    bl_idname  = "scene.refresh_num_available_servers"          # unique identifier for buttons and menu items to reference.
+    bl_label   = "Refresh Available Servers"                    # display name in the interface.
+    bl_options = {'REGISTER', 'UNDO'}                           # enable undo for the operator.
+
+    def modal(self, context, event):
+        if event.type in {'ESC'}:
+            self.cancel(context)
+            self.report({'INFO'}, "Render process cancelled")
+            print("Process cancelled")
+            return {'CANCELLED'}
+
+        if event.type == 'TIMER':
+            self.process.poll()
+
+            if self.process.returncode != 0 and self.process.returncode != None:
+                # errorMessage = str(self.process.stdout.readline(),'utf-8')
+                # print(errorMessage)
+                # self.report({'ERROR'}, errorMessage)
+                self.report({'ERROR'}, "There was an error. See terminal for details...")
+                return{'FINISHED'}
+            if self.process.returncode != None:
+                print("Process " + str(self.state) + " finished! (return code: " + str(self.process.returncode) + ")\n")
+
+                # check the number of available servers through the host
+                if(self.state == 1):
+                    print("Running 'checkNumAvailServers' function...")
+                    self.process = checkNumAvailServers(context.scene)
+                    self.state += 1
+                    return{'PASS_THROUGH'}
+
+                elif(self.state == 2):
+                    scn = context.scene
+
+                    line1 = self.process.stdout.readline().decode('ASCII').replace("\\n", "")
+                    line2 = self.process.stdout.readline().decode('ASCII').replace("\\n", "")
+                    available = json.loads(line1.replace("'", "\""))
+                    offline = json.loads(line2.replace("'", "\""))
+
+                    bpy.types.Scene.availableServers = StringProperty(name = "Available Servers")
+                    bpy.types.Scene.offlineServers = StringProperty(name = "Offline Servers")
+
+                    scn['availableServers'] = available
+                    scn['offlineServers'] = offline
+                    for a in context.screen.areas:
+                        a.tag_redraw()
+                    self.report({'INFO'}, "Refresh process completed")
+                    return{'FINISHED'}
+                else:
+                    self.report({'ERROR'}, "ERROR: Current state not recognized.")
+                    return{'FINISHED'}
+
+        return{'PASS_THROUGH'}
 
     def execute(self, context):
+
         setHostServerLogin()
-        checkNumAvailServers(context.scene)
-        return {'FINISHED'}
+        writeServersFile()
+
+        # verify user input for tempFilePath string
+        scn = context.scene
+        scn.tempFilePath.replace(" ", "_")
+        if scn.tempFilePath[-1] != "/":
+            scn.tempFilePath = scn.tempFilePath + "/"
+
+        # create timer for modal
+        wm = context.window_manager
+        self._timer = wm.event_timer_add(event_timer_len, context.window)
+        wm.modal_handler_add(self)
+
+        # start initial process
+        print("Copying project files...")
+        self.process = copyFiles(scn)
+        self.state   = 1  # initializes state for modal
+
+        self.report({'INFO'}, "Refreshing available servers...")
+
+        return{'RUNNING_MODAL'}
+
+    def cancel(self, context):
+        wm = context.window_manager
+        wm.event_timer_remove(self._timer)
+        self.process.kill()
 
 class sendFrameToRenderFarm(Operator):
     """Render current frame on remote servers"""            # blender will use this as a tooltip for menu items and buttons.
@@ -350,32 +360,32 @@ class sendFrameToRenderFarm(Operator):
         if event.type == 'TIMER':
             self.process.poll()
 
+            if self.process.returncode != None and self.process.returncode > 1:
+                # errorMessage = str(self.process.stdout.readline(),'utf-8')
+                # print(errorMessage)
+                # self.report({'ERROR'}, errorMessage)
+                self.report({'ERROR'}, "There was an error. See terminal for details...")
+                setRenderStatus("image", "ERROR")
+                return{'FINISHED'}
             if self.process.returncode != None:
-                print("Process " + str(self.state) + " finished!\n")
+                print("Process " + str(self.state) + " finished! (return code: " + str(self.process.returncode) + ")\n")
 
-                # copy python preferences file to host server
+                # copy files to host server
                 if(self.state == 1):
-                    print("Copying python preferences file to host server...")
-                    self.process = copyPythonPreferencesFile()
-                    self.state += 1
-                    return{'PASS_THROUGH'}
-
-                # copy servers text file to host server
-                elif(self.state == 2):
-                    print("Copying servers text file to host server...")
-                    self.process = copyRemoteServersFile()
+                    print("Copying files to host server...")
+                    self.process = copyFiles(context.scene)
                     self.state += 1
                     return{'PASS_THROUGH'}
 
                 # start render process at current frame
-                elif(self.state == 3):
-                    self.process = renderFrames("[" + str(self.curFrame) + "]")
+                elif(self.state == 2):
+                    self.process = renderFrames("[" + str(self.curFrame) + "]", context.scene)
                     self.state += 1
                     setRenderStatus("image", "Rendering...")
                     return{'PASS_THROUGH'}
 
                 # prepare local dump location, and move previous files to backup subdirectory
-                elif(self.state == 4):
+                elif(self.state == 3):
                     print("Preparing local directory...")
                     self.process = cleanLocalDirectoryForGetFrames()
                     self.state += 1
@@ -383,20 +393,20 @@ class sendFrameToRenderFarm(Operator):
                     return{'PASS_THROUGH'}
 
                 # get rendered frames from remote servers
-                elif(self.state == 5):
+                elif(self.state == 4):
                     print("Fetching render files...")
-                    self.process = getFrames()
+                    self.process = getFrames(context.scene)
                     self.state += 1
                     return{'PASS_THROUGH'}
 
                 # average the rendered frames
-                elif(self.state == 6):
+                elif(self.state == 5):
                     print("Averaging frames...")
                     self.process = averageFrames()
                     self.state += 1
                     return{'PASS_THROUGH'}
 
-                elif(self.state == 7):
+                elif(self.state == 6):
                     self.report({'INFO'}, "Render completed! View the rendered image in your UV/Image_Editor")
                     setRenderStatus("image", "Complete!")
                     appendViewable("image")
@@ -409,6 +419,8 @@ class sendFrameToRenderFarm(Operator):
         return{'PASS_THROUGH'}
 
     def execute(self, context):
+        scn = context.scene
+
         # ensure no other image render processes are running
         if(getRenderStatus("image") in ["Rendering...", "Preparing files..."]):
             self.report({'WARNING'}, "Render in progress...")
@@ -422,9 +434,14 @@ class sendFrameToRenderFarm(Operator):
         if jobValidityDict["errorType"] != None:
             self.report({jobValidityDict["errorType"]}, jobValidityDict["errorMessage"])
         else:
-            self.report({'INFO'}, "Rendering current frame on " + str(len(context.scene['availableServers'])) + " servers.")
+            self.report({'INFO'}, "Rendering current frame on " + str(len(scn['availableServers'])) + " servers.")
         if not jobValidityDict["valid"]:
             return{'FINISHED'}
+
+        # verify user input for tempFilePath string
+        scn.tempFilePath.replace(" ", "_")
+        if scn.tempFilePath[-1] != "/":
+            scn.tempFilePath = scn.tempFilePath + "/"
 
         # create timer for modal
         wm = context.window_manager
@@ -432,8 +449,9 @@ class sendFrameToRenderFarm(Operator):
         wm.modal_handler_add(self)
 
         # start initial render process
+        writeServersFile()
         self.curFrame = context.scene.frame_current
-        self.process = cleanLocalDirectoryForRenderFrames()
+        self.process = cleanLocalDirectoryForRenderFrames(scn)
         self.state   = 1  # initializes state for modal
 
         setRenderStatus("image", "Preparing files...")
@@ -464,32 +482,32 @@ class sendAnimationToRenderFarm(Operator):
         if event.type == 'TIMER':
             self.process.poll()
 
+            if self.process.returncode != None and self.process.returncode > 1:
+                # errorMessage = str(self.process.stdout.readline(),'utf-8')
+                # print(errorMessage)
+                # self.report({'ERROR'}, errorMessage)
+                self.report({'ERROR'}, "There was an error. See terminal for details...")
+                setRenderStatus("animation", "ERROR")
+                return{'FINISHED'}
             if self.process.returncode != None:
-                print("Process " + str(self.state) + " finished!\n")
+                print("Process " + str(self.state) + " finished! (return code: " + str(self.process.returncode) + ")\n")
 
-                # copy python preferences file to host server
+                # copy files to host server
                 if(self.state == 1):
-                    print("Copying python preferences file to host server...")
-                    self.process = copyPythonPreferencesFile()
-                    self.state += 1
-                    return{'PASS_THROUGH'}
-
-                # copy servers text file to host server
-                elif(self.state == 2):
-                    print("Copying servers text file to host server...")
-                    self.process = copyRemoteServersFile()
+                    print("Copying files to host server...")
+                    self.process = copyFiles(context.scene)
                     self.state += 1
                     return{'PASS_THROUGH'}
 
                 # start render process from the defined start and end frames
-                elif(self.state == 3):
+                elif(self.state == 2):
                     if scn.frameRanges == "":
-                        self.process = renderFrames("[[" + str(self.startFrame) + "," + str(self.endFrame) + "]]")
+                        self.process = renderFrames("[[" + str(self.startFrame) + "," + str(self.endFrame) + "]]", context.scene)
                     else:
                         global frameRangesDict
                         frameRangesDict = buildFrameRangesString(scn.frameRanges)
                         if(frameRangesDict["valid"]):
-                            self.process = renderFrames(frameRangesDict["string"])
+                            self.process = renderFrames(frameRangesDict["string"], context.scene)
                         else:
                             self.report({'ERROR'}, "ERROR: Invalid frame ranges given.")
                             setRenderStatus("animation", "ERROR")
@@ -499,7 +517,7 @@ class sendAnimationToRenderFarm(Operator):
                     return{'PASS_THROUGH'}
 
                 # prepare local dump location, and move previous files to backup subdirectory
-                elif(self.state == 4):
+                elif(self.state == 3):
                     print("Preparing local directory...")
                     self.process = cleanLocalDirectoryForGetFrames()
                     self.state += 1
@@ -507,13 +525,13 @@ class sendAnimationToRenderFarm(Operator):
                     return{'PASS_THROUGH'}
 
                 # get rendered frames from remote servers
-                elif(self.state == 5):
+                elif(self.state == 4):
                     print("Fetching render files...")
-                    self.process = getFrames()
+                    self.process = getFrames(context.scene)
                     self.state +=1
                     return{'PASS_THROUGH'}
 
-                elif(self.state == 6):
+                elif(self.state == 5):
                     self.report({'INFO'}, "Render completed! View the rendered animation in '//render/'")
                     setRenderStatus("animation", "Complete!")
                     appendViewable("animation")
@@ -526,6 +544,8 @@ class sendAnimationToRenderFarm(Operator):
         return{'PASS_THROUGH'}
 
     def execute(self, context):# ensure no other animation render processes are running
+        scn = context.scene
+
         if(getRenderStatus("animation") in ["Rendering...","Preparing files..."]):
             self.report({'WARNING'}, "Render in progress...")
             return{'FINISHED'}
@@ -539,18 +559,24 @@ class sendAnimationToRenderFarm(Operator):
             self.report({jobValidityDict["errorType"]}, jobValidityDict["errorMessage"])
             return{'FINISHED'}
 
+        # verify user input for tempFilePath string
+        scn.tempFilePath.replace(" ", "_")
+        if scn.tempFilePath[-1] != "/":
+            scn.tempFilePath = scn.tempFilePath + "/"
+
         # create timer for modal
         wm = context.window_manager
         self._timer = wm.event_timer_add(event_timer_len, context.window)
         wm.modal_handler_add(self)
 
         # start initial render process
+        writeServersFile()
         self.startFrame = context.scene.frame_start
         self.endFrame   = context.scene.frame_end
-        self.process    = cleanLocalDirectoryForRenderFrames()
+        self.process    = cleanLocalDirectoryForRenderFrames(scn)
         self.state      = 1   # initializes state for modal
 
-        self.report({'INFO'}, "Rendering animation on " + str(len(context.scene['availableServers'])) + " servers.")
+        self.report({'INFO'}, "Rendering animation on " + str(len(scn['availableServers'])) + " servers.")
         setRenderStatus("animation", "Preparing files...")
 
         return{'RUNNING_MODAL'}
@@ -559,97 +585,6 @@ class sendAnimationToRenderFarm(Operator):
         wm = context.window_manager
         wm.event_timer_remove(self._timer)
         self.process.kill()
-
-class getRenderedFrames(Operator):
-    """Get rendered frames from host server"""          # blender will use this as a tooltip for menu items and buttons.
-    bl_idname  = "scene.get_rendered_frames"            # unique identifier for buttons and menu items to reference.
-    bl_label   = "Get Rendered Frames"                  # display name in the interface.
-    bl_options = {'REGISTER', 'UNDO'}                   # enable undo for the operator.
-
-    def modal(self, context, event):
-        self.process.poll()
-
-        if self.process.returncode != None:
-            print("Process " + str(self.state) + " finished!\n")
-            self.report({'INFO'}, "'Get Frames' process complete.")
-
-            return{'FINISHED'}
-
-        return{'PASS_THROUGH'}
-
-    def execute(self, context):
-        # init global project variables
-        setGlobalProjectVars()
-
-        # ensure the job won't break the script
-        jobValidityDict = jobIsValid("animation")
-        if not jobValidityDict["valid"]:
-            self.report({jobValidityDict["errorType"]}, jobValidityDict["errorMessage"])
-            return{'FINISHED'}
-
-        # create timer for modal
-        wm = context.window_manager
-        self._timer = wm.event_timer_add(event_timer_len, context.window)
-        wm.modal_handler_add(self)
-
-        cleanLocalDirectoryForGetFrames()
-
-        # start initial render process
-        self.process    = getFrames()
-        self.state      = 1                 # initializes state for modal
-        return{'RUNNING_MODAL'}
-
-    def cancel(self, context):
-        wm = context.window_manager
-        wm.event_timer_remove(self._timer)
-        self.process.kill()
-
-# class averageRenderedFrames(Operator):
-#     """Average pixels in rendered frames"""                 # blender will use this as a tooltip for menu items and buttons.
-#     bl_idname  = "scene.average_frames"                     # unique identifier for buttons and menu items to reference.
-#     bl_label   = "Average Rendered Frames"                  # display name in the interface.
-#     bl_options = {'REGISTER', 'UNDO'}                       # enable undo for the operator.
-#
-#     def modal(self, context, event):
-#         self.process.poll()
-#
-#         if self.process.returncode != None:
-#             print("Process " + str(self.state) + " finished!\n")
-#             self.report({'INFO'}, "Frame averaging process complete.")
-#
-#             return{'FINISHED'}
-#
-#         return{'PASS_THROUGH'}
-#
-#     def execute(self, context):
-#         # init global project variables
-#         setGlobalProjectVars()
-#
-#         # ensure the job won't break the script
-#         jobValidityDict = jobIsValid("animation")
-#         if not jobValidityDict["valid"]:
-#             self.report({jobValidityDict["errorType"]}, jobValidityDict["errorMessage"])
-#             return{'FINISHED'}
-#
-#         # create timer for modal
-#         wm = context.window_manager
-#         self._timer = wm.event_timer_add(event_timer_len, context.window)
-#         wm.modal_handler_add(self)
-#
-#         # start initial render process
-#         self.process    = averageFrames()
-#         self.state      = 1                 # initializes state for modal
-#
-#         return{'RUNNING_MODAL'}
-#
-#     def cancel(self, context):
-#         wm = context.window_manager
-#         wm.event_timer_remove(self._timer)
-#         self.process.kill()
-#
-#     def execute(self, context):
-#         averageFrames()
-#         return{'FINISHED'}
 
 class openRenderedImageInUI(Operator):
     """Open rendered image"""                                       # blender will use this as a tooltip for menu items and buttons.
@@ -730,108 +665,71 @@ class commitEdits(Operator):
         importServerFiles()
         return{'FINISHED'}
 
-class killBlender(Operator):
-    """Kill all blender processes on all remote servers"""              # blender will use this as a tooltip for menu items and buttons.
-    bl_idname  = "scene.kill_blender"                                   # unique identifier for buttons and menu items to reference.
-    bl_label   = "Kill All Blender Processes"     # display name in the interface.
-    bl_options = {'REGISTER', 'UNDO'}                                   # enable undo for the operator.
-
-    def modal(self, context, event):
-        if event.type in {'ESC'}:
-            self.cancel(context)
-            self.report({'INFO'}, "Kill process cancelled")
-            print("Process cancelled")
-            return {'CANCELLED'}
-
-        if event.type == 'TIMER':
-            self.process.poll()
-
-            if self.process.returncode != None:
-                self.report({'INFO'}, "Kill All Blender Process Finished!")
-                setKillingStatus("Finished")
-                return{'FINISHED'}
-
-        return{'PASS_THROUGH'}
-
-    def execute(self, context):
-        # create timer for modal
-        wm = context.window_manager
-        self._timer = wm.event_timer_add(event_timer_len, context.window)
-        wm.modal_handler_add(self)
-
-        # start killAllBlender process
-        self.process = killAllBlender()
-
-        self.report({'INFO'}, "Killing blender processes on " + str(len(context.scene['availableServers'])) + " servers...")
-
-        return{'RUNNING_MODAL'}
-
-    def cancel(self, context):
-        wm = context.window_manager
-        wm.event_timer_remove(self._timer)
-        self.process.kill()
-
 class drawRenderOnServersPanel(View3DPanel, Panel):
     bl_label    = "Render on Servers"
     bl_idname   = "VIEW3D_PT_tools_render_on_servers"
     bl_context  = "objectmode"
     bl_category = "Render"
+    COMPAT_ENGINES = {'CYCLES'}
 
     def draw(self, context):
         layout = self.layout
         scn = context.scene
-        imRenderStatus = getRenderStatus("image")
-        animRenderStatus = getRenderStatus("animation")
 
-        # Available Servers Info
-        col = layout.column(align=True)
-        row = col.row(align=True)
-        availableServerString = 'Available Servers: ' + str(len(scn['availableServers'])) + " / " + str(len(scn['availableServers']) + len(scn['offlineServers']))
-        row.operator("scene.refresh_num_available_servers", text=availableServerString, icon="FILE_REFRESH")
-
-        # Render Buttons
-        row = col.row(align=True)
-        row.alignment = 'EXPAND'
-        row.active = len(scn['availableServers']) > 0
-        row.operator("scene.render_frame_on_servers", text="Render", icon="RENDER_STILL")
-        row.operator("scene.render_animation_on_servers", text="Animation", icon="RENDER_ANIMATION")
-        col = layout.column(align=True)
-        row = col.row(align=True)
-        row.prop(scn, "serverGroups")
-
-        # Render Status Info
-        if(imRenderStatus != "None" and animRenderStatus != "None"):
+        if scn.render.engine != 'CYCLES':
             col = layout.column(align=True)
             row = col.row(align=True)
-            row.label('Render Status (cf): ' + imRenderStatus)
-            row = col.row(align=True)
-            row.label('Render Status (a):  ' + animRenderStatus)
-        elif(imRenderStatus != "None"):
+            row.label("Please switch to Cycles")
+        else:
+            imRenderStatus = getRenderStatus("image")
+            animRenderStatus = getRenderStatus("animation")
+
+            # Available Servers Info
             col = layout.column(align=True)
             row = col.row(align=True)
-            row.label('Render Status: ' + imRenderStatus)
-        elif(animRenderStatus != "None"):
+            availableServerString = 'Available Servers: ' + str(len(scn['availableServers'])) + " / " + str(len(scn['availableServers']) + len(scn['offlineServers']))
+            row.operator("scene.refresh_num_available_servers", text=availableServerString, icon="FILE_REFRESH")
+
+            # Render Buttons
+            row = col.row(align=True)
+            row.alignment = 'EXPAND'
+            row.active = len(scn['availableServers']) > 0
+            row.operator("scene.render_frame_on_servers", text="Render", icon="RENDER_STILL")
+            row.operator("scene.render_animation_on_servers", text="Animation", icon="RENDER_ANIMATION")
             col = layout.column(align=True)
             row = col.row(align=True)
-            row.label('Render Status: ' + animRenderStatus)
+            row.prop(scn, "serverGroups")
+
+            # Render Status Info
+            if(imRenderStatus != "None" and animRenderStatus != "None"):
+                col = layout.column(align=True)
+                row = col.row(align=True)
+                row.label('Render Status (cf): ' + imRenderStatus)
+                row = col.row(align=True)
+                row.label('Render Status (a):  ' + animRenderStatus)
+            elif(imRenderStatus != "None"):
+                col = layout.column(align=True)
+                row = col.row(align=True)
+                row.label('Render Status: ' + imRenderStatus)
+            elif(animRenderStatus != "None"):
+                col = layout.column(align=True)
+                row = col.row(align=True)
+                row.label('Render Status: ' + animRenderStatus)
 
 
-        # display buttons to view render(s)
-        row = layout.row(align=True)
-        if   "image"   in renderType:
-            row.operator("scene.open_rendered_image", text="View Image", icon="FILE_IMAGE")
-        if "animation" in renderType:
-            row.operator("scene.open_rendered_animation", text="View Animation", icon="FILE_MOVIE")
+            # display buttons to view render(s)
+            row = layout.row(align=True)
+            if   "image"   in renderType:
+                row.operator("scene.open_rendered_image", text="View Image", icon="FILE_IMAGE")
+            if "animation" in renderType:
+                row.operator("scene.open_rendered_animation", text="View Animation", icon="FILE_MOVIE")
 
-    def invoke(self, context, layout):
-        checkNumAvailServers(context.scene)
-        return{'RUNNING_MODAL'}
-
-class drawSamplesPanel(View3DPanel, Panel):
+class drawSamplingPanel(View3DPanel, Panel):
     bl_label    = "Sampling (Single Frame)"
     bl_idname   = "VIEW3D_PT_sampling"
     bl_context  = "objectmode"
     bl_category = "Render"
+    COMPAT_ENGINES = {'CYCLES'}
 
     def calcSamples(self, scn, squared, category, multiplier):
         if squared:
@@ -839,82 +737,101 @@ class drawSamplesPanel(View3DPanel, Panel):
         result = math.floor(multiplier*category*len(scn['availableServers']))
         return result
 
-
     def draw(self, context):
         layout = self.layout
         scn = context.scene
 
-        # Basic Render Samples Info
-        col = layout.column(align=True)
-        row = col.row(align=True)
-
-        if not context.scene.cycles.progressive == 'BRANCHED_PATH':
-            sampleSize = scn.cycles.samples
-            if(scn.cycles.use_square_samples):
-                sampleSize = sampleSize**2
-            if sampleSize < 10:
-                row.label('Samples: Too few samples')
-            else:
-                row.label("Samples: " + str(math.floor(sampleSize*len(scn['availableServers']))))
-        else:
-            # find AA sample size first (this affects other sample sizes)
-            aaSampleSize = scn.cycles.aa_samples
-            squared = False
-            if(scn.cycles.use_square_samples):
-                squared = True
-                aaSampleSize = aaSampleSize**2
-
-            # calculate sample sizes for single frame renders on available servers
-            aa    = self.calcSamples(scn, squared, aaSampleSize, 1)
-            diff  = self.calcSamples(scn, squared, scn.cycles.diffuse_samples, aaSampleSize)
-            glos  = self.calcSamples(scn, squared, scn.cycles.glossy_samples, aaSampleSize)
-            tran  = self.calcSamples(scn, squared, scn.cycles.transmission_samples, aaSampleSize)
-            ao    = self.calcSamples(scn, squared, scn.cycles.ao_samples, aaSampleSize)
-            meshL = self.calcSamples(scn, squared, scn.cycles.mesh_light_samples, aaSampleSize)
-            sub   = self.calcSamples(scn, squared, scn.cycles.subsurface_samples, aaSampleSize)
-            vol   = self.calcSamples(scn, squared, scn.cycles.volume_samples, aaSampleSize)
-
+        if scn.render.engine == 'CYCLES':
+            # Basic Render Samples Info
+            col = layout.column(align=True)
             row = col.row(align=True)
-            if(aaSampleSize < 5):
-                row.label('AA: Too few samples')
+
+            if not context.scene.cycles.progressive == 'BRANCHED_PATH':
+                sampleSize = scn.cycles.samples
+                if(scn.cycles.use_square_samples):
+                    sampleSize = sampleSize**2
+                if sampleSize < 10:
+                    row.label('Samples: Too few samples')
+                else:
+                    row.label("Samples: " + str(math.floor(sampleSize*len(scn['availableServers']))))
             else:
-                row.label('AA:')
-                row.label(str(aa))
+                # find AA sample size first (this affects other sample sizes)
+                aaSampleSize = scn.cycles.aa_samples
+                squared = False
+                if(scn.cycles.use_square_samples):
+                    squared = True
+                    aaSampleSize = aaSampleSize**2
+
+                # calculate sample sizes for single frame renders on available servers
+                aa    = self.calcSamples(scn, squared, aaSampleSize, 1)
+                diff  = self.calcSamples(scn, squared, scn.cycles.diffuse_samples, aaSampleSize)
+                glos  = self.calcSamples(scn, squared, scn.cycles.glossy_samples, aaSampleSize)
+                tran  = self.calcSamples(scn, squared, scn.cycles.transmission_samples, aaSampleSize)
+                ao    = self.calcSamples(scn, squared, scn.cycles.ao_samples, aaSampleSize)
+                meshL = self.calcSamples(scn, squared, scn.cycles.mesh_light_samples, aaSampleSize)
+                sub   = self.calcSamples(scn, squared, scn.cycles.subsurface_samples, aaSampleSize)
+                vol   = self.calcSamples(scn, squared, scn.cycles.volume_samples, aaSampleSize)
+
                 row = col.row(align=True)
-                row.label('Diffuse:')
-                row.label(str(diff))
-                row = col.row(align=True)
-                row.label('Glossy:')
-                row.label(str(glos))
-                row = col.row(align=True)
-                row.label('Transmission:')
-                row.label(str(tran))
-                row = col.row(align=True)
-                row.label('AO:')
-                row.label(str(ao))
-                row = col.row(align=True)
-                row.label('Mesh Light:')
-                row.label(str(meshL))
-                row = col.row(align=True)
-                row.label('Subsurface:')
-                row.label(str(sub))
-                row = col.row(align=True)
-                row.label('Volume:')
-                row.label(str(vol))
+                if(aaSampleSize < 5):
+                    row.label('AA: Too few samples')
+                else:
+                    row.label('AA:')
+                    row.label(str(aa))
+                    row = col.row(align=True)
+                    row.label('Diffuse:')
+                    row.label(str(diff))
+                    row = col.row(align=True)
+                    row.label('Glossy:')
+                    row.label(str(glos))
+                    row = col.row(align=True)
+                    row.label('Transmission:')
+                    row.label(str(tran))
+                    row = col.row(align=True)
+                    row.label('AO:')
+                    row.label(str(ao))
+                    row = col.row(align=True)
+                    row.label('Mesh Light:')
+                    row.label(str(meshL))
+                    row = col.row(align=True)
+                    row.label('Subsurface:')
+                    row.label(str(sub))
+                    row = col.row(align=True)
+                    row.label('Volume:')
+                    row.label(str(vol))
+    # def menu_draw(self, context):
+    #     layout = self.layout
+    #     scn = context.scene
+    #
+    #     if scn.render.engine == 'CYCLES' and not scn.cycles.progressive == 'BRANCHED_PATH':
+    #         # Basic Render Samples Info
+    #         col = layout.column(align=True)
+    #         row = col.row(align=True)
+    #         sampleSize = scn.cycles.samples
+    #         if(scn.cycles.use_square_samples):
+    #             sampleSize = sampleSize**2
+    #         if sampleSize < 10:
+    #             row.label('Too few samples')
+    #         else:
+    #             row.label("Total Samples: " + str(math.floor(sampleSize*len(scn['availableServers']))))
+    #
+    # bpy.types.CyclesRender_PT_sampling.append(menu_draw)
 
 class drawFrameRangePanel(View3DPanel, Panel):
     bl_label    = "Frame Range"
     bl_idname   = "VIEW3D_PT_frame_range"
     bl_context  = "objectmode"
     bl_category = "Render"
+    COMPAT_ENGINES = {'CYCLES'}
 
     def draw(self, context):
         layout = self.layout
         scn = context.scene
 
-        col = layout.column(align=True)
-        row = col.row(align=True)
-        row.prop(scn, "frameRanges")
+        if scn.render.engine == 'CYCLES':
+            col = layout.column(align=True)
+            row = col.row(align=True)
+            row.prop(scn, "frameRanges")
 
 class drawServersPanel(View3DPanel, Panel):
     bl_label    = "Servers"
@@ -922,50 +839,36 @@ class drawServersPanel(View3DPanel, Panel):
     bl_context  = "objectmode"
     bl_category = "Render"
     bl_options = {'DEFAULT_CLOSED'}
+    COMPAT_ENGINES = {'CYCLES'}
 
     def draw(self, context):
         layout = self.layout
         scn = context.scene
 
-        col = layout.column(align=True)
-        row = col.row(align=True)
-        row.operator("scene.edit_servers_dict", text="Edit Remote Servers", icon="TEXT")
-        row = col.row(align=True)
-        row.operator("scene.commit_edits", text="Commit Edits", icon="FILE_REFRESH")
-
-class drawAdminOptionsPanel(View3DPanel, Panel):
-    bl_label    = "Admin Tasks"
-    bl_idname   = "VIEW3D_PT_tools_admin_options"
-    bl_context  = "objectmode"
-    bl_category = "Render"
-    bl_options = {'DEFAULT_CLOSED'}
-
-    def draw(self, context):
-        layout = self.layout
-        scn = context.scene
-        killingStatus = getKillingStatus()
-
-        # Render Buttons
-        col = layout.column(align=True)
-        col.active = len(scn['availableServers']) > 0
-        row = col.row(align=True)
-        row.operator("scene.get_rendered_frames", text="Get Frames", icon="LOAD_FACTORY")
-        #row = col.row(align=True)
-        #row.operator("scene.average_frames", text="Average Frames", icon="RENDERLAYERS")
-
-        row = col.row(align=True)
-        row = col.row(align=True)
-        row.operator("scene.kill_blender", text="Kill All Blender Processes", icon="CANCEL")
-
-        # Killall Blender Status
-        if(killingStatus != "None"):
+        if scn.render.engine == 'CYCLES':
+            col = layout.column(align=True)
             row = col.row(align=True)
-            if killingStatus == "Finished":
-                row.label('Blender processes killed!')
-            else:
-                row.label('Killing blender on remote servers...')
+            row.prop(scn, "tempFilePath")
+            col = layout.column(align=True)
+            row = col.row(align=True)
+            row.operator("scene.edit_servers_dict", text="Edit Remote Servers", icon="TEXT")
+            row = col.row(align=True)
+            row.operator("scene.commit_edits", text="Commit Edits", icon="FILE_REFRESH")
+
+def more_menu_options(self, context):
+    layout = self.layout
+    layout.separator()
+
+    layout.operator("sendFrameToRenderFarm", text="Render Image on Servers", icon='RENDER_STILL')
+    layout.operator("sendAnimationToRenderFarm", text="Render Image on Servers", icon='RENDER_ANIMAITON')
+
+# store keymaps here to access after registration
+addon_keymaps = []
 
 def register():
+    bpy.utils.register_module(__name__)
+    bpy.types.INFO_MT_render.append(more_menu_options)
+
     # initialize check box for displaying render sampling details
     bpy.types.Scene.boolTool = BoolProperty(
         name="Show Details",
@@ -976,11 +879,18 @@ def register():
     bpy.types.Scene.frameRanges = StringProperty(
         name = "Frames")
 
+    # initialize frame range string text box
+    bpy.types.Scene.tempFilePath = StringProperty(
+                        name = "Path",
+                        description="File path on host server (temporary storage location)",
+                        maxlen = 128,
+                        default = "/tmp/renderFarm/")
+
+    # initialize server groups enum property
     groupNames = [("All Servers","All Servers","Render on all servers")]
     for groupName in servers:
         junkList = [groupName,groupName,"Render only servers on this group"]
         groupNames.append(tuple(junkList))
-    print(groupNames)
     bpy.types.Scene.serverGroups = EnumProperty(
         attr="serverGroups",
         name="Servers",
@@ -988,13 +898,28 @@ def register():
         items=groupNames,
         default='All Servers')
 
-    bpy.utils.register_module(__name__)
+    # handle the keymap
+    wm = bpy.context.window_manager
+    km = wm.keyconfigs.addon.keymaps.new(name='Object Mode', space_type='EMPTY')
+    kmi = km.keymap_items.new(sendFrameToRenderFarm.bl_idname, 'F12', 'PRESS', ctrl=True)
+    kmi = km.keymap_items.new(sendAnimationToRenderFarm.bl_idname, 'F12', 'PRESS', ctrl=True, shift=True)
+    kmi = km.keymap_items.new(refreshNumAvailableServers.bl_idname, 'R', 'PRESS', ctrl=True)
+    kmi = km.keymap_items.new(editRemoteServersDict.bl_idname, 'E', 'PRESS', ctrl=True)
+    kmi = km.keymap_items.new(commitEdits.bl_idname, 'C', 'PRESS', ctrl=True, alt=True)
+    addon_keymaps.append(km)
 
 def unregister():
     bpy.utils.unregister_module(__name__)
+    bpy.types.INFO_MT_render.remove(more_menu_options)
     del bpy.types.Scene.boolTool
     del bpy.types.Scene.frameRanges
     del bpy.types.Scene.serverGroups
+
+    wm = bpy.context.window_manager
+    for km in addon_keymaps:
+        wm.keyconfigs.addon.keymaps.remove(km)
+    # clear the list
+    addon_keymaps.clear()
 
 if __name__ == "__main__":
     register()

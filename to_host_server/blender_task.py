@@ -10,6 +10,7 @@ import json
 import re
 import fnmatch
 import shlex
+import time
 
 def pflush(string):
     print(string)
@@ -96,6 +97,7 @@ parser.add_argument('-l','--frame_range',action='store',default="[]")
 # Takes a string dictionary of hosts
 # If neither of these arguments are provided, then use the default hosts file to load hosts
 parser.add_argument('-a','--hosts',action='store',default=None,help='Pass a dictionary or list of hosts. Should be valid json.')
+parser.add_argument('-H','--hosts_online',action='store_true',default=None,help='Telnets to ports to find out if a host is availible to ssh into.')
 parser.add_argument('-i','--hosts_file',action='store',default='remoteServers.txt',help='Pass a filename from which to load hosts. Should be valid json format.')
 
 # NOTE: this parameter is currently required
@@ -114,18 +116,18 @@ parser.add_argument('-o','--output_file',action='store',default=False,help='Loca
 parser.add_argument('-v','--verbose',action=verbose_action,nargs='?',default=0)
 parser.add_argument('-p','--progress',action='store_true',help='Prints the progress to stdout as a json object.')
 
-HOSTS = {'cse103group': [   'cse10301','cse10302','cse10303','cse10304','cse10305','cse10306','cse10307',
+HOSTS = {    'cse103group': [   'cse10301','cse10302','cse10303','cse10304','cse10305','cse10306','cse10307',
                                 'cse10309','cse10310','cse10311','cse10312','cse10315','cse10316','cse10317',
                                 'cse10318','cse10319','cse103podium'
                             ],
-            'cse201group' : [     'cse20101','cse20102','cse20103','cse20104','cse20105','cse20106','cse20107',
+            'cse201group':  [   'cse20101','cse20102','cse20103','cse20104','cse20105','cse20106','cse20107',
                                 'cse20108','cse20109','cse20110','cse20111','cse20112','cse20113','cse20114',
                                 'cse20116','cse20117','cse20118','cse20119','cse20120','cse20121','cse20122',
                                 'cse20123','cse20124','cse20125','cse20126','cse20127','cse20128','cse20129',
                                 'cse20130','cse20131','cse20132','cse20133','cse20134','cse20135','cse20136'
                             ],
-            'cse21801group': [  'cse21801','cse21802','cse21803','cse21804','cse21805','cse21806','cse21807',
-                                'cse21808','cse21809','cse21810','cse21811','cse21812'
+            'cse21801group':[  'cse21801','cse21802','cse21803','cse21804','cse21805','cse21806','cse21807',
+                               'cse21808','cse21809','cse21810','cse21811','cse21812'
                             ],
             'cse217group' : [   'cse21701','cse21702','cse21703','cse21704','cse21705','cse21706','cse21707',
                                 'cse21708','cse21709','cse21710','cse21711','cse21712','cse21713','cse21714',
@@ -179,8 +181,8 @@ def mkdir_string(path,verbose=False):
         pflush(tmpStr)
     return tmpStr
 
-def rsync_files_to_node_string(projectFullPath,username,hostname,remoteFullPath,verbose=False):
-    tmpStr = "rsync  -e 'ssh -oStrictHostKeyChecking=no'  -a %s %s@%s:%s/" % (projectFullPath,username,hostname,remoteFullPath)
+def rsync_files_to_node_string(projectFullPath,username,hostname,remoteProjectPath,verbose=False):
+    tmpStr = "rsync  -e 'ssh -oStrictHostKeyChecking=no' -a %s %s@%s:%s/" % (projectFullPath,username,hostname,remoteProjectPath)
     if( verbose >= 2 ):
         pflush(tmpStr)
     return tmpStr
@@ -256,7 +258,7 @@ def start_blender_tasks(
     else:
         print("rsync error: %d" % (r))
 
-def buildJobStrings(frames,projectName,username,servers=1): # jobList is a list of lists containing start and end values
+def buildJobStrings(frames,pathToProjectFiles,projectName,username,servers=1): # jobList is a list of lists containing start and end values
     jobStrings = []
     seedString = ""
     if(len(frames) == 1):
@@ -264,11 +266,11 @@ def buildJobStrings(frames,projectName,username,servers=1): # jobList is a list 
         frame = frames[0]
         for i in range(servers):
             seedString = "_seed-" + str(i)
-            builtString = "blender -b " + '/tmp/'+username+'/' +projectName+'/' +projectName + ".blend -x 1 -o //results/" + projectName + seedString + "_####.png -s " + str(frame) + " -e " + str(frame) + " -P  /tmp/"  + username + '/' +projectName + '/blender_p.py' + " -a"
+            builtString = "blender -b " + pathToProjectFiles + projectName + ".blend -x 1 -o //results/" + projectName + seedString + "_####.png -s " + str(frame) + " -e " + str(frame) + " -P  '" + pathToProjectFiles + "blender_p.py' -a"
             jobStrings.append(builtString)
     else:
         for frame in frames:
-            builtString = "blender -b " + '/tmp/'+username+'/' +projectName+'/' +projectName + ".blend -x 1 -o //results/" + projectName + "_####.png -s " + str(frame) + " -e " + str(frame) +  " -P  /tmp/"  + username + '/' +projectName + '/blender_p.py' + " -a"
+            builtString = "blender -b " + pathToProjectFiles + projectName + ".blend -x 1 -o //results/" + projectName + "_####.png -s " + str(frame) + " -e " + str(frame) +  " -P  '" + pathToProjectFiles + "blender_p.py' -a"
             jobStrings.append(builtString)
     return jobStrings
 
@@ -292,16 +294,80 @@ def expandFrames( frame_range ):
 
     return frames
 
+def stopWatch(value):
+    '''From seconds to Days;Hours:Minutes;Seconds'''
+
+    valueD = (((value/365)/24)/60)
+    Days = int(valueD)
+
+    valueH = (valueD-Days)*365
+    Hours = int(valueH)
+
+    valueM = (valueH - Hours)*24
+    Minutes = int(valueM)
+
+    valueS = (valueM - Minutes)*60
+    Seconds = int(valueS)
+
+    Days = str(Days)
+    if len(Days) == 1:
+        Days = "0" + Days
+    Hours = str(Hours)
+    if len(Hours) == 1:
+        Hours = "0" + Hours
+    Minutes = str(Minutes)
+    if len(Minutes) == 1:
+        Minutes = "0" + Minutes
+    Seconds = str(Seconds)
+    if len(Seconds) == 1:
+        Seconds = "0" + Seconds
+
+    return Days + ";" + Hours + ":" + Minutes + ";" + Seconds
+
+def hostsStatus(hosts_file=None,hosts=None,hosts_online=False,verbose=False):
+    global HOSTS # Using the global HOSTS variable
+    if( hosts ):
+        HOSTS = json.loads(args.hosts)
+    elif( hosts_file ):
+        HOSTS = setServersDict( hosts_file )
+    jobs            = []
+    tmp_hosts       = get_hosts()
+    hosts           = []
+    unreachable     = [] # jobList is a list of lists containing start and end values
+    for host in tmp_hosts:
+        try:
+            tn = telnetlib.Telnet(host,22,.5)
+            hosts.append(host.encode('utf-8'))
+        except:
+            unreachable.append(host.encode('utf-8'))
+    numHosts = len( hosts )
+    if( not(hosts_online) ):
+        print("")
+        print("Could not reach the following hosts: ")
+        print(unreachable)
+        print("Using the following %d hosts: " % (numHosts))
+        print( hosts )
+        print("")
+        sys.stdout.flush()
+    else:
+        print( hosts )
+        print( unreachable )
+    return hosts
 
 def main():
+    startTime=time.time()
     args    = parser.parse_args()
-    print ("Starting blender_task...")
-    sys.stdout.flush()
+    if(not( args.hosts_online )):
+        print ("Starting blender_task...")
+        sys.stdout.flush()
+    else:
+        hostsStatus(hosts_file=args.hosts_file, hosts=args.hosts, hosts_online=True, verbose=args.verbose)
+        sys.exit(0)
 
-    if(args.verbose >= 2):
+    if(args.verbose >= 2 and not(args.hosts_online)):
         print (args)
     username    = getpass.getuser()
-    projectRoot   = "/tmp/%s" % (username)
+    projectRoot = os.path.dirname(os.path.abspath(__file__))
 
     if(not os.path.exists(projectRoot)):
         os.mkdir(projectRoot)
@@ -309,7 +375,7 @@ def main():
     if(args.project_name):
 
         projectName         = args.project_name
-        projectPath         = '{projectRoot}/{projectName}'.format(projectRoot=projectRoot,projectName=projectName)
+        projectPath         = '{projectRoot}/{projectName}/'.format(projectRoot=projectRoot,projectName=projectName)
 
         # Make the /tmp/<username> directory
         if(not os.path.exists(projectRoot)):
@@ -332,6 +398,8 @@ def main():
                 projectSyncPath = '{tmpDir}/'.format(tmpDir=tmpDir)
         else:
             projectSyncPath = args.local_sync
+        if(not(os.path.exists(projectSyncPath))):
+            os.mkdir(projectSyncPath)
 
         remoteProjectPath       = '{projectRoot}/{projectName}'.format(projectRoot=projectRoot,projectName=projectName)
         if(args.remote_sync == 'results'):
@@ -345,44 +413,25 @@ def main():
         sys.exit(0)
 
     if(not(args.output_file)):
-        projectOutuptFile = "{projectPath}/".format(projectPath=projectPath)
+        projectOutuptFile = "{projectPath}".format(projectPath=projectPath)
         for file in os.listdir(projectOutuptFile):
             if( fnmatch.fnmatch(file,'*_seed-*') or fnmatch.fnmatch(file,'*.tga') ):
                 if( args.verbose > 1 ):
                     print('Removing %s from project dir.' % (projectOutuptFile + file))
                 os.remove(projectOutuptFile + file)
 
+    cpCommand = "cp -n '" + projectRoot + "/blender_p.py' '" + projectSyncPath + "'"
+    subprocess.call(cpCommand, shell=True)
+
     print ("Rendering frames %s in %s" % (args.frame_range,projectName))
     sys.stdout.flush()
     frame_range = json.loads(args.frame_range)
 
-    global HOSTS # Using the global HOSTS variable
-    if( args.hosts ):
-        HOSTS = json.loads(args.hosts)
-    elif( args.hosts_file ):
-        HOSTS = setServersDict( args.hosts_file )
-
-    jobs            = []
-    tmp_hosts       = get_hosts()
-    hosts           = []
-    unreachable     = [] # jobList is a list of lists containing start and end values
-    for host in tmp_hosts:
-        try:
-            tn = telnetlib.Telnet(host,22,.5)
-            hosts.append(host)
-        except:
-            unreachable.append(host)
-
+    hosts = hostsStatus(hosts_file=args.hosts_file,hosts=args.hosts,verbose=args.verbose)
     numHosts = len(hosts)
-    print ("")
-    print ("Could not reach the following hosts: ",unreachable)
-    print ("Using the following %d hosts: " % (numHosts), hosts)
-    print ("")
-
-    sys.stdout.flush()
 
     frames      = expandFrames(frame_range)
-    jobStrings  = buildJobStrings(frames,projectName,username,numHosts)
+    jobStrings  = buildJobStrings(frames,projectPath,projectName,username,numHosts)
 
     if(args.verbose >= 2):
         print ("Frames: ", frames)
@@ -423,20 +472,25 @@ def main():
     for hostname in rsync_threads.keys():
         rsync_threads[hostname].join()
 
+
     failed = 0
     for job in jobStrings:
         if(job not in jobStatus):
             print("Render task did not complete. Command: %s" % (job))
             sys.stdout.flush()
             failed += 1
+    endTime = time.time()
+    timer = stopWatch(endTime-startTime)
+    print("")
+    print("Elapsed time: " + timer)
     if(failed==0):
-        print("")
         print("Render completed successfully!")
+        print("")
         sys.stdout.flush()
         sys.exit(0)
     else:
-        print("")
         print("Render failed for %d jobs" % (failed))
+        print("")
         sys.stdout.flush()
         sys.exit(1)
 
