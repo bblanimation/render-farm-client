@@ -278,7 +278,7 @@ class refreshNumAvailableServers(Operator):
         return{'PASS_THROUGH'}
 
     def execute(self, context):
-        writeServersFile(server_init.servers)
+        writeServersFile(servers)
 
         # verify user input for tempFilePath string
         scn = context.scene
@@ -416,7 +416,7 @@ class sendFrame(Operator):
         wm.modal_handler_add(self)
 
         # start initial render process
-        writeServersFile(server_init.servers)
+        writeServersFile(servers)
         self.curFrame = context.scene.frame_current
         self.process = cleanLocalDirectoryForRenderFrames(self.projectName)
         self.state   = 1  # initializes state for modal
@@ -435,9 +435,6 @@ class sendAnimation(Operator):
     bl_idname  = "scene.render_animation_on_servers"    # unique identifier for buttons and menu items to reference.
     bl_label   = "Render Animation"   # display name in the interface.
     bl_options = {'REGISTER', 'UNDO'}                   # enable undo for the operator.
-
-    frameRangesDict = {}
-
 
     def modal(self, context, event):
         scn = context.scene
@@ -474,9 +471,9 @@ class sendAnimation(Operator):
                     if scn.frameRanges == "":
                         self.process = renderFrames("[[" + str(self.startFrame) + "," + str(self.endFrame) + "]]", self.projectName)
                     else:
-                        frameRangesDict = buildFrameRangesString(scn.frameRanges)
-                        if(frameRangesDict["valid"]):
-                            self.process = renderFrames(frameRangesDict["string"], self.projectName)
+                        self.frameRangesDict = buildFrameRangesString(scn.frameRanges)
+                        if(self.frameRangesDict["valid"]):
+                            self.process = renderFrames(self.frameRangesDict["string"], self.projectName)
                         else:
                             self.report({'ERROR'}, "ERROR: Invalid frame ranges given.")
                             setRenderStatus("animation", "ERROR")
@@ -537,7 +534,7 @@ class sendAnimation(Operator):
         wm.modal_handler_add(self)
 
         # start initial render process
-        writeServersFile(server_init.servers)
+        writeServersFile(servers)
         self.startFrame = context.scene.frame_start
         self.endFrame   = context.scene.frame_end
         self.process    = cleanLocalDirectoryForRenderFrames(self.projectName)
@@ -577,7 +574,7 @@ class openRenderedAnimationInUI(Operator):
 
 
     def execute(self, context):
-        self.frameRangesDict = sendAnimation.frameRangesDict
+        self.frameRangesDict = buildFrameRangesString(context.scene.frameRanges)
         self.projectName = bpy.path.display_name_from_filepath(bpy.data.filepath)
         # open rendered image
         context.area.type = 'CLIP_EDITOR'
