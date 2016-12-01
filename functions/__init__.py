@@ -1,0 +1,124 @@
+#!/usr/bin/env python
+
+import bpy, subprocess, os
+from .setupServerVars import *
+
+def jobIsValid(jobType, projectName):
+    if projectName == "":
+        return {"valid":False, "errorType":"WARNING", "errorMessage":"RENDER FAILED: You have not saved your project file. Please save it before attempting to render."}
+    elif " " in projectName:
+        return {"valid":False, "errorType":"ERROR", "errorMessage":"RENDER ABORTED: Please remove ' ' (spaces) from the project file name."}
+    elif bpy.context.scene.camera is None:
+        return {"valid":False, "errorType":"ERROR", "errorMessage":"RENDER FAILED: No camera in scene."}
+    elif jobType == "image":
+        if bpy.context.scene.render.image_settings.color_mode == 'BW':
+            return {"valid":False, "errorType":"ERROR", "errorMessage":"RENDER FAILED: 'BW' color mode not currently supported. Supported modes: ['RGB', 'RGBA']"}
+        if bpy.context.scene.cycles.progressive == 'PATH':
+            samples = bpy.context.scene.cycles.samples
+            if bpy.context.scene.cycles.use_square_samples:
+                samples = samples**2
+            if samples < 10:
+                return {"valid":True, "errorType":"WARNING", "errorMessage":"RENDER ALERT: Render result may be inaccurate at " + str(samples) + " samples. Try 10 or more samples for a more accurate render."}
+            else:
+                return {"valid":True, "errorType":None, "errorMessage":None}
+        elif bpy.context.scene.cycles.progressive == 'BRANCHED_PATH':
+            samples = bpy.context.scene.cycles.aa_samples
+            if bpy.context.scene.cycles.use_square_samples:
+                samples = samples**2
+            if samples < 5:
+                return {"valid":True, "errorType":"WARNING", "errorMessage":"RENDER ALERT: Render result may be inaccurate at " + str(samples) + " AA samples. Try 5 or more AA samples for a more accurate render."}
+            else:
+                return {"valid":True, "errorType":None, "errorMessage":None}
+        else:
+            return {"valid":True, "errorType":None, "errorMessage":None}
+    else:
+        return {"valid":True, "errorType":None, "errorMessage":None}
+
+def archiveOldRender(projectName):
+    dumpLocation = bpy.path.abspath("//") + "render-dump/"
+
+    print("verifying local directory...")
+    mkdirCommand = "mkdir -p " + dumpLocation + "backups/"
+    subprocess.call(mkdirCommand, shell=True)
+
+    print("cleaning up local directory...")
+    rsyncCommand = "rsync --remove-source-files --exclude='" + projectName + "_average.*' " + dumpLocation + "* " + dumpLocation + "backups/"
+    process = subprocess.Popen(rsyncCommand, stdout=subprocess.PIPE, shell=True)
+    return process
+
+def getFrames(projectName):
+    dumpLocation = bpy.path.abspath("//") + "render-dump/"
+    scn = bpy.context.scene
+
+    print("copying files from server...\n")
+    rsyncCommand = "ssh " + bpy.props.hostServerLogin + " 'mkdir -p " + scn.tempFilePath + projectName + "/;'; rsync --remove-source-files --exclude='*.blend' '" + bpy.props.hostServerLogin + ":" + scn.tempFilePath + projectName + "/results/*' '" + dumpLocation + "'"
+    process = subprocess.Popen(rsyncCommand, stdout=subprocess.PIPE, shell=True)
+    return process
+
+def buildFrameRangesString(frameRanges):
+    frameRangeList = frameRanges.replace(" ", "").split(",")
+    newFrameRangeList = []
+    invalidDict = { "valid":False, "string":None }
+    for string in frameRangeList:
+        try:
+            newInt = int(string)
+            if newInt not in newFrameRangeList:
+                newFrameRangeList.append(newInt)
+        except:
+            if "-" in string:
+                newString = string.split("-")
+                if len(newString) > 2:
+                    return invalidDict
+                try:
+                    newInt1 = int(newString[0])
+                    newInt2 = int(newString[1])
+                    if newInt1 <= newInt2:
+                        newFrameRangeList.append([newInt1,newInt2])
+                    else:
+                        return invalidDict
+                except:
+                    return invalidDict
+            else:
+                return invalidDict
+    return { "valid":True, "string":str(newFrameRangeList).replace(" ","") }
+
+def copyProjectFile(projectName):
+    scn = bpy.context.scene
+    bpy.ops.file.pack_all()
+    bpy.ops.wm.save_as_mainfile(copy=True)
+
+    print("verifying remote directory...")
+    sshCommand = "ssh " + bpy.props.hostServerLogin + " 'mkdir -p " + scn.tempFilePath + projectName + "/toRemote/'"
+    subprocess.call(sshCommand, shell=True)
+
+    # set up project folder in remote server
+    print("copying blender project files...")
+    rsyncCommand = "rsync --copy-links -rqa --include=" + projectName + ".blend --exclude='*' '" + bpy.path.abspath("//") + "' '" + bpy.props.hostServerLogin + ":" + scn.tempFilePath + projectName + "/toRemote/'"
+    process = subprocess.Popen(rsyncCommand, shell=True)
+    return process
+
+def copyFiles():
+    scn = bpy.context.scene
+    rsyncCommand = "ssh " + bpy.props.hostServerLogin + " 'mkdir -p " + scn.tempFilePath + "'; rsync -a '" + os.path.join(getLibraryPath(), "to_host_server") + "/' '" + bpy.props.hostServerLogin + ":" + scn.tempFilePath + "'"
+    process = subprocess.Popen(rsyncCommand, stdout=subprocess.PIPE, shell=True)
+    return process
+
+def renderFrames(frameRange, projectName):
+    scn = bpy.context.scene
+    # run blender command to render given range from the remote server
+    renderCommand = "ssh " + bpy.props.hostServerLogin + " 'python " + scn.tempFilePath + "blender_task.py -p -n " + projectName + " -l " + frameRange + " --hosts_file " + scn.tempFilePath + "servers.txt --local_sync " + scn.tempFilePath + projectName + "/toRemote/'"
+    process = subprocess.Popen(renderCommand, shell=True)
+    print("Process sent to remote servers!\n")
+    return process
+
+def setRenderStatus(key, status):
+    bpy.context.scene.renderStatus[key] = status
+    for a in bpy.context.screen.areas:
+        a.tag_redraw()
+
+def getRenderStatus(key):
+    return bpy.context.scene.renderStatus[key]
+
+def appendViewable(typeOfRender):
+    if(typeOfRender not in bpy.context.scene.renderType):
+        bpy.context.scene.renderType.append(typeOfRender)
