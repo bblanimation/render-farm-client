@@ -54,7 +54,7 @@ class renderOnServersPanel(Panel):
             if(imRenderStatus != "None" and animRenderStatus != "None"):
                 col = layout.column(align=True)
                 row = col.row(align=True)
-                row.label('Render Status (cf): ' + imRenderStatus)
+                row.label('Render Status (f): ' + imRenderStatus)
                 row = col.row(align=True)
                 row.label('Render Status (a):  ' + animRenderStatus)
             elif(imRenderStatus != "None"):
@@ -207,6 +207,10 @@ class serversPanel(Panel):
             row.operator("scene.edit_servers_dict", text="Edit Remote Servers", icon="TEXT")
             row = col.row(align=True)
             row.operator("scene.restart_remote_servers", text="Restart Remote Servers", icon="FILE_REFRESH")
+
             col = layout.column(align=True)
             row = col.row(align=True)
+            # box = row.box()
+            # box.prop(scn, "showAdvanced")
+            # if scn.showAdvanced:
             row.prop(scn, "tempFilePath")

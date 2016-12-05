@@ -147,7 +147,7 @@ def process_blender_output(hostname,line):
         frame = match.group(1)
         elapsed = match.group(2)
         remainingTime = match.group(3)
-        json_obj = json.loads("{{ \"{hostname}\" : {{ \"rt\" : \"{remainingTime}\", \"cf\" : \"{frame}\", \"et\" : \"{elapsed}\" }} }}".format( hostname=hostname ,elapsed = elapsed,frame = frame,remainingTime = remainingTime))
+        json_obj = json.loads("{{ \"hn\" : \"{hostname}\", \"rt\" : \"{remainingTime}\", \"cf\" : \"{frame}\", \"et\" : \"{elapsed}\" }}".format( hostname=hostname ,elapsed = elapsed,frame = frame,remainingTime = remainingTime))
 
         if(hostname not in hostcount):
             hostcount[hostname] = 0
@@ -476,7 +476,7 @@ def main():
     failed = 0
     for job in jobStrings:
         if(job not in jobStatus):
-            print("Render task did not complete. Command: %s" % (job))
+            sys.stderr.write("Render task did not complete. Command: %s" % (job) + "\n")
             sys.stdout.flush()
             failed += 1
     endTime = time.time()
@@ -485,12 +485,10 @@ def main():
     print("Elapsed time: " + timer)
     if(failed==0):
         print("Render completed successfully!")
-        print("")
         sys.stdout.flush()
         sys.exit(0)
     else:
-        print("Render failed for %d jobs" % (failed))
-        print("")
+        sys.stderr.write("Render failed for %d jobs" % (failed) + "\n")
         sys.stdout.flush()
         sys.exit(1)
 

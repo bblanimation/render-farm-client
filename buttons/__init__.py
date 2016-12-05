@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import bpy, subprocess, os, json
+import bpy, subprocess, os, json, io
 from bpy.types import Operator
 from bpy.props import *
 from ..functions import *
@@ -122,14 +122,26 @@ class sendFrame(Operator):
         if event.type == 'TIMER':
             self.process.poll()
 
-            if self.process.returncode != None and self.process.returncode > 1:
-                # errorMessage = str(self.process.stdout.readline(),'utf-8')
-                # print(errorMessage)
-                # self.report({'ERROR'}, errorMessage)
-                self.report({'ERROR'}, "There was an error. See terminal for details...")
-                setRenderStatus("image", "ERROR")
-                return{'FINISHED'}
             if self.process.returncode != None:
+                # handle unidentified errors
+                if self.process.returncode > 1:
+                    self.report({'ERROR'}, "There was an error. See terminal for details...")
+                    setRenderStatus("image", "ERROR")
+                    return{'FINISHED'}
+
+                # handle and report errors for 'blender_task.py' process
+                elif self.process.returncode == 1 and self.state == 3:
+                    if self.process.stderr:
+                        self.stderr = self.process.stderr.readlines()
+                        for line in self.stderr:
+                            line = line.decode('ASCII').replace("\\n", "")[:-1]
+                            self.report({'ERROR'}, "blender_task.py error: '" + line + "'")
+                        errorMsg = self.stderr[-1].decode('ASCII')
+                        try:
+                            self.numFailedFrames = int(errorMsg[18:-5])
+                        except:
+                            print("Couldn't read last line of process output as integer")
+
                 print("Process " + str(self.state) + " finished! (return code: " + str(self.process.returncode) + ")\n")
 
                 # copy files to host server
@@ -146,30 +158,25 @@ class sendFrame(Operator):
                     setRenderStatus("image", "Rendering...")
                     return{'PASS_THROUGH'}
 
-                # prepare local dump location, and move previous files to backup subdirectory
+                # get rendered frames from remote servers and archive old render files
                 elif(self.state == 3):
-                    print("Preparing local directory...")
-                    self.process = archiveOldRender(self.projectName)
-                    self.state += 1
-                    setRenderStatus("image", "Finishing...")
-                    return{'PASS_THROUGH'}
-
-                # get rendered frames from remote servers
-                elif(self.state == 4):
                     print("Fetching render files...")
                     self.process = getFrames(self.projectName)
                     self.state += 1
                     return{'PASS_THROUGH'}
 
                 # average the rendered frames
-                elif(self.state == 5):
+                elif(self.state == 4):
                     print("Averaging frames...")
                     self.process = self.averageFrames()
                     self.state += 1
                     return{'PASS_THROUGH'}
 
-                elif(self.state == 6):
-                    self.report({'INFO'}, "Render completed! View the rendered image in your UV/Image_Editor")
+                elif(self.state == 5):
+                    failedFramesString = ""
+                    if(self.numFailedFrames > 0):
+                        failedFramesString = " (failed for " + str(self.numFailedFrames) + " frames)"
+                    self.report({'INFO'}, "Render completed" + failedFramesString + "! View the rendered image in your UV/Image_Editor")
                     setRenderStatus("image", "Complete!")
                     appendViewable("image")
                     return{'FINISHED'}
@@ -210,6 +217,9 @@ class sendFrame(Operator):
         wm.modal_handler_add(self)
 
         # start initial render process
+        self.stdout = None
+        self.stderr = None
+        self.numFailedFrames = 0
         self.curFrame = context.scene.frame_current
         self.process = copyProjectFile(self.projectName)
         self.state   = 1  # initializes state for modal
@@ -242,14 +252,26 @@ class sendAnimation(Operator):
         if event.type == 'TIMER':
             self.process.poll()
 
-            if self.process.returncode != None and self.process.returncode > 1:
-                # errorMessage = str(self.process.stdout.readline(),'utf-8')
-                # print(errorMessage)
-                # self.report({'ERROR'}, errorMessage)
-                self.report({'ERROR'}, "There was an error. See terminal for details...")
-                setRenderStatus("animation", "ERROR")
-                return{'FINISHED'}
             if self.process.returncode != None:
+                # handle unidentified errors
+                if self.process.returncode > 1:
+                    self.report({'ERROR'}, "There was an error. See terminal for details...")
+                    setRenderStatus("image", "ERROR")
+                    return{'FINISHED'}
+
+                # handle and report errors for 'blender_task.py' process
+                elif self.process.returncode == 1 and self.state == 3:
+                    if self.process.stderr:
+                        self.stderr = self.process.stderr.readlines()
+                        for line in self.stderr:
+                            line = line.decode('ASCII').replace("\\n", "")[:-1]
+                            self.report({'ERROR'}, "blender_task.py error: '" + line + "'")
+                        errorMsg = self.stderr[-1].decode('ASCII')
+                        try:
+                            self.numFailedFrames = int(errorMsg[18:-5])
+                        except:
+                            print("Couldn't read last line of process output as integer")
+
                 print("Process " + str(self.state) + " finished! (return code: " + str(self.process.returncode) + ")\n")
 
                 # copy files to host server
@@ -275,23 +297,18 @@ class sendAnimation(Operator):
                     self.state += 1
                     return{'PASS_THROUGH'}
 
-                # prepare local dump location, and move previous files to backup subdirectory
+                # get rendered frames from remote servers and archive old render files
                 elif(self.state == 3):
-                    print("Preparing local directory...")
-                    self.process = archiveOldRender(self.projectName)
-                    self.state += 1
-                    setRenderStatus("animation", "Finishing...")
-                    return{'PASS_THROUGH'}
-
-                # get rendered frames from remote servers
-                elif(self.state == 4):
                     print("Fetching render files...")
                     self.process = getFrames(self.projectName)
                     self.state +=1
                     return{'PASS_THROUGH'}
 
-                elif(self.state == 5):
-                    self.report({'INFO'}, "Render completed! View the rendered animation in '//render/'")
+                elif(self.state == 4):
+                    failedFramesString = ""
+                    if(self.numFailedFrames > 0):
+                        failedFramesString = " (failed for " + str(self.numFailedFrames) + " frames)"
+                    self.report({'INFO'}, "Render completed" + failedFramesString + "! View the rendered animation in '//render/'")
                     setRenderStatus("animation", "Complete!")
                     appendViewable("animation")
                     return{'FINISHED'}
@@ -328,8 +345,12 @@ class sendAnimation(Operator):
         wm.modal_handler_add(self)
 
         # start initial render process
+        self.stdout = None
+        self.stderr = None
+        self.numFailedFrames = 0
         self.startFrame = context.scene.frame_start
         self.endFrame   = context.scene.frame_end
+        self.numFrames  = str(int(scn.frame_end) - int(scn.frame_start))
         self.process    = copyProjectFile(self.projectName)
         self.state      = 1   # initializes state for modal
 

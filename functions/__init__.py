@@ -4,15 +4,20 @@ import bpy, subprocess, os
 from .setupServerVars import *
 
 def jobIsValid(jobType, projectName):
+    # verify that project has been saved
     if projectName == "":
         return {"valid":False, "errorType":"WARNING", "errorMessage":"RENDER FAILED: You have not saved your project file. Please save it before attempting to render."}
+
+    # verify that project name contains no spaces
     elif " " in projectName:
         return {"valid":False, "errorType":"ERROR", "errorMessage":"RENDER ABORTED: Please remove ' ' (spaces) from the project file name."}
+
+    # verify that a camera exists in the scene
     elif bpy.context.scene.camera is None:
         return {"valid":False, "errorType":"ERROR", "errorMessage":"RENDER FAILED: No camera in scene."}
+
+    # verify that sampling is high enough to provide expected results
     elif jobType == "image":
-        if bpy.context.scene.render.image_settings.color_mode == 'BW':
-            return {"valid":False, "errorType":"ERROR", "errorMessage":"RENDER FAILED: 'BW' color mode not currently supported. Supported modes: ['RGB', 'RGBA']"}
         if bpy.context.scene.cycles.progressive == 'PATH':
             samples = bpy.context.scene.cycles.samples
             if bpy.context.scene.cycles.use_square_samples:
@@ -34,25 +39,19 @@ def jobIsValid(jobType, projectName):
     else:
         return {"valid":True, "errorType":None, "errorMessage":None}
 
-def archiveOldRender(projectName):
-    dumpLocation = bpy.path.abspath("//") + "render-dump/"
-
-    print("verifying local directory...")
-    mkdirCommand = "mkdir -p " + dumpLocation + "backups/"
-    subprocess.call(mkdirCommand, shell=True)
-
-    print("cleaning up local directory...")
-    rsyncCommand = "rsync --remove-source-files --exclude='" + projectName + "_average.*' " + dumpLocation + "* " + dumpLocation + "backups/"
-    process = subprocess.Popen(rsyncCommand, stdout=subprocess.PIPE, shell=True)
-    return process
-
 def getFrames(projectName):
     dumpLocation = bpy.path.abspath("//") + "render-dump/"
     scn = bpy.context.scene
 
-    print("copying files from server...\n")
-    rsyncCommand = "ssh " + bpy.props.hostServerLogin + " 'mkdir -p " + scn.tempFilePath + projectName + "/;'; rsync --remove-source-files --exclude='*.blend' '" + bpy.props.hostServerLogin + ":" + scn.tempFilePath + projectName + "/results/*' '" + dumpLocation + "'"
-    process = subprocess.Popen(rsyncCommand, stdout=subprocess.PIPE, shell=True)
+    # create backup directory
+    mkdirCommand = "mkdir -p " + dumpLocation + "backups/; "
+    # move old render files to backup directory
+    archiveRsyncCommand = "rsync --remove-source-files --exclude='" + projectName + "_average.*' " + dumpLocation + "* " + dumpLocation + "backups/; "
+    # rsync files from host server to local directory
+    fetchRsyncCommand = "ssh " + bpy.props.hostServerLogin + " 'mkdir -p " + scn.tempFilePath + projectName + "/;'; rsync --remove-source-files --exclude='*.blend' '" + bpy.props.hostServerLogin + ":" + scn.tempFilePath + projectName + "/results/*' '" + dumpLocation + "'"
+
+    # run the above processes
+    process = subprocess.Popen(mkdirCommand + archiveRsyncCommand + fetchRsyncCommand, stdout=subprocess.PIPE, shell=True)
     return process
 
 def buildFrameRangesString(frameRanges):
@@ -87,28 +86,36 @@ def copyProjectFile(projectName):
     bpy.ops.file.pack_all()
     bpy.ops.wm.save_as_mainfile(copy=True)
 
-    print("verifying remote directory...")
-    sshCommand = "ssh " + bpy.props.hostServerLogin + " 'mkdir -p " + scn.tempFilePath + projectName + "/toRemote/'"
-    subprocess.call(sshCommand, shell=True)
+    # creates project directory
+    mkdirCommand = "ssh " + bpy.props.hostServerLogin + " 'mkdir -p " + scn.tempFilePath + projectName + "/toRemote/'; "
 
-    # set up project folder in remote server
-    print("copying blender project files...")
+    # copies blender project file to host server
     rsyncCommand = "rsync --copy-links -rqa --include=" + projectName + ".blend --exclude='*' '" + bpy.path.abspath("//") + "' '" + bpy.props.hostServerLogin + ":" + scn.tempFilePath + projectName + "/toRemote/'"
-    process = subprocess.Popen(rsyncCommand, shell=True)
+
+    print("copying blender project files...")
+    process = subprocess.Popen(mkdirCommand + rsyncCommand, shell=True)
     return process
 
 def copyFiles():
     scn = bpy.context.scene
-    rsyncCommand = "ssh " + bpy.props.hostServerLogin + " 'mkdir -p " + scn.tempFilePath + "'; rsync -a '" + os.path.join(getLibraryPath(), "to_host_server") + "/' '" + bpy.props.hostServerLogin + ":" + scn.tempFilePath + "'"
+
+    # verifies remote project directory (currently unnecessary, as the functionality exists in 'copyProjectFile()')
+    # mkdirCommand = "ssh " + bpy.props.hostServerLogin + " 'mkdir -p " + scn.tempFilePath + "'; "
+
+    # copies necessary files to host server
+    rsyncCommand = "rsync -a '" + os.path.join(getLibraryPath(), "to_host_server") + "/' '" + bpy.props.hostServerLogin + ":" + scn.tempFilePath + "'"
+
     process = subprocess.Popen(rsyncCommand, stdout=subprocess.PIPE, shell=True)
     return process
 
 def renderFrames(frameRange, projectName):
     scn = bpy.context.scene
-    # run blender command to render given range from the remote server
+
+    # runs blender command to render given range from the remote server
     renderCommand = "ssh " + bpy.props.hostServerLogin + " 'python " + scn.tempFilePath + "blender_task.py -p -n " + projectName + " -l " + frameRange + " --hosts_file " + scn.tempFilePath + "servers.txt --local_sync " + scn.tempFilePath + projectName + "/toRemote/'"
-    process = subprocess.Popen(renderCommand, shell=True)
+
     print("Process sent to remote servers!\n")
+    process = subprocess.Popen(renderCommand, stderr=subprocess.PIPE, shell=True)
     return process
 
 def setRenderStatus(key, status):

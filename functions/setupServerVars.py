@@ -3,7 +3,7 @@
 import bpy, os, json
 
 def getLibraryPath():
-    # Full path to "\addons\server_farm_client\" -directory
+    # Full path to "/addons/server_farm_client/" -directory
     paths = bpy.utils.script_paths("addons")
 
     libraryPath = 'assets'
@@ -29,7 +29,7 @@ def readFileFor(f, flagName):
             print("Unable to read with over 300 preceeding lines.")
             break
 
-    # read following lines leading up to '### END flagName ###'
+    # read the following lines leading up to '### END flagName ###'
     nextLine = f.readline()
     numIters = 0
     while(nextLine != "### END " + flagName + " ###\n"):
@@ -59,12 +59,15 @@ def setupServerVars():
 
 def writeServersFile(serverDict, serverGroups):
     f = open(os.path.join(getLibraryPath(), "to_host_server", "servers.txt"), "w")
-    # define serversToUse
+
+    # define dictionary 'serversToUse'
     if(serverGroups == "All Servers"):
         serversToUse = serverDict
     else:
         serversToUse = {}
         serversToUse[serverGroups] = serverDict[serverGroups]
+
+    # write dictionary 'serversToUse' to 'servers.txt'
     f.write("### BEGIN REMOTE SERVERS DICTIONARY ###\n")
     f.write(str(serversToUse).replace("'", "\"") + "\n")
     f.write("### END REMOTE SERVERS DICTIONARY ###\n")

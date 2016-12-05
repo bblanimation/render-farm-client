@@ -3,7 +3,7 @@
 bl_info = {
     "name"        : "Server Farm Client",
     "author"      : "Christopher Gearhart <chris@bblanimation.com>",
-    "version"     : (0, 6, 3),
+    "version"     : (0, 6, 4),
     "blender"     : (2, 78, 0),
     "description" : "Render your scene on a remote server farm with this addon.",
     "location"    : "View3D > Tools > Render",
@@ -33,9 +33,9 @@ def register():
     bpy.types.INFO_MT_render.append(more_menu_options)
 
     # initialize check box for displaying render sampling details
-    bpy.types.Scene.boolTool = BoolProperty(
-        name="Show Details",
-        description="Display details for render sample settings",
+    bpy.types.Scene.showAdvanced = BoolProperty(
+        name="Show Advanced",
+        description="Display advanced remote server settings",
         default = False)
 
     # initialize frame range string text box
@@ -84,7 +84,7 @@ def register():
 def unregister():
     bpy.utils.unregister_module(__name__)
     bpy.types.INFO_MT_render.remove(more_menu_options)
-    del bpy.types.Scene.boolTool
+    del bpy.types.Scene.showAdvanced
     del bpy.types.Scene.frameRanges
     del bpy.types.Scene.tempFilePath
     del bpy.types.Scene.renderType
