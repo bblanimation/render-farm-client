@@ -107,7 +107,7 @@ class sendFrame(Operator):
 
     def averageFrames(self):
         averageScriptPath = os.path.join(getLibraryPath(), "functions", "averageFrames.py")
-        runScriptCommand = "python " + averageScriptPath.replace(" ", "\\ ") + " -p " + bpy.path.abspath("//") + " -n " + self.projectName
+        runScriptCommand = "python " + averageScriptPath.replace(" ", "\\ ") + " -p " + scn.tempLocalDir + " -n " + self.projectName
         process = subprocess.Popen(runScriptCommand)
         return process
 
