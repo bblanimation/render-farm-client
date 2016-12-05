@@ -84,13 +84,13 @@ def buildFrameRangesString(frameRanges):
 def copyProjectFile(projectName):
     scn = bpy.context.scene
     bpy.ops.file.pack_all()
-    bpy.ops.wm.save_as_mainfile(copy=True)
+    bpy.ops.wm.save_as_mainfile(filepath=scn.tempLocalDir + projectName + ".blend", copy=True)
 
     # creates project directory
     mkdirCommand = "ssh " + bpy.props.hostServerLogin + " 'mkdir -p " + scn.tempFilePath + projectName + "/toRemote/'; "
 
     # copies blender project file to host server
-    rsyncCommand = "rsync --copy-links -rqa --include=" + projectName + ".blend --exclude='*' '" + bpy.path.abspath("//") + "' '" + bpy.props.hostServerLogin + ":" + scn.tempFilePath + projectName + "/toRemote/'"
+    rsyncCommand = "rsync --copy-links -rqa --include=" + projectName + ".blend --exclude='*' '" + scn.tempLocalDir + "' '" + bpy.props.hostServerLogin + ":" + scn.tempFilePath + projectName + "/toRemote/'"
 
     print("copying blender project files...")
     process = subprocess.Popen(mkdirCommand + rsyncCommand, shell=True)

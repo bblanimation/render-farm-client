@@ -48,6 +48,12 @@ def register():
                         description="File path on host server (temporary storage location)",
                         maxlen = 128,
                         default = "/tmp/renderFarm/")
+    bpy.types.Scene.tempLocalDir = StringProperty(
+                        name = "Path",
+                        description="File path on local drive to store temporary project files",
+                        maxlen = 128,
+                        default = "/tmp/",
+                        subtype = "DIR_PATH")
 
     bpy.types.Scene.renderType   = []
     bpy.types.Scene.renderStatus = {"animation":"None", "image":"None"}

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import bpy, subprocess, os, json, io
+import bpy, subprocess, os, json, io, fcntl
 from bpy.types import Operator
 from bpy.props import *
 from ..functions import *
@@ -14,8 +14,8 @@ class refreshNumAvailableServers(Operator):
     def checkNumAvailServers(self):
         scn = bpy.context.scene
         command = "ssh " + bpy.props.hostServerLogin + " 'python " + scn.tempFilePath + "blender_task.py -H --hosts_file " + scn.tempFilePath + "servers.txt'"
-        process = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
-        #process = subprocess.Popen(command, shell=True)
+        process = subprocess.Popen(command, stdout=subprocess.PIPE)
+        #process = subprocess.Popen(command)
         return process
 
     def updateAvailServerInfo(self):
@@ -108,7 +108,7 @@ class sendFrame(Operator):
     def averageFrames(self):
         averageScriptPath = os.path.join(getLibraryPath(), "functions", "averageFrames.py")
         runScriptCommand = "python " + averageScriptPath.replace(" ", "\\ ") + " -p " + bpy.path.abspath("//") + " -n " + self.projectName
-        process = subprocess.Popen(runScriptCommand, shell=True)
+        process = subprocess.Popen(runScriptCommand)
         return process
 
     def modal(self, context, event):
@@ -118,6 +118,19 @@ class sendFrame(Operator):
             print("Process cancelled")
             setRenderStatus("image", "Cancelled")
             return {'CANCELLED'}
+
+        if self.process.stdout and self.state == 3:
+            flags = fcntl.fcntl(self.process.stdout, fcntl.F_GETFL) # get current stdout flags
+            fcntl.fcntl(self.process.stdout, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+            try:
+                print(read(self.process.stdout.fileno(), 1024))
+            except:
+                pass
+        #     self.stdout = self.process.stdout.readlines()
+        #     for line in self.stdout:
+        #         line = line.decode('ASCII').replace("\\n", "")[:-1]
+        #         self.finishedFrames += line.count("has been copied back from hostname")
+        #         print(self.finishedFrames)
 
         if event.type == 'TIMER':
             self.process.poll()
@@ -133,9 +146,11 @@ class sendFrame(Operator):
                 elif self.process.returncode == 1 and self.state == 3:
                     if self.process.stderr:
                         self.stderr = self.process.stderr.readlines()
+                        print("\nERRORS:")
                         for line in self.stderr:
                             line = line.decode('ASCII').replace("\\n", "")[:-1]
                             self.report({'ERROR'}, "blender_task.py error: '" + line + "'")
+                            print(line)
                         errorMsg = self.stderr[-1].decode('ASCII')
                         try:
                             self.numFailedFrames = int(errorMsg[18:-5])
@@ -192,6 +207,11 @@ class sendFrame(Operator):
         scn = context.scene
         writeServersFile(bpy.props.servers, scn.serverGroups)
 
+        #for testing purposes only (saves unsaved file as 'unsaved_file.blend')
+        if self.projectName == "":
+            self.projectName = "unsaved_file"
+            bpy.ops.wm.save_as_mainfile(filepath=scn.tempLocalDir + self.projectName + ".blend", copy=True)
+
         # ensure no other image render processes are running
         if(getRenderStatus("image") in ["Rendering...", "Preparing files..."]):
             self.report({'WARNING'}, "Render in progress...")
@@ -220,6 +240,7 @@ class sendFrame(Operator):
         self.stdout = None
         self.stderr = None
         self.numFailedFrames = 0
+        self.finishedFrames = 0
         self.curFrame = context.scene.frame_current
         self.process = copyProjectFile(self.projectName)
         self.state   = 1  # initializes state for modal
@@ -263,9 +284,12 @@ class sendAnimation(Operator):
                 elif self.process.returncode == 1 and self.state == 3:
                     if self.process.stderr:
                         self.stderr = self.process.stderr.readlines()
+                        print("\nERRORS:")
                         for line in self.stderr:
                             line = line.decode('ASCII').replace("\\n", "")[:-1]
                             self.report({'ERROR'}, "blender_task.py error: '" + line + "'")
+                            print(line)
+                        print()
                         errorMsg = self.stderr[-1].decode('ASCII')
                         try:
                             self.numFailedFrames = int(errorMsg[18:-5])
@@ -460,7 +484,7 @@ class restartRemoteServers(Operator):
         else:
             serversToRestart = "lab=" + scn.serverGroups
         curlCommand = "curl --user cgearhar:" + decodedPassword + " -X GET -H 'Content-type: application/json' -H 'Accept: application/json' 'http://fog.cse.taylor.edu/manage/restart?" + serversToRestart + "'"
-        process = subprocess.Popen(curlCommand, stdout=subprocess.PIPE, shell=True)
+        process = subprocess.Popen(curlCommand, stdout=subprocess.PIPE)
         return process
 
     def modal(self, context, event):

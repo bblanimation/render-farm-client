@@ -182,7 +182,7 @@ def mkdir_string(path,verbose=False):
     return tmpStr
 
 def rsync_files_to_node_string(projectFullPath,username,hostname,remoteProjectPath,verbose=False):
-    tmpStr = "rsync  -e 'ssh -oStrictHostKeyChecking=no' -a %s %s@%s:%s/" % (projectFullPath,username,hostname,remoteProjectPath)
+    tmpStr = "rsync -e 'ssh -oStrictHostKeyChecking=no' -a %s %s@%s:%s/" % (projectFullPath,username,hostname,remoteProjectPath)
     if( verbose >= 2 ):
         pflush(tmpStr)
     return tmpStr
