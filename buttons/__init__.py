@@ -192,6 +192,11 @@ class sendFrame(Operator):
         scn = context.scene
         writeServersFile(bpy.props.servers, scn.serverGroups)
 
+        #for testing purposes only (saves unsaved file as 'unsaved_file.blend')
+        if self.projectName == "":
+            self.projectName = "unsaved_file"
+            bpy.ops.wm.save_as_mainfile(filepath=scn.tempLocalDir + self.projectName + ".blend", copy=True)
+
         # ensure no other image render processes are running
         if(getRenderStatus("image") in ["Rendering...", "Preparing files..."]):
             self.report({'WARNING'}, "Render in progress...")
