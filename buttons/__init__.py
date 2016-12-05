@@ -14,8 +14,8 @@ class refreshNumAvailableServers(Operator):
     def checkNumAvailServers(self):
         scn = bpy.context.scene
         command = "ssh " + bpy.props.hostServerLogin + " 'python " + scn.tempFilePath + "blender_task.py -H --hosts_file " + scn.tempFilePath + "servers.txt'"
-        process = subprocess.Popen(command, stdout=subprocess.PIPE)
-        #process = subprocess.Popen(command)
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
+        #process = subprocess.Popen(command, shell=True)
         return process
 
     def updateAvailServerInfo(self):
@@ -107,8 +107,8 @@ class sendFrame(Operator):
 
     def averageFrames(self):
         averageScriptPath = os.path.join(getLibraryPath(), "functions", "averageFrames.py")
-        runScriptCommand = "python " + averageScriptPath.replace(" ", "\\ ") + " -p " + scn.tempLocalDir + " -n " + self.projectName
-        process = subprocess.Popen(runScriptCommand)
+        runScriptCommand = "python " + averageScriptPath.replace(" ", "\\ ") + " -p " + bpy.path.abspath('//') + " -n " + self.projectName
+        process = subprocess.Popen(runScriptCommand, shell=True)
         return process
 
     def modal(self, context, event):
@@ -210,7 +210,7 @@ class sendFrame(Operator):
         #for testing purposes only (saves unsaved file as 'unsaved_file.blend')
         if self.projectName == "":
             self.projectName = "unsaved_file"
-            bpy.ops.wm.save_as_mainfile(filepath=scn.tempLocalDir + self.projectName + ".blend", copy=True)
+            bpy.ops.wm.save_mainfile(filepath=scn.tempLocalDir + self.projectName + ".blend")
 
         # ensure no other image render processes are running
         if(getRenderStatus("image") in ["Rendering...", "Preparing files..."]):
@@ -348,6 +348,11 @@ class sendAnimation(Operator):
         scn = context.scene
         writeServersFile(bpy.props.servers, scn.serverGroups)
 
+        #for testing purposes only (saves unsaved file as 'unsaved_file.blend')
+        if self.projectName == "":
+            self.projectName = "unsaved_file"
+            bpy.ops.wm.save_mainfile(filepath=scn.tempLocalDir + self.projectName + ".blend")
+
         if(getRenderStatus("animation") in ["Rendering...","Preparing files..."]):
             self.report({'WARNING'}, "Render in progress...")
             return{'FINISHED'}
@@ -484,7 +489,7 @@ class restartRemoteServers(Operator):
         else:
             serversToRestart = "lab=" + scn.serverGroups
         curlCommand = "curl --user cgearhar:" + decodedPassword + " -X GET -H 'Content-type: application/json' -H 'Accept: application/json' 'http://fog.cse.taylor.edu/manage/restart?" + serversToRestart + "'"
-        process = subprocess.Popen(curlCommand, stdout=subprocess.PIPE)
+        process = subprocess.Popen(curlCommand, stdout=subprocess.PIPE, shell=True)
         return process
 
     def modal(self, context, event):
