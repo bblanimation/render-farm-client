@@ -473,49 +473,50 @@ class restartRemoteServers(Operator):
     bl_label   = "Restart Remote Servers"       # display name in the interface.
     bl_options = {'REGISTER', 'UNDO'}           # enable undo for the operator.
 
-    def restartServers(self, scn):
-        # for security reasons, read password in from external file on local machine
-        f = open("/Users/cgear13/loginValue.txt", "r")
-        encodedPassword = f.readline()[:-1]
-
-        # decode password from 'loginValue.txt'
-        decodedPassword = ""
-        for i in range(len(encodedPassword)):
-            decodedPassword += chr(ord(encodedPassword[i])-2)
-
-        # build and execute curl command
-        if(scn.serverGroups == "All Servers"):
-            serversToRestart = "all"
-        else:
-            serversToRestart = "lab=" + scn.serverGroups
-        curlCommand = "curl --user cgearhar:" + decodedPassword + " -X GET -H 'Content-type: application/json' -H 'Accept: application/json' 'http://fog.cse.taylor.edu/manage/restart?" + serversToRestart + "'"
-        process = subprocess.Popen(curlCommand, stdout=subprocess.PIPE, shell=True)
-        return process
-
-    def modal(self, context, event):
-        scn = context.scene
-
-        if event.type == 'TIMER':
-            self.process.poll()
-
-            if self.process.returncode != None and self.process.returncode > 1:
-                self.report({'ERROR'}, "There was an error. See terminal for details...")
-                return{'FINISHED'}
-            if self.process.returncode != None:
-                self.report({'INFO'}, "Remote servers have been restarted")
-                return{'FINISHED'}
-
-        return{'PASS_THROUGH'}
+    # def restartServers(self, scn):
+    #     # for security reasons, read password in from external file on local machine
+    #     f = open("/Users/cgear13/loginValue.txt", "r")
+    #     encodedPassword = f.readline()[:-1]
+    #
+    #     # decode password from 'loginValue.txt'
+    #     decodedPassword = ""
+    #     for i in range(len(encodedPassword)):
+    #         decodedPassword += chr(ord(encodedPassword[i])-2)
+    #
+    #     # build and execute curl command
+    #     if(scn.serverGroups == "All Servers"):
+    #         serversToRestart = "all"
+    #     else:
+    #         serversToRestart = "lab=" + scn.serverGroups
+    #     curlCommand = "curl --user cgearhar:" + decodedPassword + " -X GET -H 'Content-type: application/json' -H 'Accept: application/json' 'http://fog.cse.taylor.edu/lab-resource/restart?" + serversToRestart + "&os=linux&fork=" + str(len(bpy.props.servers[scn.serverGroups])) + "'"
+    #     process = subprocess.Popen(curlCommand, stdout=subprocess.PIPE, shell=True)
+    #     return process
+    #
+    # def modal(self, context, event):
+    #     scn = context.scene
+    #
+    #     if event.type == 'TIMER':
+    #         self.process.poll()
+    #
+    #         if self.process.returncode != None and self.process.returncode > 1:
+    #             self.report({'ERROR'}, "There was an error. See terminal for details...")
+    #             return{'FINISHED'}
+    #         if self.process.returncode != None:
+    #             self.report({'INFO'}, "Remote servers have been restarted")
+    #             return{'FINISHED'}
+    #
+    #     return{'PASS_THROUGH'}
 
     def execute(self, context):
-        # create timer for modal
-        wm = context.window_manager
-        self._timer = wm.event_timer_add(0.1, context.window)
-        wm.modal_handler_add(self)
-
-        # start initial process
-        self.process = self.restartServers(context.scene)
-        self.state   = 1
-        self.report({'INFO'}, "Restarting remote servers")
-
-        return{'RUNNING_MODAL'}
+        # # create timer for modal
+        # wm = context.window_manager
+        # self._timer = wm.event_timer_add(0.1, context.window)
+        # wm.modal_handler_add(self)
+        #
+        # # start initial process
+        # self.process = self.restartServers(context.scene)
+        # self.state   = 1
+        # self.report({'INFO'}, "Restarting remote servers")
+        #
+        # return{'RUNNING_MODAL'}
+        return{'FINISHED'}
