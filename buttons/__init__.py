@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import bpy, subprocess, os, json, io, fcntl
+import bpy, subprocess, os, json, io, fcntl, time
 from bpy.types import Operator
 from bpy.props import *
 from ..functions import *
@@ -13,7 +13,7 @@ class refreshNumAvailableServers(Operator):
 
     def checkNumAvailServers(self):
         scn = bpy.context.scene
-        command = "ssh " + bpy.props.hostServerLogin + " 'python " + scn.tempFilePath + "blender_task.py -H --hosts_file " + scn.tempFilePath + "servers.txt'"
+        command = "ssh " + bpy.props.hostServerLogin + " 'python " + scn.tempFilePath + "blender_task -H --hosts_file " + scn.tempFilePath + "servers.txt'"
         process = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
         #process = subprocess.Popen(command, shell=True)
         return process
@@ -112,12 +112,19 @@ class sendFrame(Operator):
         return process
 
     def modal(self, context, event):
-        if event.type in {'ESC'}:
-            self.cancel(context)
-            self.report({'INFO'}, "Render process cancelled")
-            print("Process cancelled")
-            setRenderStatus("image", "Cancelled")
-            return {'CANCELLED'}
+        if event.type in {'ESC'} and not(self.alreadyCalled):
+            if self.state == 3:
+                self.alreadyCalled = True
+                self.process.kill()
+                self.report({'INFO'}, "Render process cancelled. Fetching frames...")
+                print("Process cancelled")
+                setRenderStatus("image", "Cancelled")
+            else:
+                self.cancel(context)
+                self.report({'INFO'}, "Render process cancelled")
+                print("Process cancelled")
+                setRenderStatus("image", "Cancelled")
+                return {'CANCELLED'}
 
         if self.process.stdout and self.state == 3:
             flags = fcntl.fcntl(self.process.stdout, fcntl.F_GETFL) # get current stdout flags
@@ -142,14 +149,14 @@ class sendFrame(Operator):
                     setRenderStatus("image", "ERROR")
                     return{'FINISHED'}
 
-                # handle and report errors for 'blender_task.py' process
+                # handle and report errors for 'blender_task' process
                 elif self.process.returncode == 1 and self.state == 3:
                     if self.process.stderr:
                         self.stderr = self.process.stderr.readlines()
                         print("\nERRORS:")
                         for line in self.stderr:
                             line = line.decode('ASCII').replace("\\n", "")[:-1]
-                            self.report({'ERROR'}, "blender_task.py error: '" + line + "'")
+                            self.report({'ERROR'}, "blender_task error: '" + line + "'")
                             print(line)
                         errorMsg = self.stderr[-1].decode('ASCII')
                         try:
@@ -239,6 +246,7 @@ class sendFrame(Operator):
         # start initial render process
         self.stdout = None
         self.stderr = None
+        self.alreadyCalled = False
         self.numFailedFrames = 0
         self.finishedFrames = 0
         self.curFrame = context.scene.frame_current
@@ -263,12 +271,20 @@ class sendAnimation(Operator):
     def modal(self, context, event):
         scn = context.scene
 
-        if event.type in {'ESC'}:
-            self.cancel(context)
-            self.report({'INFO'}, "Render process cancelled")
-            print("Process cancelled")
-            setRenderStatus("animation", "Cancelled")
-            return {'CANCELLED'}
+        if event.type in {'ESC'} and not(self.alreadyCalled):
+            if self.state == 3:
+                self.alreadyCalled = True
+                self.process.kill()
+                self.report({'INFO'}, "Render process cancelled. Fetching frames...")
+                print("Process cancelled")
+                setRenderStatus("animation", "Cancelled")
+            else:
+                self.cancel(context)
+                self.report({'INFO'}, "Render process cancelled")
+                print("Process cancelled")
+                setRenderStatus("animation", "Cancelled")
+                return {'CANCELLED'}
+
 
         if event.type == 'TIMER':
             self.process.poll()
@@ -280,14 +296,14 @@ class sendAnimation(Operator):
                     setRenderStatus("image", "ERROR")
                     return{'FINISHED'}
 
-                # handle and report errors for 'blender_task.py' process
+                # handle and report errors for 'blender_task' process
                 elif self.process.returncode == 1 and self.state == 3:
                     if self.process.stderr:
                         self.stderr = self.process.stderr.readlines()
                         print("\nERRORS:")
                         for line in self.stderr:
                             line = line.decode('ASCII').replace("\\n", "")[:-1]
-                            self.report({'ERROR'}, "blender_task.py error: '" + line + "'")
+                            self.report({'ERROR'}, "blender_task error: '" + line + "'")
                             print(line)
                         print()
                         errorMsg = self.stderr[-1].decode('ASCII')
@@ -376,6 +392,7 @@ class sendAnimation(Operator):
         # start initial render process
         self.stdout = None
         self.stderr = None
+        self.alreadyCalled = False
         self.numFailedFrames = 0
         self.startFrame = context.scene.frame_start
         self.endFrame   = context.scene.frame_end

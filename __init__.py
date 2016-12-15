@@ -3,7 +3,7 @@
 bl_info = {
     "name"        : "Server Farm Client",
     "author"      : "Christopher Gearhart <chris@bblanimation.com>",
-    "version"     : (0, 6, 4),
+    "version"     : (0, 6, 5),
     "blender"     : (2, 78, 0),
     "description" : "Render your scene on a remote server farm with this addon.",
     "location"    : "View3D > Tools > Render",
@@ -23,7 +23,7 @@ def more_menu_options(self, context):
     layout.separator()
 
     layout.operator("sendFrame", text="Render Image on Servers", icon='RENDER_STILL')
-    layout.operator("sendAnimation", text="Render Image on Servers", icon='RENDER_ANIMAITON')
+    layout.operator("sendAnimation", text="Render Image on Servers", icon='RENDER_ANIMATION')
 
 # store keymaps here to access after registration
 addon_keymaps = []
@@ -54,6 +54,12 @@ def register():
                         maxlen = 128,
                         default = "/tmp/",
                         subtype = "DIR_PATH")
+
+    bpy.types.Scene.nameOutputFiles = StringProperty(
+                        name = "Name Output Files",
+                        description="Custom name used for rendered frames in 'render_dump' folder (prepended to: '_####')",
+                        maxlen = 128,
+                        default = "")
 
     bpy.types.Scene.renderType   = []
     bpy.types.Scene.renderStatus = {"animation":"None", "image":"None"}

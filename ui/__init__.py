@@ -210,7 +210,10 @@ class serversPanel(Panel):
 
             col = layout.column(align=True)
             row = col.row(align=True)
-            # box = row.box()
-            # box.prop(scn, "showAdvanced")
-            # if scn.showAdvanced:
-            row.prop(scn, "tempFilePath")
+            box = row.box()
+            box.prop(scn, "showAdvanced")
+            if scn.showAdvanced:
+                row = box.row(align=True)
+                row.prop(scn, "tempFilePath")
+                row = box.row(align=True)
+                row.prop(scn, "nameOutputFiles")
