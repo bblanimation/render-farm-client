@@ -42,9 +42,11 @@ parser = argparse.ArgumentParser()
 parser.add_argument('-l','--frame_range',action='store',default="[]")
 # Takes a string dictionary of hosts
 # If neither of these arguments are provided, then use the default hosts file to load hosts
-parser.add_argument('-a','--hosts',action='store',default=None,help='Pass a dictionary or list of hosts. Should be valid json.')
+parser.add_argument('-d','--hosts',action='store',default=None,help='Pass a dictionary or list of hosts. Should be valid json.')
 parser.add_argument('-H','--hosts_online',action='store_true',default=None,help='Telnets to ports to find out if a host is availible to ssh into, skips everything else.')
 parser.add_argument('-i','--hosts_file',action='store',default='remoteServers.txt',help='Pass a filename from which to load hosts. Should be valid json format.')
+parser.add_argument('-m','--max_server_load',action='store',default=None,help='Max render processes to run on each server at a time.')
+parser.add_argument('-a','--average_results',action='store_true',default=None,help='Average frames when finished.')
 
 # NOTE: this parameter is currently required
 parser.add_argument('-n','--project_name',action='store',default=False) # just project name. default path will be in /tmp/blenderProjects
@@ -115,7 +117,7 @@ def main():
         if(not (os.path.exists(projectPath))):
             os.mkdir(projectPath)
 
-        if( args.local_sync == './toRemote' ):
+        if( not(args.local_sync) or args.local_sync == './toRemote' ):
             workingDir      = os.path.dirname(os.path.abspath(__file__))
             # Defaults to ./toRemote directory in working directory
             if(os.path.exists(os.path.join(workingDir,'toRemote'))):
@@ -156,7 +158,7 @@ def main():
     numHosts = len(hosts)
 
     frames      = expandFrames(frame_range)
-    jobStrings  = buildJobStrings(frames,projectName,projectPath,args.name_output_files,numHosts)
+    jobStrings  = buildJobStrings(frames,projectName,projectPath,projectRoot,args.name_output_files,numHosts)
 
     job_args =  {
         'projectName':      projectName,
@@ -173,6 +175,9 @@ def main():
     jhm = JobHostManager(jobs=jobStrings,hosts=host_objects,function_args=job_args,verbose=verbose,max_on_hosts=2)
     jhm.start()
     status = jhm.get_cumulative_status()
+
+    if args.average_results:
+        averageFrames(remoteSyncBack, projectName)
 
     endTime = time.time()
     timer = stopWatch(endTime-startTime)

@@ -37,6 +37,10 @@ def register():
         name="Show Advanced",
         description="Display advanced remote server settings",
         default = False)
+    bpy.types.Scene.unpack = BoolProperty(
+        name="Unpack files after saving",
+        description="Unpack the files that got packed for remote servers after saving",
+        default = True)
 
     # initialize frame range string text box
     bpy.types.Scene.frameRanges = StringProperty(
@@ -44,12 +48,12 @@ def register():
 
     # initialize frame range string text box
     bpy.types.Scene.tempFilePath = StringProperty(
-                        name = "Path",
+                        name = "Path Remote",
                         description="File path on host server (temporary storage location)",
                         maxlen = 128,
                         default = "/tmp/renderFarm/")
     bpy.types.Scene.tempLocalDir = StringProperty(
-                        name = "Path",
+                        name = "Temp Local Path",
                         description="File path on local drive to store temporary project files",
                         maxlen = 128,
                         default = "/tmp/",
@@ -60,6 +64,19 @@ def register():
                         description="Custom name used for rendered frames in 'render_dump' folder (prepended to: '_####')",
                         maxlen = 128,
                         default = "")
+
+    bpy.types.Scene.maxServerLoad = IntProperty(
+        name="Max Server Load",
+        min = 1, max = 50,
+        default = 1)
+
+    bpy.types.Scene.distributionType = EnumProperty(
+        attr="distributionType",
+        name="Frame Distribution",
+        description="Choose which hosts to use for render processes",
+        items=[("Split Process (WIP)", "Split Process (WIP)", "Distribute a portion of the frame to each server based on server processing speed"),
+               ("Paralell Process", "Paralell Process", "Send full frame to each server and average results")],
+        default='Paralell Process')
 
     bpy.types.Scene.renderType   = []
     bpy.types.Scene.renderStatus = {"animation":"None", "image":"None"}
@@ -99,6 +116,7 @@ def unregister():
     del bpy.types.Scene.showAdvanced
     del bpy.types.Scene.frameRanges
     del bpy.types.Scene.tempFilePath
+    del bpy.types.Scene.tempLocalDir
     del bpy.types.Scene.renderType
     del bpy.types.Scene.renderStatus
     del bpy.props.servers

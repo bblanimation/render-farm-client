@@ -175,7 +175,7 @@ class sendFrame(Operator):
 
                 # start render process at current frame
                 elif(self.state == 2):
-                    self.process = renderFrames("[" + str(self.curFrame) + "]", self.projectName)
+                    self.process = renderFrames("[" + str(self.curFrame) + "]", self.projectName, True)
                     self.state += 1
                     setRenderStatus("image", "Rendering...")
                     return{'PASS_THROUGH'}
@@ -185,8 +185,10 @@ class sendFrame(Operator):
                     print("Fetching render files...")
                     self.process = getFrames(self.projectName)
                     self.state += 1
+                    setRenderStatus("image", "Finishing...")
                     return{'PASS_THROUGH'}
 
+##TODO: Delete this process and run it on host server
                 # average the rendered frames
                 elif(self.state == 4):
                     print("Averaging frames...")
@@ -324,11 +326,11 @@ class sendAnimation(Operator):
                 # start render process from the defined start and end frames
                 elif(self.state == 2):
                     if scn.frameRanges == "":
-                        self.process = renderFrames("[[" + str(self.startFrame) + "," + str(self.endFrame) + "]]", self.projectName)
+                        self.process = renderFrames("[[" + str(self.startFrame) + "," + str(self.endFrame) + "]]", self.projectName, False)
                     else:
                         self.frameRangesDict = buildFrameRangesString(scn.frameRanges)
                         if(self.frameRangesDict["valid"]):
-                            self.process = renderFrames(self.frameRangesDict["string"], self.projectName)
+                            self.process = renderFrames(self.frameRangesDict["string"], self.projectName, False)
                         else:
                             self.report({'ERROR'}, "ERROR: Invalid frame ranges given.")
                             setRenderStatus("animation", "ERROR")
@@ -341,6 +343,7 @@ class sendAnimation(Operator):
                 elif(self.state == 3):
                     print("Fetching render files...")
                     self.process = getFrames(self.projectName)
+                    setRenderStatus("animation", "Finishing...")
                     self.state +=1
                     return{'PASS_THROUGH'}
 
