@@ -85,6 +85,7 @@ def copyProjectFile(projectName):
     scn = bpy.context.scene
     bpy.ops.file.pack_all()
     bpy.ops.wm.save_as_mainfile(filepath=scn.tempLocalDir + projectName + ".blend", copy=True)
+    bpy.context.scene.render.resolution_percentage = bpy.context.scene.render.resolution_percentage
     if scn.unpack:
         bpy.ops.file.unpack_all()
 
