@@ -509,7 +509,8 @@ class restartRemoteServers(Operator):
     #     else:
     #         serversToRestart = "lab=" + scn.serverGroups
     #     curlCommand = "curl --user cgearhar:" + decodedPassword + " -X GET -H 'Content-type: application/json' -H 'Accept: application/json' 'http://fog.cse.taylor.edu/lab-resource/restart?" + serversToRestart + "&os=linux&fork=" + str(len(bpy.props.servers[scn.serverGroups])) + "'"
-    #     process = subprocess.Popen(curlCommand, stdout=subprocess.PIPE, shell=True)
+    #     sshCurlCommand = "ssh " + bpy.props.hostServerLogin + ":'" + curlCommand + "'"
+    #     process = subprocess.Popen(sshCurlCommand, stdout=subprocess.PIPE, shell=True)
     #     return process
     #
     # def modal(self, context, event):
