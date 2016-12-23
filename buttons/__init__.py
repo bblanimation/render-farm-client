@@ -562,10 +562,7 @@ class listMissingFiles(Operator):
         if int(endFrame) < 1000:
              endFrame = "0" + endFrame
 
-        listString = "cd " + bpy.path.abspath("//") + "render-dump/; for i in \{" + startFrame + ".." + endFrame + "\}; do [ -e " + projectName + "_$i.tga ]  || echo " + projectName + "_$i.tga missing; done"
-        print(listString)
         listString = "cd " + bpy.path.abspath("//") + "render-dump/; for (( i=" + startFrame + "; i<=" + endFrame + "; ++i )); do printf -v n " + projectName + "_%04d.tga $i; [ -e $n ] || echo $n missing; done"
-        print(listString)
         process = subprocess.Popen(listString, shell=True)
         return process
 
