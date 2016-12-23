@@ -93,7 +93,7 @@ def copyProjectFile(projectName):
     mkdirCommand = "ssh " + bpy.props.hostServerLogin + " 'mkdir -p " + scn.tempFilePath + projectName + "/toRemote/'; "
 
     # copies blender project file to host server
-    rsyncCommand = "rsync --copy-links -qax --include=" + projectName + ".blend --exclude='*' -e 'ssh -T -o Compression=no -x' '" + scn.tempLocalDir + "' '" + bpy.props.hostServerLogin + ":" + scn.tempFilePath + projectName + "/toRemote/'"
+    rsyncCommand = "rsync --copy-links -qazx --include=" + projectName + ".blend --exclude='*' -e 'ssh -T -o Compression=no -x' '" + scn.tempLocalDir + "' '" + bpy.props.hostServerLogin + ":" + scn.tempFilePath + projectName + "/toRemote/'"
 
     print("copying blender project files...")
     process = subprocess.Popen(mkdirCommand + rsyncCommand, shell=True)
