@@ -549,20 +549,6 @@ class listMissingFiles(Operator):
     bl_options = {'REGISTER', 'UNDO'}           # enable undo for the operator.
 
     def listFiles(self, projectName, startFrame, endFrame):
-        # add the appropriate amount of '0's
-        if int(startFrame) < 10:
-             startFrame = "000" + startFrame
-        if int(endFrame) < 10:
-             endFrame = "000" + endFrame
-        if int(startFrame) < 100:
-             startFrame = "00" + startFrame
-        if int(endFrame) < 100:
-             endFrame = "00" + endFrame
-        if int(startFrame) < 1000:
-             startFrame = "0" + startFrame
-        if int(endFrame) < 1000:
-             endFrame = "0" + endFrame
-
         listString = "cd " + bpy.path.abspath("//") + "render-dump/; for (( i=" + startFrame + "; i<=" + endFrame + "; ++i )); do printf -v n " + projectName + "_%04d.tga $i; [ -e $n ] || echo $n missing; done"
         process = subprocess.Popen(listString, shell=True)
         return process
