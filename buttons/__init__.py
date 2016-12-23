@@ -540,3 +540,62 @@ class restartRemoteServers(Operator):
         #
         # return{'RUNNING_MODAL'}
         return{'FINISHED'}
+
+class listMissingFiles(Operator):
+    """List the files missing from the render-dump folder"""   # blender will use this as a tooltip for menu items and buttons.
+    bl_idname  = "scene.list_missing_files"     # unique identifier for buttons and menu items to reference.
+    bl_label   = "List Missing Files"           # display name in the interface.
+    bl_options = {'REGISTER', 'UNDO'}           # enable undo for the operator.
+
+    def listFiles(self, projectName, startFrame, endFrame):
+        # add the appropriate amount of '0's
+        if int(startFrame) < 10:
+             startFrame = "000" + startFrame
+        if int(endFrame) < 10:
+             endFrame = "000" + endFrame
+        if int(startFrame) < 100:
+             startFrame = "00" + startFrame
+        if int(endFrame) < 100:
+             endFrame = "00" + endFrame
+        if int(startFrame) < 1000:
+             startFrame = "0" + startFrame
+        if int(endFrame) < 1000:
+             endFrame = "0" + endFrame
+
+        listString = "cd " + bpy.path.abspath("//") + "render-dump/; for i in \{" + startFrame + ".." + endFrame + "\}; do [ -e " + projectName + "_$i.tga ]  || echo " + projectName + "_$i.tga missing; done"
+        print(listString)
+        listString = "cd " + bpy.path.abspath("//") + "render-dump/; for (( i=" + startFrame + "; i<=" + endFrame + "; ++i )); do printf -v n " + projectName + "_%04d.tga $i; [ -e $n ] || echo $n missing; done"
+        print(listString)
+        process = subprocess.Popen(listString, shell=True)
+        return process
+
+    def modal(self, context, event):
+        scn = context.scene
+
+        if event.type == 'TIMER':
+            self.process.poll()
+
+            if self.process.returncode != None and self.process.returncode > 0:
+                self.report({'ERROR'}, "There was an error. See terminal for details...")
+                return{'FINISHED'}
+            if self.process.returncode != None:
+                self.report({'INFO'}, "Missing files listed in the terminal")
+                return{'FINISHED'}
+
+        return{'PASS_THROUGH'}
+
+    def execute(self, context):
+        self.projectName = bpy.path.display_name_from_filepath(bpy.data.filepath)
+        self.startFrame = context.scene.frame_start
+        self.endFrame   = context.scene.frame_end
+
+        # create timer for modal
+        wm = context.window_manager
+        self._timer = wm.event_timer_add(0.1, context.window)
+        wm.modal_handler_add(self)
+
+        # list all missing files from start frame to end frame in render-dump location
+        self.process = self.listFiles(self.projectName, str(self.startFrame), str(self.endFrame))
+        self.state   = 1
+
+        return{'RUNNING_MODAL'}
