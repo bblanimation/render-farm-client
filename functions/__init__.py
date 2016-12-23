@@ -46,9 +46,9 @@ def getFrames(projectName):
     # create backup directory
     mkdirCommand = "mkdir -p " + dumpLocation + "backups/;"
     # move old render files to backup directory
-    archiveRsyncCommand = "rsync --remove-source-files --exclude='" + projectName + "_average.*' " + dumpLocation + "* " + dumpLocation + "backups/;"
+    archiveRsyncCommand = "rsync -qx --remove-source-files --exclude='" + projectName + "_average.*' " + dumpLocation + "* " + dumpLocation + "backups/;"
     # rsync files from host server to local directory
-    fetchRsyncCommand = "rsync --remove-source-files --exclude='*.blend' '" + bpy.props.hostServerLogin + ":" + scn.tempFilePath + projectName + "/results/*' '" + dumpLocation + "';"
+    fetchRsyncCommand = "rsync -x --progress --remove-source-files --exclude='*.blend' -e 'ssh -T -o Compression=no -x' '" + bpy.props.hostServerLogin + ":" + scn.tempFilePath + projectName + "/results/*' '" + dumpLocation + "';"
 
     # run the above processes
     process = subprocess.Popen(mkdirCommand + archiveRsyncCommand + fetchRsyncCommand, stdout=subprocess.PIPE, shell=True)
@@ -93,7 +93,7 @@ def copyProjectFile(projectName):
     mkdirCommand = "ssh " + bpy.props.hostServerLogin + " 'mkdir -p " + scn.tempFilePath + projectName + "/toRemote/'; "
 
     # copies blender project file to host server
-    rsyncCommand = "rsync --copy-links -rqa --include=" + projectName + ".blend --exclude='*' '" + scn.tempLocalDir + "' '" + bpy.props.hostServerLogin + ":" + scn.tempFilePath + projectName + "/toRemote/'"
+    rsyncCommand = "rsync --copy-links -qax --include=" + projectName + ".blend --exclude='*' -e 'ssh -T -o Compression=no -x' '" + scn.tempLocalDir + "' '" + bpy.props.hostServerLogin + ":" + scn.tempFilePath + projectName + "/toRemote/'"
 
     print("copying blender project files...")
     process = subprocess.Popen(mkdirCommand + rsyncCommand, shell=True)
@@ -106,7 +106,7 @@ def copyFiles():
     # mkdirCommand = "ssh " + bpy.props.hostServerLogin + " 'mkdir -p " + scn.tempFilePath + "'; "
 
     # copies necessary files to host server
-    rsyncCommand = "rsync -a '" + os.path.join(getLibraryPath(), "to_host_server") + "/' '" + bpy.props.hostServerLogin + ":" + scn.tempFilePath + "'"
+    rsyncCommand = "rsync -qax -e 'ssh -T -o Compression=no -x' '" + os.path.join(getLibraryPath(), "to_host_server") + "/' '" + bpy.props.hostServerLogin + ":" + scn.tempFilePath + "'"
 
     process = subprocess.Popen(rsyncCommand, stdout=subprocess.PIPE, shell=True)
     return process
