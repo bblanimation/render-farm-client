@@ -46,9 +46,8 @@ If you have any questions or if you'd like to report a bug, feel free to email
 the author, Chris Gearhart, at chris@bblanimation.com.
 
     Once you've finished making changes to the information below, save the
-changes to this file (Text > Save), and switch back to the 3D viewport. Once
-you've committed your changes with the 'Commit Edits' button in the servers
-menu, you're ready to render on your remote servers!
+changes to this file (Text > Save), and switch back to the 3D viewport. Now
+you're ready to render on your remote servers!
 
 
 

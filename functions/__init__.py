@@ -146,3 +146,33 @@ def getRenderStatus(key):
 def appendViewable(typeOfRender):
     if(typeOfRender not in bpy.context.scene.renderType):
         bpy.context.scene.renderType.append(typeOfRender)
+
+def expandFrames( frame_range ):
+    frames = []
+    sequential = False
+    junk        = True
+    for i in frame_range:
+        if( type(i) == list ):
+            frames += range(i[0],i[1]+1)
+            if( junk ):
+                sequential  = True
+                junk        = False
+        elif( type(i) == int ):
+            frames.append(i)
+            sequential = False
+        else:
+            print("Unknown type in frames list")
+
+    return frames
+
+def listMissingFiles(projectName, startFrame, endFrame, frameRange):
+    allfiles=os.listdir(bpy.path.abspath("//") + "render-dump/")
+    imlist = []
+    for filename in allfiles:
+        if (filename[-4:] in [".tga",".TGA"] and filename[-5] != "e"):
+            imlist.append(int(filename[len(projectName)+1:len(projectName)+5]))
+    if frameRange != None:
+        compRange = expandFrames(json.loads(frameRange))
+    else:
+        compRange = [x for x in range(startFrame, endFrame + 1)]
+    return str(list(set(imlist) ^ set(compRange)))[1:-1]
