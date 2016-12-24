@@ -326,6 +326,7 @@ class sendAnimation(Operator):
                 # start render process from the defined start and end frames
                 elif(self.state == 2):
                     if scn.frameRanges == "":
+                        self.frameRangesDict = None
                         self.process = renderFrames("[[" + str(self.startFrame) + "," + str(self.endFrame) + "]]", self.projectName, False)
                     else:
                         self.frameRangesDict = buildFrameRangesString(scn.frameRanges)
@@ -351,6 +352,10 @@ class sendAnimation(Operator):
                     failedFramesString = ""
                     if(self.numFailedFrames > 0):
                         failedFramesString = " (failed for " + str(self.numFailedFrames) + " frames)"
+                    missingFiles = listMissingFiles(self.projectName, self.startFrame, self.endFrame, self.frameRangesDict["string"])
+                    if len(missingFiles) > 0:
+                        self.report({'WARNING'}, "Missing Files: ")
+                        self.report({'WARNING'}, missingFiles)
                     self.report({'INFO'}, "Render completed" + failedFramesString + "! View the rendered animation in '//render/'")
                     setRenderStatus("animation", "Complete!")
                     appendViewable("animation")
@@ -583,3 +588,19 @@ class listMissingFiles(Operator):
         self.state   = 1
 
         return{'RUNNING_MODAL'}
+
+class listFiles(Operator):
+    """List the files missing from the render-dump folder"""   # blender will use this as a tooltip for menu items and buttons.
+    bl_idname  = "scene.list_files"     # unique identifier for buttons and menu items to reference.
+    bl_label   = "List Files"           # display name in the interface.
+    bl_options = {'REGISTER', 'UNDO'}           # enable undo for the operator.
+
+    def execute(self, context):
+        self.projectName = bpy.path.display_name_from_filepath(bpy.data.filepath)
+        self.startFrame = context.scene.frame_start
+        self.endFrame   = context.scene.frame_end
+
+        # list all missing files from start frame to end frame in render-dump location
+        print(listMissingFiles(self.projectName, self.startFrame, self.endFrame, None))
+
+        return{'FINISHED'}

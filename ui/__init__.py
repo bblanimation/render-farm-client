@@ -188,7 +188,7 @@ class frameRangePanel(Panel):
             row.prop(scn, "frameRanges")
             col = layout.column(align=True)
             row = col.row(align=True)
-            row.operator("scene.list_missing_files", text="List Missing Files", icon="LONGDISPLAY")
+            row.operator("scene.list_files", text="List Missing Files", icon="LONGDISPLAY")
 
 class serversPanel(Panel):
     bl_space_type  = "VIEW_3D"
