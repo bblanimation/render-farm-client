@@ -165,14 +165,11 @@ def expandFrames( frame_range ):
 
     return frames
 
-def listMissingFiles(projectName, startFrame, endFrame, frameRange):
+def listMissingFiles(projectName, frameRange):
     allfiles=os.listdir(bpy.path.abspath("//") + "render-dump/")
     imlist = []
     for filename in allfiles:
         if (filename[-4:] in [".tga",".TGA"] and filename[-5] != "e"):
             imlist.append(int(filename[len(projectName)+1:len(projectName)+5]))
-    if frameRange != None:
-        compRange = expandFrames(json.loads(frameRange))
-    else:
-        compRange = [x for x in range(startFrame, endFrame + 1)]
+    compRange = expandFrames(json.loads(frameRange))
     return str(list(set(imlist) ^ set(compRange)))[1:-1]

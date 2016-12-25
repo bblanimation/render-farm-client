@@ -189,6 +189,8 @@ class frameRangePanel(Panel):
             col = layout.column(align=True)
             row = col.row(align=True)
             row.operator("scene.list_files", text="List Missing Files", icon="LONGDISPLAY")
+            row = col.row(align=True)
+            row.operator("scene.set_to_missing_frames", text="Set to Missing Frames", icon="FILE_PARENT")
 
 class serversPanel(Panel):
     bl_space_type  = "VIEW_3D"

@@ -326,16 +326,14 @@ class sendAnimation(Operator):
                 # start render process from the defined start and end frames
                 elif(self.state == 2):
                     if scn.frameRanges == "":
-                        self.frameRangesDict = None
-                        self.process = renderFrames("[[" + str(self.startFrame) + "," + str(self.endFrame) + "]]", self.projectName, False)
+                        self.frameRangesDict = {"string":"[[" + str(context.scene.frame_start) + "," + str(context.scene.frame_end) + "]]"}
                     else:
                         self.frameRangesDict = buildFrameRangesString(scn.frameRanges)
-                        if(self.frameRangesDict["valid"]):
-                            self.process = renderFrames(self.frameRangesDict["string"], self.projectName, False)
-                        else:
+                        if not self.frameRangesDict["valid"]:
                             self.report({'ERROR'}, "ERROR: Invalid frame ranges given.")
                             setRenderStatus("animation", "ERROR")
                             return{'FINISHED'}
+                    self.process = renderFrames(self.frameRangesDict["string"], self.projectName)
                     setRenderStatus("animation", "Rendering...")
                     self.state += 1
                     return{'PASS_THROUGH'}
@@ -352,10 +350,10 @@ class sendAnimation(Operator):
                     failedFramesString = ""
                     if(self.numFailedFrames > 0):
                         failedFramesString = " (failed for " + str(self.numFailedFrames) + " frames)"
-                    missingFiles = listMissingFiles(self.projectName, self.startFrame, self.endFrame, self.frameRangesDict["string"])
-                    if len(missingFiles) > 0:
+                    missingFrames = listMissingFiles(self.projectName, self.frameRangesDict["string"])
+                    if len(missingFrames) > 0:
                         self.report({'WARNING'}, "Missing Files: ")
-                        self.report({'WARNING'}, missingFiles)
+                        self.report({'WARNING'}, missingFrames)
                     self.report({'INFO'}, "Render completed" + failedFramesString + "! View the rendered animation in '//render/'")
                     setRenderStatus("animation", "Complete!")
                     appendViewable("animation")
@@ -597,10 +595,42 @@ class listFiles(Operator):
 
     def execute(self, context):
         self.projectName = bpy.path.display_name_from_filepath(bpy.data.filepath)
-        self.startFrame = context.scene.frame_start
-        self.endFrame   = context.scene.frame_end
+        scn = context.scene
+
+        if scn.frameRanges == "":
+            self.frameRangesDict = {"string":"[[" + str(context.scene.frame_start) + "," + str(context.scene.frame_end) + "]]"}
+        else:
+            self.frameRangesDict = buildFrameRangesString(scn.frameRanges)
+            if not self.frameRangesDict["valid"]:
+                self.report({'ERROR'}, "ERROR: Invalid frame ranges given.")
+                return{'FINISHED'}
 
         # list all missing files from start frame to end frame in render-dump location
-        print(listMissingFiles(self.projectName, self.startFrame, self.endFrame, None))
+        missingFrames = listMissingFiles(self.projectName, self.frameRangesDict["string"])
+        self.report({'INFO'}, "Missing frames:")
+        self.report({'INFO'}, missingFrames)
+
+        return{'FINISHED'}
+
+class setToMissingFrames(Operator):
+    """Set frame range to frames missing from the render-dump folder"""   # blender will use this as a tooltip for menu items and buttons.
+    bl_idname  = "scene.set_to_missing_frames"  # unique identifier for buttons and menu items to reference.
+    bl_label   = "Set to Missing Frames"        # display name in the interface.
+    bl_options = {'REGISTER', 'UNDO'}           # enable undo for the operator.
+
+    def execute(self, context):
+        self.projectName = bpy.path.display_name_from_filepath(bpy.data.filepath)
+        scn = context.scene
+
+        if scn.frameRanges == "":
+            self.frameRangesDict = {"string":"[[" + str(context.scene.frame_start) + "," + str(context.scene.frame_end) + "]]"}
+        else:
+            self.frameRangesDict = buildFrameRangesString(scn.frameRanges)
+            if not self.frameRangesDict["valid"]:
+                self.report({'ERROR'}, "ERROR: Invalid frame ranges given.")
+                return{'FINISHED'}
+
+        # list all missing files from start frame to end frame in render-dump location
+        scn.frameRanges = listMissingFiles(self.projectName, self.frameRangesDict["string"])
 
         return{'FINISHED'}
