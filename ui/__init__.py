@@ -187,6 +187,7 @@ class frameRangePanel(Panel):
             row = col.row(align=True)
             row.prop(scn, "frameRanges")
             col = layout.column(align=True)
+            col.active = bpy.path.display_name_from_filepath(bpy.data.filepath) != ""
             row = col.row(align=True)
             row.operator("scene.list_files", text="List Missing Files", icon="LONGDISPLAY")
             row = col.row(align=True)

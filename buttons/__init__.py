@@ -295,7 +295,7 @@ class sendAnimation(Operator):
                 # handle unidentified errors
                 if self.process.returncode > 1:
                     self.report({'ERROR'}, "There was an error. See terminal for details...")
-                    setRenderStatus("image", "ERROR")
+                    setRenderStatus("animation", "ERROR")
                     return{'FINISHED'}
 
                 # handle and report errors for 'blender_task' process
@@ -607,8 +607,7 @@ class listFiles(Operator):
 
         # list all missing files from start frame to end frame in render-dump location
         missingFrames = listMissingFiles(self.projectName, self.frameRangesDict["string"])
-        self.report({'INFO'}, "Missing frames:")
-        self.report({'INFO'}, missingFrames)
+        self.report({'INFO'}, "Missing frames: " + missingFrames)
 
         return{'FINISHED'}
 

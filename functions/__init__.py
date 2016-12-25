@@ -166,7 +166,11 @@ def expandFrames( frame_range ):
     return frames
 
 def listMissingFiles(projectName, frameRange):
-    allfiles=os.listdir(bpy.path.abspath("//") + "render-dump/")
+    try:
+        allfiles=os.listdir(bpy.path.abspath("//") + "render-dump/")
+    except:
+        print("Error listing directory " + bpy.path.abspath("//") + "render-dump/. The folder may not exist.")
+        return ""
     imlist = []
     for filename in allfiles:
         if (filename[-4:] in [".tga",".TGA"] and filename[-5] != "e"):
