@@ -171,5 +171,13 @@ def listMissingFiles(projectName, frameRange):
     for filename in allfiles:
         if (filename[-4:] in [".tga",".TGA"] and filename[-5] != "e"):
             imlist.append(int(filename[len(projectName)+1:len(projectName)+5]))
-    compRange = expandFrames(json.loads(frameRange))
-    return str(list(set(imlist) ^ set(compRange)))[1:-1]
+    complist = expandFrames(json.loads(frameRange))
+
+    # compare lists and determine which frames are missing from imlist
+    missingF = []
+    for i in complist:
+        if i not in imlist:
+            missingF.append(i)
+
+    # return the list of missing frames as string, omitting the open and close brackets
+    return str(missingF)[1:-1]
