@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import bpy, subprocess, os
+import bpy, subprocess, os, sys
 from .setupServerVars import *
 
 def jobIsValid(jobType, projectName):
@@ -61,8 +61,6 @@ def buildFrameRangesString(frameRanges):
     for string in frameRangeList:
         try:
             newInt = int(string)
-            if newInt not in newFrameRangeList:
-                newFrameRangeList.append(newInt)
         except:
             if "-" in string:
                 newString = string.split("-")
@@ -85,27 +83,20 @@ def copyProjectFile(projectName):
     scn = bpy.context.scene
     bpy.ops.file.pack_all()
     bpy.ops.wm.save_as_mainfile(filepath=scn.tempLocalDir + projectName + ".blend", copy=True)
-    bpy.context.scene.render.resolution_percentage = bpy.context.scene.render.resolution_percentage
     if scn.unpack:
         bpy.ops.file.unpack_all()
 
-    # creates project directory
-    mkdirCommand = "ssh " + bpy.props.hostServerLogin + " 'mkdir -p " + scn.tempFilePath + projectName + "/toRemote/'; "
-
     # copies blender project file to host server
-    rsyncCommand = "rsync --copy-links --progress -qazx --include=" + projectName + ".blend --exclude='*' -e 'ssh -T -o Compression=no -x' '" + scn.tempLocalDir + "' '" + bpy.props.hostServerLogin + ":" + scn.tempFilePath + projectName + "/toRemote/'"
+    rsyncCommand = "rsync --copy-links --progress --rsync-path='mkdir -p " + scn.tempFilePath + projectName + "/toRemote/ && rsync' -qazx --include=" + projectName + ".blend --exclude='*' -e 'ssh -T -o Compression=no -x' '" + scn.tempLocalDir + "' '" + bpy.props.hostServerLogin + ":" + scn.tempFilePath + projectName + "/toRemote/'"
 
     print("copying blender project files...")
-    process = subprocess.Popen(mkdirCommand + rsyncCommand, shell=True)
+    process = subprocess.Popen(rsyncCommand, shell=True)
     return process
 
 def copyFiles():
     scn = bpy.context.scene
 
-    # verifies remote project directory (currently unnecessary, as the functionality exists in 'copyProjectFile()')
-    # mkdirCommand = "ssh " + bpy.props.hostServerLogin + " 'mkdir -p " + scn.tempFilePath + "'; "
-
-    # copies necessary files to host server
+    # copies necessary files to host server (currently unnecessary to run 'mkdir', as the functionality exists in 'copyProjectFile()')
     rsyncCommand = "rsync -qax -e 'ssh -T -o Compression=no -x' '" + os.path.join(getLibraryPath(), "to_host_server") + "/' '" + bpy.props.hostServerLogin + ":" + scn.tempFilePath + "'"
 
     process = subprocess.Popen(rsyncCommand, stdout=subprocess.PIPE, shell=True)
@@ -120,15 +111,15 @@ def renderFrames(frameRange, projectName, averageFrames):
         extraFlags += " -O " + scn.nameOutputFiles
 
     # if rendering one frame, set '-a' flag to alert blender_task that we want an averaged result
-    # if averageFrames:
-    #     extraFlags += " -a"
+    if averageFrames:
+        extraFlags += " -a"
 
     # defines the project path on the host server if specified
     if scn.tempFilePath == "":
         scn.tempFilePath = "/tmp/"
 
     # runs blender command to render given range from the remote server
-    renderCommand = "ssh " + bpy.props.hostServerLogin + " 'python " + scn.tempFilePath + "blender_task -vv -n " + projectName + " -l " + frameRange + " --hosts_file " + scn.tempFilePath + "servers.txt -R " + scn.tempFilePath + " --max_server_load " + str(scn.maxServerLoad) + extraFlags + "'"
+    renderCommand = "ssh -T -x " + bpy.props.hostServerLogin + " 'python " + scn.tempFilePath + "blender_task -vv -n " + projectName + " -l " + frameRange + " --hosts_file " + scn.tempFilePath + "servers.txt -R " + scn.tempFilePath + " --max_server_load " + str(scn.maxServerLoad) + extraFlags + "'"
     print("Running command: " + renderCommand)
 
     print("Process sent to remote servers!\n")
@@ -149,32 +140,27 @@ def appendViewable(typeOfRender):
 
 def expandFrames( frame_range ):
     frames = []
-    sequential = False
-    junk        = True
     for i in frame_range:
         if( type(i) == list ):
             frames += range(i[0],i[1]+1)
-            if( junk ):
-                sequential  = True
-                junk        = False
         elif( type(i) == int ):
             frames.append(i)
-            sequential = False
         else:
-            print("Unknown type in frames list")
+            sys.stderr.write("Unknown type in frames list")
 
-    return frames
+    # returns 'frames' but converts to keys and back to ensure uniqueness of values
+    return {}.fromkeys(frames).keys()
 
-def listMissingFiles(projectName, frameRange):
+def listMissingFiles(filename, frameRange):
     try:
         allfiles=os.listdir(bpy.path.abspath("//") + "render-dump/")
     except:
-        print("Error listing directory " + bpy.path.abspath("//") + "render-dump/. The folder may not exist.")
+        sys.stderr.write("Error listing directory " + bpy.path.abspath("//") + "render-dump/. The folder may not exist.")
         return ""
     imlist = []
-    for filename in allfiles:
-        if (filename[-4:] in [".tga",".TGA"] and filename[-5] != "e"):
-            imlist.append(int(filename[len(projectName)+1:len(projectName)+5]))
+    for f in allfiles:
+        if (f[-4:] in [".tga",".TGA"] and f[-5] != "e" and f[:len(filename)] == filename):
+            imlist.append(int(f[len(filename)+1:len(filename)+5]))
     complist = expandFrames(json.loads(frameRange))
 
     # compare lists and determine which frames are missing from imlist

@@ -38,7 +38,7 @@ def register():
         description="Display advanced remote server settings",
         default = False)
     bpy.types.Scene.unpack = BoolProperty(
-        name="Unpack files after saving",
+        name="Auto-unpack files",
         description="Unpack the files that got packed for remote servers after saving",
         default = True)
 
@@ -48,7 +48,7 @@ def register():
 
     # initialize frame range string text box
     bpy.types.Scene.tempFilePath = StringProperty(
-                        name = "Path Remote",
+                        name = "Remote Path",
                         description="File path on host server (temporary storage location)",
                         maxlen = 128,
                         default = "/tmp/renderFarm/")
@@ -68,7 +68,7 @@ def register():
     bpy.types.Scene.maxServerLoad = IntProperty(
         name="Max Server Load",
         min = 1, max = 50,
-        default = 1)
+        default = 3)
 
     bpy.types.Scene.distributionType = EnumProperty(
         attr="distributionType",

@@ -13,9 +13,8 @@ class refreshNumAvailableServers(Operator):
 
     def checkNumAvailServers(self):
         scn = bpy.context.scene
-        command = "ssh " + bpy.props.hostServerLogin + " 'python " + scn.tempFilePath + "blender_task -H --hosts_file " + scn.tempFilePath + "servers.txt'"
+        command = "ssh -T -x " + bpy.props.hostServerLogin + " 'python " + scn.tempFilePath + "blender_task -H --hosts_file " + scn.tempFilePath + "servers.txt'"
         process = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
-        #process = subprocess.Popen(command, shell=True)
         return process
 
     def updateAvailServerInfo(self):
@@ -157,12 +156,12 @@ class sendFrame(Operator):
                         for line in self.stderr:
                             line = line.decode('ASCII').replace("\\n", "")[:-1]
                             self.report({'ERROR'}, "blender_task error: '" + line + "'")
-                            print(line)
+                            sys.stderr.write(line)
                         errorMsg = self.stderr[-1].decode('ASCII')
                         try:
                             self.numFailedFrames = int(errorMsg[18:-5])
                         except:
-                            print("Couldn't read last line of process output as integer")
+                            sys.stderr.write("Couldn't read last line of process output as integer")
 
                 print("Process " + str(self.state) + " finished! (return code: " + str(self.process.returncode) + ")\n")
 
@@ -188,15 +187,7 @@ class sendFrame(Operator):
                     setRenderStatus("image", "Finishing...")
                     return{'PASS_THROUGH'}
 
-##TODO: Delete this process and run it on host server
-                # average the rendered frames
                 elif(self.state == 4):
-                    print("Averaging frames...")
-                    self.process = self.averageFrames()
-                    self.state += 1
-                    return{'PASS_THROUGH'}
-
-                elif(self.state == 5):
                     failedFramesString = ""
                     if(self.numFailedFrames > 0):
                         failedFramesString = " (failed for " + str(self.numFailedFrames) + " frames)"
@@ -214,7 +205,6 @@ class sendFrame(Operator):
     def execute(self, context):
         self.projectName = bpy.path.display_name_from_filepath(bpy.data.filepath)
         scn = context.scene
-        writeServersFile(bpy.props.servers, scn.serverGroups)
 
         #for testing purposes only (saves unsaved file as 'unsaved_file.blend')
         if self.projectName == "":
@@ -239,6 +229,9 @@ class sendFrame(Operator):
         scn.tempFilePath.replace(" ", "_")
         if scn.tempFilePath[-1] != "/":
             scn.tempFilePath = scn.tempFilePath + "/"
+
+        # write out the servers file for remote servers
+        writeServersFile(bpy.props.servers, scn.serverGroups)
 
         # create timer for modal
         wm = context.window_manager
@@ -306,13 +299,12 @@ class sendAnimation(Operator):
                         for line in self.stderr:
                             line = line.decode('ASCII').replace("\\n", "")[:-1]
                             self.report({'ERROR'}, "blender_task error: '" + line + "'")
-                            print(line)
-                        print()
+                            sys.stderr.write(line)
                         errorMsg = self.stderr[-1].decode('ASCII')
                         try:
                             self.numFailedFrames = int(errorMsg[18:-5])
                         except:
-                            print("Couldn't read last line of process output as integer")
+                            sys.stderr.write("Couldn't read last line of process output as integer")
 
                 print("Process " + str(self.state) + " finished! (return code: " + str(self.process.returncode) + ")\n")
 
@@ -333,7 +325,7 @@ class sendAnimation(Operator):
                             self.report({'ERROR'}, "ERROR: Invalid frame ranges given.")
                             setRenderStatus("animation", "ERROR")
                             return{'FINISHED'}
-                    self.process = renderFrames(self.frameRangesDict["string"], self.projectName)
+                    self.process = renderFrames(str(expandFrames(json.loads(self.frameRangesDict["string"]))), self.projectName)
                     setRenderStatus("animation", "Rendering...")
                     self.state += 1
                     return{'PASS_THROUGH'}
@@ -368,7 +360,6 @@ class sendAnimation(Operator):
     def execute(self, context):# ensure no other animation render processes are running
         self.projectName = bpy.path.display_name_from_filepath(bpy.data.filepath)
         scn = context.scene
-        writeServersFile(bpy.props.servers, scn.serverGroups)
 
         #for testing purposes only (saves unsaved file as 'unsaved_file.blend')
         if self.projectName == "":
@@ -381,14 +372,20 @@ class sendAnimation(Operator):
 
         # ensure the job won't break the script
         jobValidityDict = jobIsValid("animation", self.projectName)
-        if not jobValidityDict["valid"]:
+        if jobValidityDict["errorType"] != None:
             self.report({jobValidityDict["errorType"]}, jobValidityDict["errorMessage"])
+        else:
+            self.report({'INFO'}, "Rendering current frame on " + str(len(scn['availableServers'])) + " servers.")
+        if not jobValidityDict["valid"]:
             return{'FINISHED'}
 
         # verify user input for tempFilePath string
         scn.tempFilePath.replace(" ", "_")
         if scn.tempFilePath[-1] != "/":
             scn.tempFilePath = scn.tempFilePath + "/"
+
+        # write out the servers file for remote servers
+        writeServersFile(bpy.props.servers, scn.serverGroups)
 
         # create timer for modal
         wm = context.window_manager
@@ -458,15 +455,7 @@ class openRenderedAnimationInUI(Operator):
                 self.report({'ERROR'}, "ERROR: Invalid frame ranges given.")
                 return{'FINISHED'}
 
-        # zero pad the value
-        if fs < 10:
-            fs = "000" + str(fs)
-        elif fs < 100:
-            fs = "00" + str(fs)
-        elif fs < 1000:
-            fs = "0" + str(fs)
-
-        image_filename = self.projectName + "_" + fs + ".tga"
+        image_filename = self.projectName + "_%04d.tga" % (fs)
         print("Opening frame: " + image_filename)
         bpy.ops.clip.open(directory=image_sequence_filepath, files=[{"name":image_filename}])
         bpy.ops.clip.reload()
@@ -487,7 +476,7 @@ class editRemoteServersDict(Operator):
             self.report({'INFO'}, "Opened 'remoteServers.txt'")
             bpy.props.requiredFileRead = True
         except:
-            self.report({'ERROR'}, "ERROR: Could not open 'remoteServers.txt'")
+            self.report({'ERROR'}, "ERROR: Could not open 'remoteServers.txt'. If the problem persists, try reinstalling the add-on.")
         return{'FINISHED'}
 
 class restartRemoteServers(Operator):
@@ -545,48 +534,6 @@ class restartRemoteServers(Operator):
         # return{'RUNNING_MODAL'}
         return{'FINISHED'}
 
-class listMissingFiles(Operator):
-    """List the files missing from the render-dump folder"""   # blender will use this as a tooltip for menu items and buttons.
-    bl_idname  = "scene.list_missing_files"     # unique identifier for buttons and menu items to reference.
-    bl_label   = "List Missing Files"           # display name in the interface.
-    bl_options = {'REGISTER', 'UNDO'}           # enable undo for the operator.
-
-    def listFiles(self, projectName, startFrame, endFrame):
-        listString = "cd " + bpy.path.abspath("//") + "render-dump/; for (( i=" + startFrame + "; i<=" + endFrame + "; ++i )); do printf -v n " + projectName + "_%04d.tga $i; [ -e $n ] || echo $n missing; done"
-        process = subprocess.Popen(listString, shell=True)
-        return process
-
-    def modal(self, context, event):
-        scn = context.scene
-
-        if event.type == 'TIMER':
-            self.process.poll()
-
-            if self.process.returncode != None and self.process.returncode > 0:
-                self.report({'ERROR'}, "There was an error. See terminal for details...")
-                return{'FINISHED'}
-            if self.process.returncode != None:
-                self.report({'INFO'}, "Missing files listed in the terminal")
-                return{'FINISHED'}
-
-        return{'PASS_THROUGH'}
-
-    def execute(self, context):
-        self.projectName = bpy.path.display_name_from_filepath(bpy.data.filepath)
-        self.startFrame = context.scene.frame_start
-        self.endFrame   = context.scene.frame_end
-
-        # create timer for modal
-        wm = context.window_manager
-        self._timer = wm.event_timer_add(0.1, context.window)
-        wm.modal_handler_add(self)
-
-        # list all missing files from start frame to end frame in render-dump location
-        self.process = self.listFiles(self.projectName, str(self.startFrame), str(self.endFrame))
-        self.state   = 1
-
-        return{'RUNNING_MODAL'}
-
 class listFiles(Operator):
     """List the files missing from the render-dump folder"""   # blender will use this as a tooltip for menu items and buttons.
     bl_idname  = "scene.list_files"     # unique identifier for buttons and menu items to reference.
@@ -594,8 +541,11 @@ class listFiles(Operator):
     bl_options = {'REGISTER', 'UNDO'}   # enable undo for the operator.
 
     def execute(self, context):
-        self.projectName = bpy.path.display_name_from_filepath(bpy.data.filepath)
         scn = context.scene
+        if scn.nameOutputFiles != "":
+            self.fileName = scn.nameOutputFiles
+        else:
+            self.fileName = bpy.path.display_name_from_filepath(bpy.data.filepath)
 
         if scn.frameRanges == "":
             self.frameRangesDict = {"string":"[[" + str(context.scene.frame_start) + "," + str(context.scene.frame_end) + "]]"}
@@ -606,7 +556,7 @@ class listFiles(Operator):
                 return{'FINISHED'}
 
         # list all missing files from start frame to end frame in render-dump location
-        missingFrames = listMissingFiles(self.projectName, self.frameRangesDict["string"])
+        missingFrames = listMissingFiles(self.fileName, self.frameRangesDict["string"])
         self.report({'INFO'}, "Missing frames: " + missingFrames)
 
         return{'FINISHED'}
@@ -618,8 +568,13 @@ class setToMissingFrames(Operator):
     bl_options = {'REGISTER', 'UNDO'}           # enable undo for the operator.
 
     def execute(self, context):
-        self.projectName = bpy.path.display_name_from_filepath(bpy.data.filepath)
         scn = context.scene
+
+        # set the name of the files to the project name or custom name defined in advanced settings
+        if scn.nameOutputFiles != "":
+            self.fileName = scn.nameOutputFiles
+        else:
+            self.fileName = bpy.path.display_name_from_filepath(bpy.data.filepath)
 
         if scn.frameRanges == "":
             self.frameRangesDict = {"string":"[[" + str(context.scene.frame_start) + "," + str(context.scene.frame_end) + "]]"}
@@ -630,6 +585,6 @@ class setToMissingFrames(Operator):
                 return{'FINISHED'}
 
         # list all missing files from start frame to end frame in render-dump location
-        scn.frameRanges = listMissingFiles(self.projectName, self.frameRangesDict["string"])
+        scn.frameRanges = listMissingFiles(self.fileName, self.frameRangesDict["string"])
 
         return{'FINISHED'}

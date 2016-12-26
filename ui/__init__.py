@@ -74,100 +74,23 @@ class renderOnServersPanel(Panel):
             if "animation" in scn.renderType:
                 row.operator("scene.open_rendered_animation", text="View Animation", icon="FILE_MOVIE")
 
-class samplingPanel(Panel):
-    bl_space_type  = "VIEW_3D"
-    bl_region_type = "TOOLS"
-    bl_label       = "Sampling (Single Frame)"
-    bl_idname      = "VIEW3D_PT_sampling"
-    bl_context     = "objectmode"
-    bl_category    = "Render"
-    COMPAT_ENGINES = {'CYCLES'}
+def menu_draw(self, context):
+    layout = self.layout
+    scn = context.scene
 
-    def calcSamples(self, scn, squared, category, multiplier):
-        if squared:
-            category = category**2
-        result = math.floor(multiplier*category*len(scn['availableServers']))
-        return result
+    if scn.render.engine == 'CYCLES' and not scn.cycles.progressive == 'BRANCHED_PATH' and scn.distributionType == "Paralell Process":
+        # Basic Render Samples Info
+        col = layout.column(align=True)
+        row = col.row(align=True)
+        sampleSize = scn.cycles.samples
+        if(scn.cycles.use_square_samples):
+            sampleSize = sampleSize**2
+        if sampleSize < 10:
+            row.label('Too few samples')
+        else:
+            row.label("Samples on Servers: " + str(math.floor(sampleSize*len(scn['availableServers']))))
 
-    def draw(self, context):
-        layout = self.layout
-        scn = context.scene
-
-        if scn.render.engine == 'CYCLES':
-            # Basic Render Samples Info
-            col = layout.column(align=True)
-            row = col.row(align=True)
-
-            if not context.scene.cycles.progressive == 'BRANCHED_PATH':
-                sampleSize = scn.cycles.samples
-                if(scn.cycles.use_square_samples):
-                    sampleSize = sampleSize**2
-                if sampleSize < 10:
-                    row.label('Samples: Too few samples')
-                else:
-                    row.label("Samples: " + str(math.floor(sampleSize*len(scn['availableServers']))))
-            else:
-                # find AA sample size first (this affects other sample sizes)
-                aaSampleSize = scn.cycles.aa_samples
-                squared = False
-                if(scn.cycles.use_square_samples):
-                    squared = True
-                    aaSampleSize = aaSampleSize**2
-
-                # calculate sample sizes for single frame renders on available servers
-                aa    = self.calcSamples(scn, squared, aaSampleSize, 1)
-                diff  = self.calcSamples(scn, squared, scn.cycles.diffuse_samples, aaSampleSize)
-                glos  = self.calcSamples(scn, squared, scn.cycles.glossy_samples, aaSampleSize)
-                tran  = self.calcSamples(scn, squared, scn.cycles.transmission_samples, aaSampleSize)
-                ao    = self.calcSamples(scn, squared, scn.cycles.ao_samples, aaSampleSize)
-                meshL = self.calcSamples(scn, squared, scn.cycles.mesh_light_samples, aaSampleSize)
-                sub   = self.calcSamples(scn, squared, scn.cycles.subsurface_samples, aaSampleSize)
-                vol   = self.calcSamples(scn, squared, scn.cycles.volume_samples, aaSampleSize)
-
-                row = col.row(align=True)
-                if(aaSampleSize < 5):
-                    row.label('AA: Too few samples')
-                else:
-                    row.label('AA:')
-                    row.label(str(aa))
-                    row = col.row(align=True)
-                    row.label('Diffuse:')
-                    row.label(str(diff))
-                    row = col.row(align=True)
-                    row.label('Glossy:')
-                    row.label(str(glos))
-                    row = col.row(align=True)
-                    row.label('Transmission:')
-                    row.label(str(tran))
-                    row = col.row(align=True)
-                    row.label('AO:')
-                    row.label(str(ao))
-                    row = col.row(align=True)
-                    row.label('Mesh Light:')
-                    row.label(str(meshL))
-                    row = col.row(align=True)
-                    row.label('Subsurface:')
-                    row.label(str(sub))
-                    row = col.row(align=True)
-                    row.label('Volume:')
-                    row.label(str(vol))
-    # def menu_draw(self, context):
-    #     layout = self.layout
-    #     scn = context.scene
-    #
-    #     if scn.render.engine == 'CYCLES' and not scn.cycles.progressive == 'BRANCHED_PATH':
-    #         # Basic Render Samples Info
-    #         col = layout.column(align=True)
-    #         row = col.row(align=True)
-    #         sampleSize = scn.cycles.samples
-    #         if(scn.cycles.use_square_samples):
-    #             sampleSize = sampleSize**2
-    #         if sampleSize < 10:
-    #             row.label('Too few samples')
-    #         else:
-    #             row.label("Total Samples: " + str(math.floor(sampleSize*len(scn['availableServers']))))
-    #
-    # bpy.types.CyclesRender_PT_sampling.append(menu_draw)
+bpy.types.CyclesRender_PT_sampling.append(menu_draw)
 
 class frameRangePanel(Panel):
     bl_space_type  = "VIEW_3D"
