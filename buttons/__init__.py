@@ -591,7 +591,7 @@ class listFiles(Operator):
     """List the files missing from the render-dump folder"""   # blender will use this as a tooltip for menu items and buttons.
     bl_idname  = "scene.list_files"     # unique identifier for buttons and menu items to reference.
     bl_label   = "List Files"           # display name in the interface.
-    bl_options = {'REGISTER', 'UNDO'}           # enable undo for the operator.
+    bl_options = {'REGISTER', 'UNDO'}   # enable undo for the operator.
 
     def execute(self, context):
         self.projectName = bpy.path.display_name_from_filepath(bpy.data.filepath)
