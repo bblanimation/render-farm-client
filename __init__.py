@@ -74,9 +74,9 @@ def register():
         attr="distributionType",
         name="Frame Distribution",
         description="Choose which hosts to use for render processes",
-        items=[("Split Process (WIP)", "Split Process (WIP)", "Distribute a portion of the frame to each server based on server processing speed"),
-               ("Paralell Process", "Paralell Process", "Send full frame to each server and average results")],
-        default='Paralell Process')
+        items=[("Split Process", "Split Process", "Distribute a portion of the frame to each server based on server processing speed"),
+               ("Parallel Process", "Parallel Process", "Send full frame to each server and average results")],
+        default='Parallel Process')
 
     bpy.types.Scene.renderType   = []
     bpy.types.Scene.renderStatus = {"animation":"None", "image":"None"}
@@ -114,6 +114,7 @@ def unregister():
     bpy.utils.unregister_module(__name__)
     bpy.types.INFO_MT_render.remove(more_menu_options)
     del bpy.types.Scene.showAdvanced
+    del bpy.types.Scene.unpack
     del bpy.types.Scene.frameRanges
     del bpy.types.Scene.tempFilePath
     del bpy.types.Scene.tempLocalDir

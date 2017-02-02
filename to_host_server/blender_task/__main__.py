@@ -47,6 +47,7 @@ parser.add_argument('-H','--hosts_online',action='store_true',default=None,help=
 parser.add_argument('-i','--hosts_file',action='store',default='remoteServers.txt',help='Pass a filename from which to load hosts. Should be valid json format.')
 parser.add_argument('-m','--max_server_load',action='store',default=None,help='Max render processes to run on each server at a time.')
 parser.add_argument('-a','--average_results',action='store_true',default=None,help='Average frames when finished.')
+parser.add_argument('-S','--split_process',action='store_true',default=None,help='Send only one job at a time to each server.')
 
 # NOTE: this parameter is currently required
 parser.add_argument('-n','--project_name',action='store',default=False) # just project name. default path will be in /tmp/blenderProjects
@@ -62,6 +63,45 @@ parser.add_argument('-p','--progress',action='store_true',help='Prints the progr
 parser.add_argument('-R','--project_root',action='store',help='Root path for storing project files on host server.')
 parser.add_argument('-o','--output_file_path',action='store',default=False,help='Local file to rsync files back into when done')
 parser.add_argument('-O','--name_output_files',action='store',default=False,help='Name to use for output files in results directory.')
+
+# the following two functions are exclusively for use with parallel process
+def hostsStatus(hosts_file=None,hosts=None,hosts_online=False,verbose=False):
+    global HOSTS # Using the global HOSTS variable
+    if( hosts ):
+        HOSTS = json.loads(args.hosts)
+    elif( hosts_file ):
+        HOSTS = setServersDict( hosts_file )
+    jobs            = []
+    tmp_hosts       = get_hosts()
+    hosts           = []
+    unreachable     = [] # jobList is a list of lists containing start and end values
+    for host in tmp_hosts:
+        try:
+            tn = telnetlib.Telnet(host,22,.5)
+            hosts.append(host.encode('utf-8'))
+        except:
+            unreachable.append(host.encode('utf-8'))
+    numHosts = len( hosts )
+    if( not(hosts_online) ):
+        print("")
+        print("Could not reach the following hosts: ")
+        print(unreachable)
+        print("Using the following %d hosts: " % (numHosts))
+        print( hosts )
+        print("")
+        sys.stdout.flush()
+    else:
+        print( hosts )
+        print( unreachable )
+    return hosts
+def get_hosts(groupName=None,hosts=None):
+    global HOSTS
+    if(groupName):
+        return HOSTS[groupName]
+    elif(hosts):
+        return [ i for k in HOSTS.keys() for i in hosts[k]]
+    else:
+        return [ i for k in HOSTS.keys() for i in HOSTS[k]]
 
 def main():
     startTime=time.time()
@@ -79,7 +119,7 @@ def main():
     hosts_online    = list()
     hosts_offline   = list()
     for host in hosts:
-        jh = JobHost( hostname=host,thread_func=start_tasks,verbose=verbose )
+        jh = JobHost( hostname=host,thread_func=start_split_tasks,verbose=verbose )
         if( jh.is_reachable() ):
             hosts_online.append(str(host))
         else:
@@ -153,47 +193,113 @@ def main():
     else:
          projectOutuptFile = args.output_file_path
 
-    # What is the abstraction for this
+    # Copy blender_p.py to project folder
+    subprocess.call("rsync -e 'ssh -oStrictHostKeyChecking=no' -a '" + os.path.join(projectRoot, "blender_p.py") + "' '" + os.path.join(projectPath, "toRemote", "blender_p.py") + "'", shell=True)
+
+    if( verbose >= 1 ):
+        print ("Rendering frames %s in %s" % (args.frame_range,projectName))
+        sys.stdout.flush()
+
     frame_range = json.loads(args.frame_range)
     numHosts = len(hosts)
 
     frames      = expandFrames(frame_range)
     jobStrings  = buildJobStrings(frames,projectName,projectPath,args.name_output_files,numHosts)
 
-    # Copy blender_p.py to project folder
-    subprocess.call("rsync -e 'ssh -oStrictHostKeyChecking=no' -a '" + os.path.join(projectRoot, "blender_p.py") + "' '" + os.path.join(projectPath, "toRemote", "blender_p.py") + "'", shell=True)
+    # for split processing
+    if args.split_process:
+        job_args =  {
+            'projectName':      projectName,
+            'projectPath':      projectPath,
+            'projectSyncPath':  projectSyncPath,
+            'remoteProjectPath':   remoteProjectPath,
+            'username':         username,
+            'verbose':          verbose,
+            'projectOutuptFile' :projectOutuptFile,
+            'remoteSyncBack':   remoteSyncBack,
+        }
 
-    job_args =  {
-        'projectName':      projectName,
-        'projectPath':      projectPath,
-        'projectSyncPath':  projectSyncPath,
-        'remoteProjectPath':   remoteProjectPath,
-        'username':         username,
-        'verbose':          verbose,
-        'projectOutuptFile' :projectOutuptFile,
-        'remoteSyncBack':   remoteSyncBack,
-    }
+        # Sets up kwargs, and callbacks on the hosts
+        jhm = JobHostManager(jobs=jobStrings,hosts=host_objects,function_args=job_args,verbose=verbose,max_on_hosts=2)
+        jhm.start()
+        status = jhm.get_cumulative_status()
 
-    # Sets up kwargs, and callbacks on the hosts
-    jhm = JobHostManager(jobs=jobStrings,hosts=host_objects,function_args=job_args,verbose=verbose,max_on_hosts=2)
-    jhm.start()
-    status = jhm.get_cumulative_status()
+        if args.average_results:
+            averageFrames(remoteSyncBack, projectName, verbose)
 
-    if args.average_results:
-        averageFrames(remoteSyncBack, projectName, verbose)
+    # for parallel processing
+    else:
+        hosts = hostsStatus(hosts_file=args.hosts_file,hosts=args.hosts,verbose=args.verbose)
+        if(args.verbose >= 2):
+            print ("Frames: ", frames)
+            print ("Blender Commands: ", jobStrings)
+        rsync_threads = {}
+        jobStatus = {}
+
+        for idx,jobString in enumerate(jobStrings):
+            # Get the job string at the index of this host and pass to the thread with other info
+            hostname = hosts[ idx % (len(hosts)) ]
+
+            if(len(frames)==1):
+                frame = frames[0]
+            else:
+                frame = frames[idx]
+
+            job_args =  {
+                'projectName':      projectName,
+                'projectPath':      projectPath,
+                'projectSyncPath':  projectSyncPath,
+                'remoteProjectPath':   remoteProjectPath,
+                'hostname':         hostname,
+                'username':         username,
+                'verbose':          args.verbose,
+                'projectOutuptFile' :projectOutuptFile,
+                'jobString' :       jobString,
+                'jobStatus' :       jobStatus,
+                'progress' :        args.progress,
+                'frame' :           frame,
+                'remoteSyncBack':   remoteSyncBack
+            }
+
+            thread = threading.Thread(target=start_parallel_tasks,kwargs=job_args)
+            rsync_threads[hostname] = thread
+            thread.start()
+
+        # Blocks `til all threads are done
+        for hostname in rsync_threads.keys():
+            rsync_threads[hostname].join()
+
+
+        failed = 0
+        for job in jobStrings:
+            if(job not in jobStatus):
+                sys.stderr.write("Render task did not complete. Command: %s" % (job) + "\n")
+                sys.stdout.flush()
+                failed += 1
 
     endTime = time.time()
     timer = stopWatch(endTime-startTime)
     if( verbose >= 1 ):
         print("")
         print("Elapsed time: " + timer)
-        ##TODO: Add the functionality on the following 6 lines back in
-        # if(status==0):
-        #     print("Render completed successfully!")
-        #     sys.stdout.flush()
-        # else:
-        #     sys.stderr.write("Render failed for %d jobs" % (failed) + "\n")
-        #     sys.stderr.flush()
+        if args.split_process:
+            pass
+            # TODO: Show status of render if using split processing
+            # if(status==0):
+            #     print("Render completed successfully!")
+            #     sys.stdout.flush()
+            # else:
+            #     sys.stderr.write("Render failed for %d jobs" % (failed) + "\n")
+            #     sys.stderr.flush()
+        else:
+            if(failed==0):
+                print("Render completed successfully!")
+                sys.stdout.flush()
+                sys.exit(0)
+            else:
+                sys.stderr.write("Render failed for %d jobs" % (failed) + "\n")
+                sys.stdout.flush()
+                sys.exit(1)
 
     if( verbose >= 3 ):
         print("\nJob exit statuses:")

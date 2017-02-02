@@ -5,6 +5,7 @@ import sys
 import json
 import shlex
 import subprocess
+import re
 import numpy
 import PIL
 from PIL import Image
@@ -14,6 +15,9 @@ def pflush(string):
     sys.stdout.flush()
 
 def process_blender_output(hostname,line):
+    status_regex = r"Fra:(\d+)\s.*Time:(\d{2}:\d{2}\.\d{2}).*Remaining:(\d{2}:\d+\.\d+)\s.*"
+    hostcount = {}
+    
     # Parsing the following output
     matches = re.finditer(status_regex, line)
     mod     = 100
@@ -59,7 +63,7 @@ def rsync_files_from_node_string(username,hostname,remoteProjectPath,projectName
         pflush(tmpStr)
     return tmpStr
 
-def start_tasks(
+def start_split_tasks(
     projectName, projectPath,
     projectSyncPath, hostname,
     username, jobString,
@@ -129,6 +133,73 @@ def start_tasks(
         run_status['r'] = 1
 
     return run_status['p'] + run_status['q'] + run_status['r']
+
+def start_parallel_tasks(
+    projectName, projectPath,
+    projectSyncPath, hostname,
+    username, jobString,
+    projectOutuptFile, jobStatus,
+    remoteProjectPath, frame,
+    remoteSyncBack, progress=False,
+    verbose=0 ):
+
+    pflush("Starting thread. Rendering frame %s on %s" % (frame,hostname))
+    # First copy the files over using rsync
+    rsync_to            = rsync_files_to_node_string( projectSyncPath, username, hostname, remoteProjectPath )
+    rsync_from          = rsync_files_from_node_string( username, hostname, remoteSyncBack, projectName, projectOutuptFile )
+    mkdir_local_string  = mkdir_string( projectPath )
+    mkdir_remote_string = mkdir_string( remoteProjectPath + '/results' )
+    ssh_c_string        = ssh_string( username, hostname )
+
+    ssh_mkdir           = ssh_c_string + " '" + mkdir_remote_string + "'"
+    ssh_blender         = ssh_c_string + " '" + jobString + "' "
+    pull_from           = mkdir_remote_string + ";" + rsync_from
+
+    if(verbose >= 3):
+        print("Syncing project file %s.blend to %s" % (projectName,hostname))
+        print("rsync command: %s" % (rsync_to))
+    t = subprocess.call(ssh_mkdir,shell=True )
+    p = subprocess.call(rsync_to, shell=True)
+    if(verbose >= 3):
+        print("Finished the rsync to host %s" % (hostname))
+    if(verbose >= 3):
+        print("Returned from rsync command: %d" % (p))
+        sys.stdout.flush()
+        if(p == 0): print ("Success!")
+    # Now start the blender command
+
+    if(verbose >= 3):
+        print ( "blender command: %s" % (jobString))
+
+    q = subprocess.Popen(shlex.split(ssh_blender),stdout=subprocess.PIPE)
+    # This blocks til q is done
+    while(type(q.poll()) == type(None)):
+        # This blocks til there is something to read
+        line = q.stdout.readline()
+        if( progress ):
+            process_blender_output(hostname,line)
+
+    if( q.returncode == 0 ):
+        if( verbose >= 1 ):
+            print ("Successfully completed render for frame (%s) on hostname %s." % (frame,hostname))
+            sys.stdout.flush()
+        jobStatus[jobString] = dict()
+        jobStatus[jobString]['blend'] = 0
+    else:
+        sys.stderr.write("blender error: %d" % (q.returncode))
+    # Now rsync the files in /tmp/<name>/render back to this host.
+
+    if( verbose >= 3 ):
+        print("rsync pull: " + pull_from )
+    r = subprocess.call(pull_from,shell=True)
+
+    if( r == 0 and q.returncode == 0 ):
+        jobStatus[jobString]['rsync'] = 0
+        if( verbose >= 1 ):
+            print( "Render frame (%s) has been copied back from hostname %s" % (frame,hostname))
+            sys.stdout.flush()
+    else:
+        sys.stderr.write("rsync error: %d" % (r))
 
 def buildJobStrings(frames,projectName,projectPath,nameOutputFiles,servers=1): # jobList is a list of lists containing start and end values
     jobStrings = []
