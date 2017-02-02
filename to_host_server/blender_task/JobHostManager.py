@@ -4,7 +4,7 @@ from JobHost import *
 
 class JobHostManager():
 
-    def __init__(self,jobs=None,hosts=None,max_on_hosts=1,verbose=False,function_args=None):
+    def __init__(self,jobs=None,hosts=None,max_on_hosts=1,verbose=0,function_args=None):
         self.jobs               = jobs
         self.original_jobs      = list(jobs)
         self.function_args      = function_args
@@ -85,7 +85,7 @@ class JobHostManager():
 
         sys.stderr.write(error_string)
         sys.stderr.flush()
-        
+
         if( self.verbose >= 3 ):
             print(error_string)
 

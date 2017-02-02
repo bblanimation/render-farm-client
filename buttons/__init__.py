@@ -104,12 +104,6 @@ class sendFrame(Operator):
     bl_options = {'REGISTER', 'UNDO'}                       # enable undo for the operator.
 
 
-    def averageFrames(self):
-        averageScriptPath = os.path.join(getLibraryPath(), "functions", "averageFrames.py")
-        runScriptCommand = "python " + averageScriptPath.replace(" ", "\\ ") + " -p " + bpy.path.abspath('//') + " -n " + self.projectName
-        process = subprocess.Popen(runScriptCommand, shell=True)
-        return process
-
     def modal(self, context, event):
         if event.type in {'ESC'} and not(self.alreadyCalled):
             if self.state == 3:
@@ -156,6 +150,7 @@ class sendFrame(Operator):
                         for line in self.stderr:
                             line = line.decode('ASCII').replace("\\n", "")[:-1]
                             self.report({'ERROR'}, "blender_task error: '" + line + "'")
+                            print("blender_task error: '" + line + "'")
                             sys.stderr.write(line)
                         errorMsg = self.stderr[-1].decode('ASCII')
                         try:
@@ -299,6 +294,7 @@ class sendAnimation(Operator):
                         for line in self.stderr:
                             line = line.decode('ASCII').replace("\\n", "")[:-1]
                             self.report({'ERROR'}, "blender_task error: '" + line + "'")
+                            print("blender_task error: '" + line + "'")
                             sys.stderr.write(line)
                         errorMsg = self.stderr[-1].decode('ASCII')
                         try:
@@ -325,7 +321,7 @@ class sendAnimation(Operator):
                             self.report({'ERROR'}, "ERROR: Invalid frame ranges given.")
                             setRenderStatus("animation", "ERROR")
                             return{'FINISHED'}
-                    self.process = renderFrames(str(expandFrames(json.loads(self.frameRangesDict["string"]))), self.projectName)
+                    self.process = renderFrames(str(expandFrames(json.loads(self.frameRangesDict["string"]))), self.projectName, False)
                     setRenderStatus("animation", "Rendering...")
                     self.state += 1
                     return{'PASS_THROUGH'}

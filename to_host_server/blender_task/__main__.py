@@ -147,7 +147,7 @@ def main():
         projectOutuptFile = "{projectPath}/".format(projectPath=projectPath)
         for file in os.listdir(projectOutuptFile):
             if( fnmatch.fnmatch(file,'*_seed-*') or fnmatch.fnmatch(file,'*.tga') ):
-                if( args.verbose > 1 ):
+                if( verbose > 1 ):
                     print('Removing %s from project dir.' % (projectOutuptFile + file))
                 os.remove(projectOutuptFile + file)
     else:
@@ -158,7 +158,10 @@ def main():
     numHosts = len(hosts)
 
     frames      = expandFrames(frame_range)
-    jobStrings  = buildJobStrings(frames,projectName,projectPath,projectRoot,args.name_output_files,numHosts)
+    jobStrings  = buildJobStrings(frames,projectName,projectPath,args.name_output_files,numHosts)
+
+    # Copy blender_p.py to project folder
+    subprocess.call("rsync -e 'ssh -oStrictHostKeyChecking=no' -a '" + os.path.join(projectRoot, "blender_p.py") + "' '" + os.path.join(projectPath, "toRemote", "blender_p.py") + "'", shell=True)
 
     job_args =  {
         'projectName':      projectName,
@@ -166,7 +169,7 @@ def main():
         'projectSyncPath':  projectSyncPath,
         'remoteProjectPath':   remoteProjectPath,
         'username':         username,
-        'verbose':          args.verbose,
+        'verbose':          verbose,
         'projectOutuptFile' :projectOutuptFile,
         'remoteSyncBack':   remoteSyncBack,
     }
@@ -177,7 +180,7 @@ def main():
     status = jhm.get_cumulative_status()
 
     if args.average_results:
-        averageFrames(remoteSyncBack, projectName)
+        averageFrames(remoteSyncBack, projectName, verbose)
 
     endTime = time.time()
     timer = stopWatch(endTime-startTime)

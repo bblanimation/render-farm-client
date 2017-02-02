@@ -102,7 +102,7 @@ def copyFiles():
     process = subprocess.Popen(rsyncCommand, stdout=subprocess.PIPE, shell=True)
     return process
 
-def renderFrames(frameRange, projectName, averageFrames):
+def renderFrames(frameRange, projectName, averageFrames=False):
     scn = bpy.context.scene
     extraFlags = ""
 
@@ -148,8 +148,7 @@ def expandFrames( frame_range ):
         else:
             sys.stderr.write("Unknown type in frames list")
 
-    # returns 'frames' but converts to keys and back to ensure uniqueness of values
-    return {}.fromkeys(frames).keys()
+    return list(set(frames))
 
 def listMissingFiles(filename, frameRange):
     try:

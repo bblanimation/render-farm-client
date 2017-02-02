@@ -8,7 +8,7 @@ import time
 from supporting_methods import *
 
 class JobHost(threading.Thread):
-    def __init__(self,hostname,persist_thread=True,jobs_list=None,thread_func=None,kwargs=None,callback=None,verbose=False,error_callback=None):
+    def __init__(self,hostname,persist_thread=True,jobs_list=None,thread_func=None,kwargs=None,callback=None,verbose=0,error_callback=None):
         super(JobHost,self).__init__()
 
         self.verbose = verbose

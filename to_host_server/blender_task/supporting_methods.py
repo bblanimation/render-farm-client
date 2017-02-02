@@ -5,9 +5,9 @@ import sys
 import json
 import shlex
 import subprocess
-# import numpy
-# import PIL
-# from PIL import Image
+import numpy
+import PIL
+from PIL import Image
 
 def pflush(string):
     print(string)
@@ -35,25 +35,25 @@ def process_blender_output(hostname,line):
         hostcount[hostname] += 1
         sys.stdout.flush()
 
-def ssh_string(username,hostname,verbose=False):
+def ssh_string(username,hostname,verbose=0):
     tmpStr = "ssh -oStrictHostKeyChecking=no %s@%s" % (username,hostname)
     if( verbose >= 3 ):
         pflush(tmpStr)
     return tmpStr
 
-def mkdir_string(path,verbose=False):
+def mkdir_string(path,verbose=0):
     tmpStr = "mkdir -p %s" % (path)
     if( verbose >= 3 ):
         pflush(tmpStr)
     return tmpStr
 
-def rsync_files_to_node_string(projectFullPath,username,hostname,remoteFullPath,verbose=False):
-    tmpStr = "rsync  -e 'ssh -oStrictHostKeyChecking=no'  -a %s %s@%s:%s/" % (projectFullPath,username,hostname,remoteFullPath)
+def rsync_files_to_node_string(projectFullPath,username,hostname,remoteFullPath,verbose=0):
+    tmpStr = "rsync -e 'ssh -oStrictHostKeyChecking=no' -a %s %s@%s:%s/" % (projectFullPath,username,hostname,remoteFullPath)
     if( verbose >= 3 ):
         pflush(tmpStr)
     return tmpStr
 
-def rsync_files_from_node_string(username,hostname,remoteProjectPath,projectName,projectOutuptFile,verbose=False):
+def rsync_files_from_node_string(username,hostname,remoteProjectPath,projectName,projectOutuptFile,verbose=0):
     tmpStr = "rsync -atu --remove-source-files %s@%s:%s %s" % (username,hostname,remoteProjectPath,projectOutuptFile)
     if(verbose >= 3 ):
         pflush(tmpStr)
@@ -68,11 +68,11 @@ def start_tasks(
     progress=False, verbose=0 ):
 
     # First copy the files over using rsync
-    rsync_to            = rsync_files_to_node_string( projectSyncPath, username, hostname, remoteProjectPath )
-    rsync_from          = rsync_files_from_node_string( username, hostname, remoteSyncBack, projectName, projectOutuptFile )
-    mkdir_local_string  = mkdir_string( projectPath )
-    mkdir_remote_string = mkdir_string( remoteProjectPath + '/results' )
-    ssh_c_string        = ssh_string( username, hostname )
+    rsync_to            = rsync_files_to_node_string( projectSyncPath, username, hostname, remoteProjectPath, verbose )
+    rsync_from          = rsync_files_from_node_string( username, hostname, remoteSyncBack, projectName, projectOutuptFile, verbose )
+    mkdir_local_string  = mkdir_string( projectPath, verbose )
+    mkdir_remote_string = mkdir_string( remoteProjectPath + '/results', verbose )
+    ssh_c_string        = ssh_string( username, hostname, verbose )
 
     ssh_mkdir           = ssh_c_string + " '" + mkdir_remote_string + "'"
     ssh_blender         = ssh_c_string + " '" + jobString + "' "
@@ -236,7 +236,7 @@ def stopWatch(value):
 
     return Days + ";" + Hours + ":" + Minutes + ";" + Seconds
 
-def averageFrames(renderedFramesPath, projectName):
+def averageFrames(renderedFramesPath, projectName, verbose=0):
     if( verbose >= 2 ):
         print "running averageFrames()... (currently only supports '.png' and '.tga')"
 
