@@ -7,18 +7,19 @@ Scripts and associated files for rendering from Blender files on CSE remote serv
       * Clean UI for sending frames to servers and viewing them within Blender
 
   * Future improvements:
-      * don't rely on scripts that run on python 2 (averageFrames)
-      * flush self.report() statements so that they appear when they are called from a modal context
-      * Comment code well
       * Detect when SSH keys have not been set up
       * Detect if you've run out of disk space
       * Don't pack files into the blend file
   * For documentation
-      * Let them know that all external files are packed into the .blender
+      * Let them know that all external files are packed into the .blend
   * Required python modules:
       * bpy, subprocess, telnetlib, sys, os, numpy, time, json, math
   * Required local packages:
       * rsync, curl
+  * Required packages on host server:
+      * rsync, numpy, pillow
+  * Required packages on client servers:
+      * blender
 
 ## Server-side improvements to be made:
 * Give user some sort of status for the render (e.g. 5% done)
@@ -27,4 +28,4 @@ Scripts and associated files for rendering from Blender files on CSE remote serv
 * Detect when SSH keys have not been set up
 * Detect when necessary packages have not been installed on remote servers (rsync, blender)
 * Detect if you've run out of disk space
-* Speed up ssh/rsync editing the daemon to remove unnecessary speed bumps, and other optimizations
+* Send tiles to the various servers based on computer speed

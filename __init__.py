@@ -3,7 +3,7 @@
 bl_info = {
     "name"        : "Server Farm Client",
     "author"      : "Christopher Gearhart <chris@bblanimation.com>",
-    "version"     : (0, 6, 5),
+    "version"     : (0, 7, 0),
     "blender"     : (2, 78, 0),
     "description" : "Render your scene on a remote server farm with this addon.",
     "location"    : "View3D > Tools > Render",

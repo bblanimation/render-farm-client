@@ -135,7 +135,7 @@ def main():
             sys.stdout.flush()
         if (len(hosts_online) == 0):
             sys.stderr.write("No hosts available.")
-            sys.exit(1)
+            sys.exit(58)
     else:
         if( verbose >= 1 ): print( "Hosts Online : " )
         print(hosts_online)
