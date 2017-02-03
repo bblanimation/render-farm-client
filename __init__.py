@@ -67,16 +67,9 @@ def register():
 
     bpy.types.Scene.maxServerLoad = IntProperty(
         name="Max Server Load",
-        min = 1, max = 50,
-        default = 3)
-
-    bpy.types.Scene.distributionType = EnumProperty(
-        attr="distributionType",
-        name="Frame Distribution",
-        description="Choose which hosts to use for render processes",
-        items=[("Split Process", "Split Process", "Distribute a portion of the frame to each server based on server processing speed"),
-               ("Parallel Process", "Parallel Process", "Send full frame to each server and average results")],
-        default='Parallel Process')
+        description="Set a limit on the number of frames to be rendered in parallel by each server (0 for no limit)",
+        min = 0, max = 50,
+        default = 0)
 
     bpy.types.Scene.renderType   = []
     bpy.types.Scene.renderStatus = {"animation":"None", "image":"None"}

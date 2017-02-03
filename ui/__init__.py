@@ -78,7 +78,7 @@ def menu_draw(self, context):
     layout = self.layout
     scn = context.scene
 
-    if scn.render.engine == 'CYCLES' and not scn.cycles.progressive == 'BRANCHED_PATH' and scn.distributionType == "Paralell Process":
+    if scn.render.engine == 'CYCLES' and not scn.cycles.progressive == 'BRANCHED_PATH':
         # Basic Render Samples Info
         col = layout.column(align=True)
         row = col.row(align=True)
@@ -143,11 +143,8 @@ class serversPanel(Panel):
             box.prop(scn, "showAdvanced")
             if scn.showAdvanced:
                 row = box.row(align=True)
-                row.prop(scn, "distributionType")
+                row.prop(scn, "maxServerLoad")
                 row = box.row(align=True)
-                if scn.distributionType == "Split Process":
-                    row.prop(scn, "maxServerLoad")
-                    row = box.row(align=True)
                 row.prop(scn, "unpack")
                 row = box.row(align=True)
                 row.prop(scn, "tempFilePath")

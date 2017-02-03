@@ -114,19 +114,12 @@ def renderFrames(frameRange, projectName, averageFrames=False):
     if averageFrames:
         extraFlags += " -a"
 
-    # if the distribution type is split process, set the appropriate flag to alert blender_task of user setting
-    if scn.distributionType == "Split Process":
-        extraFlags += " -S"
-    # else, show JSON progress objects
-    else:
-        extraFlags += " -p"
-
     # defines the project path on the host server if specified
     if scn.tempFilePath == "":
         scn.tempFilePath = "/tmp/"
 
     # runs blender command to render given range from the remote server
-    renderCommand = "ssh -T -x " + bpy.props.hostServerLogin + " 'python " + scn.tempFilePath + "blender_task -v -n " + projectName + " -l " + frameRange.replace(" ","") + " --hosts_file " + scn.tempFilePath + "servers.txt -R " + scn.tempFilePath + " --max_server_load " + str(scn.maxServerLoad) + extraFlags + "'"
+    renderCommand = "ssh -T -x " + bpy.props.hostServerLogin + " 'python " + scn.tempFilePath + "blender_task -v -p -n " + projectName + " -l " + frameRange.replace(" ","") + " --hosts_file " + scn.tempFilePath + "servers.txt -R " + scn.tempFilePath + " --max_server_load " + str(scn.maxServerLoad) + extraFlags + "'"
     print("Running command: " + renderCommand)
 
     print("Process sent to remote servers!\n")
