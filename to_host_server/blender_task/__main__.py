@@ -131,6 +131,9 @@ def main():
         if(verbose >= 1):
             print ("Starting distribute task...")
             sys.stdout.flush()
+        if (len(hosts_online) == 0):
+            sys.stderr.write("No hosts available.")
+            sys.exit(1)
     else:
         if( verbose >= 1 ): print( "Hosts Online : " )
         print(hosts_online)
