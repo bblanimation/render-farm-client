@@ -44,11 +44,18 @@ class refreshNumAvailableServers(Operator):
             self.process.poll()
 
             if self.process.returncode != 0 and self.process.returncode != None:
-                # errorMessage = str(self.process.stdout.readline(),'utf-8')
-                # print(errorMessage)
-                # self.report({'ERROR'}, errorMessage)
-                self.report({'ERROR'}, "There was an error. See terminal for details...")
+
+                # if error message available, print in Info window and define errorMessage string
+                if self.process.stderr != None:
+                    errorMessage = "Error message available in terminal/Info window."
+                    for line in self.process.stderr.readlines():
+                        self.report({'WARNING'}, str(line, 'utf-8').replace("\n",""))
+                else:
+                    errorMessage = "No error message to print."
+
+                self.report({'ERROR'}, "Process " + str(self.state-1) + " gave return code " + str(self.process.returncode) + ". " + errorMessage)
                 return{'FINISHED'}
+
             if self.process.returncode != None:
                 print("Process " + str(self.state) + " finished! (return code: " + str(self.process.returncode) + ")\n")
 
@@ -138,8 +145,26 @@ class sendFrame(Operator):
             if self.process.returncode != None:
                 # handle unidentified errors
                 if self.process.returncode > 1:
-                    self.report({'ERROR'}, "There was an error. See terminal for details...")
-                    setRenderStatus("image", "ERROR")
+                    if self.alreadyCalled:
+                        self.report({'INFO'}, "Process cancelled - No rendered frames found.")
+                    else:
+                        setRenderStatus("image", "ERROR")
+
+                        # if error message available, print in Info window and define errorMessage string
+                        if self.process.stderr != None:
+                            errorMessage = "Error message available in terminal/Info window."
+                            for line in self.process.stderr.readlines():
+                                self.report({'WARNING'}, str(line, 'utf-8').replace("\n",""))
+                        else:
+                            errorMessage = "No error message to print."
+
+                        # define self.errorSource string
+                        if not(self.state == 3):
+                            self.errorSource = "Process " + str(self.state-1)
+                        else:
+                            self.errorSource = "blender_task"
+
+                        self.report({'ERROR'}, self.errorSource + " gave return code " + str(self.process.returncode) + ". " + errorMessage)
                     return{'FINISHED'}
 
                 # handle and report errors for 'blender_task' process
@@ -179,15 +204,20 @@ class sendFrame(Operator):
                     print("Fetching render files...")
                     self.process = getFrames(self.projectName)
                     self.state += 1
-                    setRenderStatus("image", "Finishing...")
+                    if not(self.alreadyCalled):
+                        setRenderStatus("image", "Finishing...")
                     return{'PASS_THROUGH'}
 
                 elif(self.state == 4):
                     failedFramesString = ""
                     if(self.numFailedFrames > 0):
                         failedFramesString = " (failed for " + str(self.numFailedFrames) + " frames)"
-                    self.report({'INFO'}, "Render completed" + failedFramesString + "! View the rendered image in your UV/Image_Editor")
-                    setRenderStatus("image", "Complete!")
+                    if not(self.alreadyCalled):
+                        setRenderStatus("image", "Complete!")
+                        self.report({'INFO'}, "Render completed" + failedFramesString + "! View the rendered image in your UV/Image_Editor")
+                    else:
+                        setRenderStatus("image", "Partial completetion")
+                        self.report({'INFO'}, "Render partially completed" + failedFramesString + " - View the rendered image in your UV/Image_Editor")
                     appendViewable("image")
                     return{'FINISHED'}
                 else:
@@ -282,8 +312,26 @@ class sendAnimation(Operator):
             if self.process.returncode != None:
                 # handle unidentified errors
                 if self.process.returncode > 1:
-                    self.report({'ERROR'}, "There was an error. See terminal for details...")
-                    setRenderStatus("animation", "ERROR")
+                    if self.alreadyCalled:
+                        self.report({'INFO'}, "Process cancelled - No rendered frames found.")
+                    else:
+                        setRenderStatus("animation", "ERROR")
+
+                        # if error message available, print in Info window and define errorMessage string
+                        if self.process.stderr != None:
+                            errorMessage = "Error message available in terminal/Info window."
+                            for line in self.process.stderr.readlines():
+                                self.report({'WARNING'}, str(line, 'utf-8').replace("\n",""))
+                        else:
+                            errorMessage = "No error message to print."
+
+                        # define self.errorSource string
+                        if not(self.state == 3):
+                            self.errorSource = "Process " + str(self.state-1)
+                        else:
+                            self.errorSource = "blender_task"
+
+                        self.report({'ERROR'}, self.errorSource + " gave return code " + str(self.process.returncode) + ". " + errorMessage)
                     return{'FINISHED'}
 
                 # handle and report errors for 'blender_task' process
@@ -330,7 +378,8 @@ class sendAnimation(Operator):
                 elif(self.state == 3):
                     print("Fetching render files...")
                     self.process = getFrames(self.projectName)
-                    setRenderStatus("animation", "Finishing...")
+                    if not(self.alreadyCalled):
+                        setRenderStatus("animation", "Finishing...")
                     self.state +=1
                     return{'PASS_THROUGH'}
 
@@ -342,8 +391,11 @@ class sendAnimation(Operator):
                     if len(missingFrames) > 0:
                         self.report({'WARNING'}, "Missing Files: ")
                         self.report({'WARNING'}, missingFrames)
-                    self.report({'INFO'}, "Render completed" + failedFramesString + "! View the rendered animation in '//render/'")
-                    setRenderStatus("animation", "Complete!")
+                    if not(self.alreadyCalled):
+                        self.report({'INFO'}, "Render completed" + failedFramesString + "! View the rendered animation in '//render/'")
+                        setRenderStatus("animation", "Complete!")
+                    else:
+                        self.report({'INFO'}, "Render partially completed - View rendered frames in '//render/'")
                     appendViewable("animation")
                     return{'FINISHED'}
                 else:
@@ -508,8 +560,14 @@ class restartRemoteServers(Operator):
     #         self.process.poll()
     #
     #         if self.process.returncode != None and self.process.returncode > 1:
-    #             self.report({'ERROR'}, "There was an error. See terminal for details...")
-    #             return{'FINISHED'}
+                # if self.process.stderr != None:
+                #     errorMessage = "Error message available in terminal/Info window."
+                #     for line in self.process.stderr.readlines():
+                #         self.report({'WARNING'}, str(line, 'utf-8').replace("\n",""))
+                # else:
+                #     errorMessage = "No error message to print."
+                # self.report({'ERROR'}, "Process " + str(self.state-1) + " gave return code " + str(self.process.returncode) + ". " + errorMessage)
+                # return{'FINISHED'}
     #         if self.process.returncode != None:
     #             self.report({'INFO'}, "Remote servers have been restarted")
     #             return{'FINISHED'}

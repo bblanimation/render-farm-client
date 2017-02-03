@@ -116,7 +116,7 @@ def renderFrames(frameRange, projectName, averageFrames=False):
 
     # if the distribution type is split process, set the appropriate flag to alert blender_task of user setting
     if scn.distributionType == "Split Process":
-        extraFlags += " -L"
+        extraFlags += " -S"
     # else, show JSON progress objects
     else:
         extraFlags += " -p"

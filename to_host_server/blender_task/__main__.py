@@ -107,15 +107,16 @@ def main():
     startTime=time.time()
     args    = parser.parse_args()
     verbose = args.verbose
+
     # Getting hosts from some source
-    hosts   = listHosts( HOSTS )
     if( args.hosts_file ):
         hosts = listHosts( setServersDict(args.hosts_file) )
     elif( args.hosts ):
         hosts = listHosts( args.hosts )
+    else:
+        hosts = listHosts( HOSTS )
 
     host_objects = dict()
-
     hosts_online    = list()
     hosts_offline   = list()
     for host in hosts:
@@ -125,6 +126,7 @@ def main():
         else:
             hosts_offline.append(str(host))
         host_objects[host] = jh
+    numHosts = len(hosts_online)
 
     # Printing the start message
     if(not( args.hosts_online )):
@@ -204,7 +206,6 @@ def main():
         sys.stdout.flush()
 
     frame_range = json.loads(args.frame_range)
-    numHosts = len(hosts)
 
     frames      = expandFrames(frame_range)
     jobStrings  = buildJobStrings(frames,projectName,projectPath,args.name_output_files,numHosts)
@@ -232,7 +233,6 @@ def main():
 
     # for parallel processing
     else:
-        hosts = hostsStatus(hosts_file=args.hosts_file,hosts=args.hosts,verbose=args.verbose)
         if(args.verbose >= 2):
             print ("Frames: ", frames)
             print ("Blender Commands: ", jobStrings)
@@ -241,7 +241,7 @@ def main():
 
         for idx,jobString in enumerate(jobStrings):
             # Get the job string at the index of this host and pass to the thread with other info
-            hostname = hosts[ idx % (len(hosts)) ]
+            hostname = hosts_online[ idx % (numHosts) ]
 
             if(len(frames)==1):
                 frame = frames[0]
