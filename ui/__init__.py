@@ -145,8 +145,9 @@ class serversPanel(Panel):
                 row = box.row(align=True)
                 row.prop(scn, "distributionType")
                 row = box.row(align=True)
-                row.prop(scn, "maxServerLoad")
-                row = box.row(align=True)
+                if scn.distributionType == "Split Process":
+                    row.prop(scn, "maxServerLoad")
+                    row = box.row(align=True)
                 row.prop(scn, "unpack")
                 row = box.row(align=True)
                 row.prop(scn, "tempFilePath")

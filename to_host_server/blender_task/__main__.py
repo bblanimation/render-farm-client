@@ -47,7 +47,7 @@ parser.add_argument('-H','--hosts_online',action='store_true',default=None,help=
 parser.add_argument('-i','--hosts_file',action='store',default='remoteServers.txt',help='Pass a filename from which to load hosts. Should be valid json format.')
 parser.add_argument('-m','--max_server_load',action='store',default=None,help='Max render processes to run on each server at a time.')
 parser.add_argument('-a','--average_results',action='store_true',default=None,help='Average frames when finished.')
-parser.add_argument('-S','--split_process',action='store_true',default=None,help='Send only one job at a time to each server.')
+parser.add_argument('-S','--split_distribution',action='store_true',default=None,help='Send only one job at a time to each server.')
 
 # NOTE: this parameter is currently required
 parser.add_argument('-n','--project_name',action='store',default=False) # just project name. default path will be in /tmp/blenderProjects
@@ -211,7 +211,7 @@ def main():
     jobStrings  = buildJobStrings(frames,projectName,projectPath,args.name_output_files,numHosts)
 
     # for split processing
-    if args.split_process:
+    if args.split_distribution:
         job_args =  {
             'projectName':      projectName,
             'projectPath':      projectPath,
@@ -285,7 +285,7 @@ def main():
     if( verbose >= 1 ):
         print("")
         print("Elapsed time: " + timer)
-        if args.split_process:
+        if args.split_distribution:
             pass
             # TODO: Show status of render if using split processing
             # if(status==0):
