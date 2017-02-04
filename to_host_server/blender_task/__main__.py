@@ -187,13 +187,13 @@ def main():
         print("sorry, please give your project a name using the -n or --project_name flags.")
         sys.exit(0)
 
-    if(not(args.output_file_path)):
-        projectOutuptFile = "{projectPath}/".format(projectPath=projectPath)
-        for file in os.listdir(projectOutuptFile):
+    if( not(args.output_file_path) ):
+        for file in os.listdir(projectPath):
             if( fnmatch.fnmatch(file,'*_seed-*') or fnmatch.fnmatch(file,'*.tga') ):
+                projectOutputFile = os.path.join(projectPath, file)
                 if( verbose > 1 ):
-                    print('Removing %s from project dir.' % (projectOutuptFile + file))
-                os.remove(projectOutuptFile + file)
+                    print( "Removing {projectOutputFile} from project dir.".format(projectOutputFile=projectOutputFile) )
+                os.remove(projectOutuptFile)
     else:
          projectOutuptFile = args.output_file_path
 
@@ -201,7 +201,7 @@ def main():
     subprocess.call("rsync -e 'ssh -oStrictHostKeyChecking=no' -a '" + os.path.join(projectRoot, "blender_p.py") + "' '" + os.path.join(projectPath, "toRemote", "blender_p.py") + "'", shell=True)
 
     if( verbose >= 1 ):
-        print ("Rendering frames %s in %s" % (args.frame_range,projectName))
+        print( "Rendering frames {frameRange} in {projectName}".format(frameRange=args.frame_range,projectName=projectName) )
         sys.stdout.flush()
 
     frame_range = json.loads(args.frame_range)

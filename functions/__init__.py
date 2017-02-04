@@ -4,6 +4,8 @@ import bpy, subprocess, os, sys
 from .setupServerVars import *
 
 def jobIsValid(jobType, projectName):
+    """ Verifies that the job is valid before sending it to the host server """
+
     # verify that project has been saved
     if projectName == "":
         return {"valid":False, "errorType":"WARNING", "errorMessage":"RENDER FAILED: You have not saved your project file. Please save it before attempting to render."}
@@ -18,26 +20,21 @@ def jobIsValid(jobType, projectName):
 
     # verify that sampling is high enough to provide expected results
     elif jobType == "image":
-        if bpy.context.scene.cycles.progressive == 'PATH':
+        if bpy.context.scene.cycles.progressive == "PATH":
             samples = bpy.context.scene.cycles.samples
             if bpy.context.scene.cycles.use_square_samples:
                 samples = samples**2
             if samples < 10:
-                return {"valid":True, "errorType":"WARNING", "errorMessage":"RENDER ALERT: Render result may be inaccurate at " + str(samples) + " samples. Try 10 or more samples for a more accurate render."}
-            else:
-                return {"valid":True, "errorType":None, "errorMessage":None}
-        elif bpy.context.scene.cycles.progressive == 'BRANCHED_PATH':
+                return {"valid":True, "errorType":"WARNING", "errorMessage":"RENDER ALERT: Render result may be inaccurate at {samples} samples. Try 10 or more samples for a more accurate render.".format(samples=str(samples))}
+        elif bpy.context.scene.cycles.progressive == "BRANCHED_PATH":
             samples = bpy.context.scene.cycles.aa_samples
             if bpy.context.scene.cycles.use_square_samples:
                 samples = samples**2
             if samples < 5:
-                return {"valid":True, "errorType":"WARNING", "errorMessage":"RENDER ALERT: Render result may be inaccurate at " + str(samples) + " AA samples. Try 5 or more AA samples for a more accurate render."}
-            else:
-                return {"valid":True, "errorType":None, "errorMessage":None}
-        else:
-            return {"valid":True, "errorType":None, "errorMessage":None}
-    else:
-        return {"valid":True, "errorType":None, "errorMessage":None}
+                return {"valid":True, "errorType":"WARNING", "errorMessage":"RENDER ALERT: Render result may be inaccurate at {samples} AA samples. Try 5 or more AA samples for a more accurate render.".format(samples=str(samples))}
+
+    # else, the job is valid
+    return {"valid":True, "errorType":None, "errorMessage":None}
 
 def getFrames(projectName):
     dumpLocation = bpy.path.abspath("//")+ "render-dump/"
@@ -57,7 +54,7 @@ def getFrames(projectName):
 def buildFrameRangesString(frameRanges):
     frameRangeList = frameRanges.replace(" ", "").split(",")
     newFrameRangeList = []
-    invalidDict = { "valid":False, "string":None }
+    invalidDict = {"valid":False, "string":None}
     for string in frameRangeList:
         try:
             newInt = int(string)
@@ -70,14 +67,14 @@ def buildFrameRangesString(frameRanges):
                     newInt1 = int(newString[0])
                     newInt2 = int(newString[1])
                     if newInt1 <= newInt2:
-                        newFrameRangeList.append([newInt1,newInt2])
+                        newFrameRangeList.append([newInt1, newInt2])
                     else:
                         return invalidDict
                 except:
                     return invalidDict
             else:
                 return invalidDict
-    return { "valid":True, "string":str(newFrameRangeList).replace(" ","") }
+    return {"valid":True, "string":str(newFrameRangeList).replace(" ", "")}
 
 def copyProjectFile(projectName):
     scn = bpy.context.scene
@@ -103,6 +100,8 @@ def copyFiles():
     return process
 
 def renderFrames(frameRange, projectName, averageFrames=False):
+    """ Define what the function does """
+
     scn = bpy.context.scene
     extraFlags = ""
 
@@ -119,7 +118,7 @@ def renderFrames(frameRange, projectName, averageFrames=False):
         scn.tempFilePath = "/tmp/"
 
     # runs blender command to render given range from the remote server
-    renderCommand = "ssh -T -x " + bpy.props.hostServerLogin + " 'python " + scn.tempFilePath + "blender_task -v -p -n " + projectName + " -l " + frameRange.replace(" ","") + " --hosts_file " + scn.tempFilePath + "servers.txt -R " + scn.tempFilePath + " --max_server_load " + str(scn.maxServerLoad) + extraFlags + "'"
+    renderCommand = "ssh -T -x " + bpy.props.hostServerLogin + " 'python " + scn.tempFilePath + "blender_task -v -p -n " + projectName + " -l " + frameRange.replace(" ", "") + " --hosts_file " + scn.tempFilePath + "servers.txt -R " + scn.tempFilePath + " --max_server_load " + str(scn.maxServerLoad) + extraFlags + "'"
     print("Running command: " + renderCommand)
 
     print("Process sent to remote servers!\n")
@@ -135,15 +134,15 @@ def getRenderStatus(key):
     return bpy.context.scene.renderStatus[key]
 
 def appendViewable(typeOfRender):
-    if(typeOfRender not in bpy.context.scene.renderType):
+    if typeOfRender not in bpy.context.scene.renderType:
         bpy.context.scene.renderType.append(typeOfRender)
 
-def expandFrames( frame_range ):
+def expandFrames(frame_range):
     frames = []
     for i in frame_range:
-        if( type(i) == list ):
-            frames += range(i[0],i[1]+1)
-        elif( type(i) == int ):
+        if type(i) == list:
+            frames += range(i[0], i[1]+1)
+        elif type(i) == int:
             frames.append(i)
         else:
             sys.stderr.write("Unknown type in frames list")
@@ -151,22 +150,21 @@ def expandFrames( frame_range ):
     return list(set(frames))
 
 def listMissingFiles(filename, frameRange):
-    try:
-        allfiles=os.listdir(bpy.path.abspath("//") + "render-dump/")
-    except:
-        sys.stderr.write("Error listing directory " + bpy.path.abspath("//") + "render-dump/. The folder may not exist.")
-        return ""
-    imlist = []
-    for f in allfiles:
-        if (f[-4:] in [".tga",".TGA"] and f[-5] != "e" and f[:len(filename)] == filename):
-            imlist.append(int(f[len(filename)+1:len(filename)+5]))
-    complist = expandFrames(json.loads(frameRange))
+    """ Lists all missing files from local 'render-dump' directory """
 
-    # compare lists and determine which frames are missing from imlist
-    missingF = []
-    for i in complist:
-        if i not in imlist:
-            missingF.append(i)
+    try:
+        allFiles = os.listdir(os.path.join(bpy.path.abspath("//"), "render-dump"))
+    except:
+        sys.stderr.write("Error listing directory {dumpFolder}/. The folder may not exist.".format(dumpFolder=os.path.join(bpy.path.abspath("//"), "render-dump")))
+        return ""
+    imList = []
+    for f in allFiles:
+        if f[-4:] in [".tga", ".TGA"] and f[-5] != "e" and f[:len(filename)] == filename:
+            imList.append(int(f[len(filename)+1:len(filename)+5]))
+    compList = expandFrames(json.loads(frameRange))
+
+    # compare lists to determine which frames are missing from imlist
+    missingF = [i for i in compList if i not in imList]
 
     # return the list of missing frames as string, omitting the open and close brackets
     return str(missingF)[1:-1]

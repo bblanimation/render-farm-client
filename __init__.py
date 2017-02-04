@@ -36,56 +36,56 @@ def register():
     bpy.types.Scene.showAdvanced = BoolProperty(
         name="Show Advanced",
         description="Display advanced remote server settings",
-        default = False)
+        default=False)
     bpy.types.Scene.unpack = BoolProperty(
         name="Auto-unpack files",
         description="Unpack the files that got packed for remote servers after saving",
-        default = True)
+        default=True)
 
     # initialize frame range string text box
     bpy.types.Scene.frameRanges = StringProperty(
-        name = "Frames")
+        name="Frames")
 
     # initialize frame range string text box
     bpy.types.Scene.tempFilePath = StringProperty(
-                        name = "Remote Path",
-                        description="File path on host server (temporary storage location)",
-                        maxlen = 128,
-                        default = "/tmp/renderFarm/")
+        name="Remote Path",
+        description="File path on host server (temporary storage location)",
+        maxlen=128,
+        default="/tmp/renderFarm/")
     bpy.types.Scene.tempLocalDir = StringProperty(
-                        name = "Temp Local Path",
-                        description="File path on local drive to store temporary project files",
-                        maxlen = 128,
-                        default = "/tmp/",
-                        subtype = "DIR_PATH")
+        name="Temp Local Path",
+        description="File path on local drive to store temporary project files",
+        maxlen=128,
+        default="/tmp/",
+        subtype="DIR_PATH")
 
     bpy.types.Scene.nameOutputFiles = StringProperty(
-                        name = "Name Output Files",
-                        description="Custom name used for rendered frames in 'render_dump' folder (prepended to: '_####')",
-                        maxlen = 128,
-                        default = "")
+        name="Name Output Files",
+        description="Custom name used for rendered frames in 'render_dump' folder (prepended to: '_####')",
+        maxlen=128,
+        default="")
 
     bpy.types.Scene.maxServerLoad = IntProperty(
         name="Max Server Load",
         description="Set a limit on the number of frames to be rendered in parallel by each server (0 for no limit)",
-        min = 0, max = 50,
-        default = 0)
+        min=0, max=50,
+        default=0)
 
-    bpy.types.Scene.renderType   = []
+    bpy.types.Scene.renderType = []
     bpy.types.Scene.renderStatus = {"animation":"None", "image":"None"}
 
     # Initialize server and hostServerLogin variables
-    serverVars                 = setupServerVars()
-    bpy.props.servers          = serverVars["servers"]
-    bpy.props.hostServerLogin  = serverVars["hostServerLogin"]
+    serverVars = setupServerVars()
+    bpy.props.servers = serverVars["servers"]
+    bpy.props.hostServerLogin = serverVars["hostServerLogin"]
     writeServersFile(bpy.props.servers, "All Servers")
     bpy.props.requiredFileRead = False
 
     # initialize server groups enum property
-    groupNames = [("All Servers","All Servers","Render on all servers")]
+    groupNames = [("All Servers", "All Servers", "Render on all servers")]
     for groupName in serverVars["servers"]:
-        junkList = [groupName,groupName,"Render only servers on this group"]
-        groupNames.append(tuple(junkList))
+        tmpList = [groupName, groupName, "Render only servers on this group"]
+        groupNames.append(tuple(tmpList))
     bpy.types.Scene.serverGroups = EnumProperty(
         attr="serverGroups",
         name="Servers",
