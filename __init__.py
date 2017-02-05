@@ -67,9 +67,15 @@ def register():
 
     bpy.types.Scene.maxServerLoad = IntProperty(
         name="Max Server Load",
-        description="Set a limit on the number of frames to be rendered in parallel by each server (0 for no limit)",
-        min=0, max=50,
-        default=0)
+        description="Set a limit on the number of frames to be rendered in parallel by each server",
+        min=1, max=8,
+        default=1)
+
+    bpy.types.Scene.connectionTimeout = FloatProperty(
+        name="Connection Timeout",
+        description="Time (in seconds) to wait for client servers to respond.",
+        min=.001, max=1,
+        default=.01)
 
     bpy.types.Scene.renderType = []
     bpy.types.Scene.renderStatus = {"animation":"None", "image":"None"}
@@ -113,6 +119,7 @@ def unregister():
     del bpy.types.Scene.tempLocalDir
     del bpy.types.Scene.nameOutputFiles
     del bpy.types.Scene.maxServerLoad
+    del bpy.types.Scene.connectionTimeout
     del bpy.types.Scene.renderType
     del bpy.types.Scene.renderStatus
     del bpy.props.servers

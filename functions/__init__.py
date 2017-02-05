@@ -123,7 +123,7 @@ def renderFrames(frameRange, projectName, averageFrames=False):
         scn.tempFilePath = "/tmp/"
 
     # runs blender command to render given range from the remote server
-    renderCommand = "ssh -T -x " + bpy.props.hostServerLogin + " 'python " + scn.tempFilePath + "blender_task -v -p -n " + projectName + " -l " + frameRange.replace(" ", "") + " --hosts_file " + scn.tempFilePath + "servers.txt -R " + scn.tempFilePath + " --max_server_load " + str(scn.maxServerLoad) + extraFlags + "'"
+    renderCommand = "ssh -T -x " + bpy.props.hostServerLogin + " 'python " + scn.tempFilePath + "blender_task -v -p -n " + projectName + " -l " + frameRange.replace(" ", "") + " --hosts_file " + scn.tempFilePath + "servers.txt -R " + scn.tempFilePath + " --connection_timeout " + str(scn.connectionTimeout) + " --max_server_load " + str(scn.maxServerLoad) + extraFlags + "'"
     process = subprocess.Popen(renderCommand, stderr=subprocess.PIPE, shell=True)
     print("Process sent to remote servers!")
     return process
@@ -170,7 +170,7 @@ def listMissingFiles(filename, frameRange):
         return ""
     imList = []
     for f in allFiles:
-        if f[-4:] in [".tga", ".TGA"] and f[-5] != "e" and f[:len(filename)] == filename:
+        if f.endswith(".tga") and f[-11:-4] != "average" and "seed" not in f and f[:len(filename)] == filename:
             imList.append(int(f[len(filename)+1:len(filename)+5]))
     compList = expandFrames(json.loads(frameRange))
 

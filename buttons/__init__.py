@@ -20,7 +20,7 @@ class refreshNumAvailableServers(Operator):
 
     def checkNumAvailServers(self):
         scn = bpy.context.scene
-        command = "ssh -T -x " + bpy.props.hostServerLogin + " 'python " + scn.tempFilePath + "blender_task -H --hosts_file " + scn.tempFilePath + "servers.txt'"
+        command = "ssh -T -x " + bpy.props.hostServerLogin + " 'python " + scn.tempFilePath + "blender_task -H --connection_timeout " + str(scn.connectionTimeout) + " --hosts_file " + scn.tempFilePath + "servers.txt'"
         process = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
         return process
 
@@ -118,9 +118,9 @@ class sendFrame(Operator):
 
 
     def modal(self, context, event):
-        if event.type in {"ESC"} and not self.alreadyCalled:
+        if event.type in {"ESC"} and not self.renderCancelled:
             if self.state == 3:
-                self.alreadyCalled = True
+                self.renderCancelled = True
                 self.process.kill()
                 self.report({"INFO"}, "Render process cancelled. Fetching frames...")
                 print("Process cancelled")
@@ -151,7 +151,7 @@ class sendFrame(Operator):
             if self.process.returncode != None:
                 # handle unidentified errors
                 if self.process.returncode > 1:
-                    if self.alreadyCalled:
+                    if self.renderCancelled:
                         self.report({"INFO"}, "Process cancelled - No rendered frames found.")
                     else:
                         setRenderStatus("image", "ERROR")
@@ -208,7 +208,7 @@ class sendFrame(Operator):
                 elif self.state == 3:
                     self.process = getFrames(self.projectName)
                     self.state += 1
-                    if not self.alreadyCalled:
+                    if not self.renderCancelled:
                         setRenderStatus("image", "Finishing...")
                     return{"PASS_THROUGH"}
 
@@ -216,7 +216,7 @@ class sendFrame(Operator):
                     failedFramesString = ""
                     if self.numFailedFrames > 0:
                         failedFramesString = " (failed for " + str(self.numFailedFrames) + " frames)"
-                    if not self.alreadyCalled:
+                    if not self.renderCancelled:
                         setRenderStatus("image", "Complete!")
                         self.report({"INFO"}, "Render completed" + failedFramesString + "! View the rendered image in your UV/Image_Editor")
                         appendViewable("image")
@@ -274,7 +274,7 @@ class sendFrame(Operator):
         # start initial render process
         self.stdout = None
         self.stderr = None
-        self.alreadyCalled = False
+        self.renderCancelled = False
         self.numFailedFrames = 0
         self.finishedFrames = 0
         self.curFrame = context.scene.frame_current
@@ -299,9 +299,9 @@ class sendAnimation(Operator):
     def modal(self, context, event):
         scn = context.scene
 
-        if event.type in {"ESC"} and not self.alreadyCalled:
+        if event.type in {"ESC"} and not self.renderCancelled:
             if self.state == 3:
-                self.alreadyCalled = True
+                self.renderCancelled = True
                 self.process.kill()
                 self.report({"INFO"}, "Render process cancelled. Fetching frames...")
                 print("Process cancelled")
@@ -319,7 +319,7 @@ class sendAnimation(Operator):
             if self.process.returncode != None:
                 # handle unidentified errors
                 if self.process.returncode > 1:
-                    if self.alreadyCalled:
+                    if self.renderCancelled:
                         self.report({"INFO"}, "Process cancelled - No rendered frames found.")
                     else:
                         setRenderStatus("animation", "ERROR")
@@ -383,7 +383,7 @@ class sendAnimation(Operator):
                 # get rendered frames from remote servers and archive old render files
                 elif self.state == 3:
                     self.process = getFrames(self.projectName)
-                    if not self.alreadyCalled:
+                    if not self.renderCancelled:
                         setRenderStatus("animation", "Finishing...")
                     self.state += 1
                     return{"PASS_THROUGH"}
@@ -396,7 +396,7 @@ class sendAnimation(Operator):
                     if len(missingFrames) > 0:
                         self.report({"WARNING"}, "Missing Files: ")
                         self.report({"WARNING"}, missingFrames)
-                    if not self.alreadyCalled:
+                    if not self.renderCancelled:
                         self.report({"INFO"}, "Render completed" + failedFramesString + "! View the rendered animation in '//render/'")
                         setRenderStatus("animation", "Complete!")
                     else:
@@ -424,7 +424,7 @@ class sendAnimation(Operator):
             return{"FINISHED"}
 
         print("\nRunning sendAnimation function...")
-        
+
         # ensure the job won't break the script
         jobValidityDict = jobIsValid("animation", self.projectName)
         if jobValidityDict["errorType"] != None:
@@ -450,7 +450,7 @@ class sendAnimation(Operator):
         # start initial render process
         self.stdout = None
         self.stderr = None
-        self.alreadyCalled = False
+        self.renderCancelled = False
         self.numFailedFrames = 0
         self.startFrame = context.scene.frame_start
         self.endFrame = context.scene.frame_end

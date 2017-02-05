@@ -72,7 +72,7 @@ def rsync_files_from_node_string(username, hostname, remoteResultsPath, localRes
         pflush(tmpStr)
     return tmpStr
 
-def start_tasks(projectName, projectPath, projectSyncPath, hostname, username, jobString, remoteResultsPath, localResultsPath, frame=False, progress=False, verbose=0):
+def start_tasks(projectName, projectPath, projectSyncPath, hostname, username, jobString, remoteResultsPath, localResultsPath, firstTime=True, frame=False, progress=False, verbose=0):
     """ Write tooltip here """
 
     if verbose >= 1 and frame:
@@ -89,19 +89,23 @@ def start_tasks(projectName, projectPath, projectSyncPath, hostname, username, j
     pull_from           = "{mkdir_local_string};{rsync_from}".format(mkdir_local_string=mkdir_local_string, rsync_from=rsync_from)
     run_status          = {"p":-1, "q":-1, "r":-1}
 
-    if verbose >= 3:
-        pflush("Syncing project file {projectName}.blend to {hostname}\nrsync command: {rsync_to}".format(projectName=projectName, hostname=hostname, rsync_to=rsync_to))
-    t = subprocess.call(ssh_mkdir, shell=True)
-    p = subprocess.call(rsync_to, shell=True)
-    if verbose >= 3:
-        pflush("Finished the rsync to host {hostname}".format(hostname=hostname))
-    if verbose >= 3:
-        pflush("Returned from rsync command: {p}".format(p=p))
-        if p == 0: pflush("Success!")
-    if p == 0:
-        run_status["p"] = 0
+    # only sync project files if they haven't already been synced
+    if firstTime:
+        if verbose >= 3:
+            pflush("Syncing project file {projectName}.blend to {hostname}\nrsync command: {rsync_to}".format(projectName=projectName, hostname=hostname, rsync_to=rsync_to))
+        t = subprocess.call(ssh_mkdir, shell=True)
+        p = subprocess.call(rsync_to, shell=True)
+        if verbose >= 3:
+            pflush("Finished the rsync to host {hostname}".format(hostname=hostname))
+        if verbose >= 3:
+            pflush("Returned from rsync command: {p}".format(p=p))
+            if p == 0: pflush("Success!")
+        if p == 0:
+            run_status["p"] = 0
+        else:
+            run_status["p"] = 1
     else:
-        run_status["p"] = 1
+        run_status["p"] = 0
 
     # Now start the blender command
     if verbose >= 3:
@@ -190,6 +194,14 @@ def setServersDict(hostDirPath="remoteServers.txt"):
         serverFile = open(hostDirPath, "r")
     servers = json.loads(readFileFor(serverFile, "REMOTE SERVERS DICTIONARY"))
     return servers
+
+def testHosts(host, hosts_online, hosts_offline, start_tasks, verbose=0):
+    jh = JobHost(hostname=host, thread_func=start_tasks, verbose=verbose)
+    if jh.is_reachable():
+        hosts_online.append(str(host))
+    else:
+        hosts_offline.append(str(host))
+
 
 def listHosts(hostDict):
     if type(hostDict) == list:

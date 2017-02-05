@@ -14,11 +14,11 @@ class JobHostManager():
         if not hosts: self.hosts = dict()
         else: self.add_hosts(hosts)
 
-        self.hosts_with_jobs    = dict()
-        self.job_status         = dict()
-        self.errors             = list()
-        self.verbose            = verbose
-        self.max_on_hosts = max_on_hosts
+        self.hosts_with_jobs = dict()
+        self.job_status      = dict()
+        self.errors          = list()
+        self.verbose         = verbose
+        self.max_on_hosts    = max_on_hosts
         if self.jobs:
             self.process_jobs()
 
@@ -32,14 +32,17 @@ class JobHostManager():
             for aHost in self.hosts.keys():
                 host = self.hosts[aHost]
                 while self.host_can_take_job(host=host) and len(self.jobs) > 0:
+                    hostname = host.get_hostname()
                     job = self.jobs.pop()
                     if self.verbose >= 3:
-                        print("Running job {job} on host {host}.".format(job=job, host=host.get_hostname()))
+                        pflush("Running job {job} on host {host}.".format(job=job, host=hostname))
                     host.add_job(job)
                     if host not in self.hosts_with_jobs:
-                        self.hosts_with_jobs[host.get_hostname()] = host.get_task_count()
+                        self.hosts_with_jobs[hostname] = host.get_task_count()
                     if not host.is_started() and not host.thread_stopped():
                         host.start()
+                    numQueued = str(len(self.jobs))
+                    pflush("Job sent to host '{hostname}' ({numQueued} jobs remain in queue)".format(hostname=hostname, numQueued=numQueued))
                 if self.jobs_complete():
                     break
             if self.jobs_complete():
@@ -55,6 +58,13 @@ class JobHostManager():
             else:
                 return False
         return True
+
+    def remaining_jobs(self):
+        remaining = len(self.original_jobs)
+        for job in self.original_jobs:
+            if job in self.job_status:
+                if self.job_status[job] == 0: remaining -= 1
+        return remaining
 
     def add_hosts(self, hosts):
         if type(hosts) == list:

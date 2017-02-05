@@ -13,6 +13,7 @@ import re
 import fnmatch
 import shlex
 import json
+import signal
 from JobHost import *
 from JobHostManager import *
 from VerboseAction import verbose_action
@@ -25,8 +26,9 @@ parser.add_argument("-l", "--frame_range", action="store", default="[]", help="P
 parser.add_argument("-d", "--hosts", action="store", default=None, help="Pass a dictionary or list of hosts. Should be valid json.")
 parser.add_argument("-H", "--hosts_online", action="store_true", default=None, help="Telnets to ports to find out if a host is availible to ssh into, skips everything else.")
 parser.add_argument("-i", "--hosts_file", action="store", default="remoteServers.txt", help="Pass a filename from which to load hosts. Should be valid json format.")
-parser.add_argument("-m", "--max_server_load", action="store", default=None, help="Max render processes to run on each server at a time.")
+parser.add_argument("-m", "--max_server_load", action="store", default=1, help="Max render processes to run on each server at a time.")
 parser.add_argument("-a", "--average_results", action="store_true", default=None, help="Average frames when finished.")
+parser.add_argument("-t", "--connection_timeout", action="store", default=.01, help="Pass a float for the timeout in seconds for telnet connections to client servers.")
 # NOTE: this parameter is currently required
 parser.add_argument("-n", "--project_name", action="store", default=False) # just project name. default path will be in /tmp/blenderProjects
 # TODO: test this for directories other than toRemote
@@ -48,6 +50,7 @@ def main():
     startTime = time.time()
     args = parser.parse_args()
     verbose = args.verbose
+    max_server_load = int(args.max_server_load)
 
     # Getting hosts from some source
     if args.hosts_file:
@@ -61,8 +64,9 @@ def main():
     host_objects = dict()
     hosts_online = list()
     hosts_offline = list()
+
     for host in hosts:
-        jh = JobHost(hostname=host, thread_func=start_tasks, verbose=verbose)
+        jh = JobHost(hostname=host, timeout=float(args.connection_timeout), thread_func=start_tasks, verbose=verbose)
         if jh.is_reachable():
             hosts_online.append(str(host))
         else:
@@ -77,6 +81,8 @@ def main():
         if verbose >= 2: print("Hosts Offline: ")
         print(hosts_offline)
         sys.exit(0)
+    elif verbose >= 1:
+        print("hosts available: {numHostsOnline}".format(numHostsOnline=len(hosts_online)))
 
     # Print the start message
     elif verbose >= 1:
@@ -157,7 +163,11 @@ def main():
     # Print frame range to be rendered
     frames = json.loads(args.frame_range)
     if verbose >= 1:
-        pflush("Rendering frames {frameRange} in {projectName}".format(frameRange=str(frames), projectName=projectName))
+        pflush("{numFrames} frames queued from project '{projectName}': {frameRange}".format(numFrames=str(len(frames)), frameRange=str(frames), projectName=projectName))
+
+    if args.average_results and len(frames) > 1:
+        signal.signal(signal.SIGINT, averageFrames(localResultsPath, projectName, verbose))
+        signal.signal(signal.SIGTERM, averageFrames(localResultsPath, projectName, verbose))
 
     # set up variables for threads
     jobStrings = buildJobStrings(frames, projectName, projectPath, args.name_output_files, numHosts)
@@ -174,9 +184,9 @@ def main():
 
     # if max server load specified, uses JobHostManager class
 
-    # if int(args.max_server_load) > 0:
+    # if max_server_load > 0:
     # Sets up kwargs, and callbacks on the hosts
-    jhm = JobHostManager(jobs=jobStrings, hosts=host_objects, function_args=job_args, verbose=verbose, max_on_hosts=2)
+    jhm = JobHostManager(jobs=jobStrings, hosts=host_objects, function_args=job_args, verbose=verbose, max_on_hosts=max_server_load)
     jhm.start()
     status = jhm.get_cumulative_status()
 
@@ -207,7 +217,6 @@ def main():
     #     # Blocks `til all threads are done
     #     for hostname in rsync_threads.keys():
     #         rsync_threads[hostname].join()
-
     if args.average_results:
         averageFrames(localResultsPath, projectName, verbose)
 
@@ -216,13 +225,12 @@ def main():
     timer = stopWatch(endTime-startTime)
     if verbose >= 1:
         pflush("Elapsed time: {timer}".format(timer=timer))
-        if int(args.max_server_load) > 0:
-            # TODO: Define failed earlier on... keep the strings the same to preserve render status
-            failed = "?"
-            if(status==0):
-                pflush("Render completed successfully!")
-            else:
-                eflush("Render failed for {numFailed} jobs\n".format(numFailed=failed))
+        # TODO: Define failed earlier on... keep the strings the same to preserve render status
+        failed = "?"
+        if(status==0):
+            pflush("Render completed successfully!")
+        else:
+            eflush("Render failed for {numFailed} jobs\n".format(numFailed=failed))
 
 if __name__ == "__main__":
     main()

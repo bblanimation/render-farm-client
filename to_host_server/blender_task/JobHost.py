@@ -10,10 +10,12 @@ from supporting_methods import *
 class JobHost(threading.Thread):
     """ Write tooltip here """
 
-    def __init__(self, hostname, persist_thread=True, jobs_list=None, thread_func=None, kwargs=None, callback=None, verbose=0, error_callback=None):
+    def __init__(self, hostname, persist_thread=True, jobs_list=None, thread_func=None, kwargs=None, callback=None, timeout=.01, verbose=0, error_callback=None):
         super(JobHost, self).__init__()
 
         self.verbose = verbose
+        self.timeout = timeout
+        self.firstTime = True
 
         # The name of the host this object represents
         self.hostname = hostname
@@ -91,12 +93,9 @@ class JobHost(threading.Thread):
     def is_started(self):
         return self.started
 
-    def print_job_status(self, state, job=None):
-        if self.verbose >= 1:
-            tmpString = ""
-            if state == "finished":
-                tmpString = " ({task_count} jobs remaining)".format(task_count=task_count)
-            pflush("Job {state} on host {hostname}{tmpString}".format(state=state, hostname=self.get_hostname(), tmpString=tmpString))
+    def print_job_status(self, state, verboseLevel=1, job=None):
+        if self.verbose >= verboseLevel:
+            pflush("Job {state} on host {hostname}".format(state=state, hostname=self.get_hostname()))
             if self.verbose >= 2:
                 pflush(job + "\n")
 
@@ -109,7 +108,8 @@ class JobHost(threading.Thread):
                 self.jobs[job] = {"exit_status":-1, "get_callback":self.get_callback, "error_callback":self.get_error_callback}
                 self.kwargs["jobString"] = job
                 self.kwargs["hostname"] = self.get_hostname()
-                self.print_job_status("started", job)
+                self.kwargs["firstTime"] = self.firstTime
+                self.print_job_status("started", 2, job)
                 r_value = self.thread_func(**self.kwargs)
                 # Cleanup after job is finished and call callback
                 self.jobs[job]["exit_status"] = r_value
@@ -136,13 +136,14 @@ class JobHost(threading.Thread):
 
     def job_complete(self, job=None, exit_status=0):
         self.task_count -= 1
+        self.firstTime = False
 
         if self.task_count == 0:
             self.running_job = False
         # Call the callback
         if self.jobs[job]["exit_status"] == 0:
 
-            self.print_job_status("finished", job)
+            self.print_job_status("finished", 1, job)
 
             # Skip callback if there is not one set.
             if self.jobs[job]["get_callback"] != None:
@@ -161,7 +162,7 @@ class JobHost(threading.Thread):
 
     def is_telnetable(self):
         try:
-            tn = telnetlib.Telnet(self.hostname, 22, .25)
+            tn = telnetlib.Telnet(self.hostname, 22, self.timeout)
             self.reachable = True
             return True
         except:
