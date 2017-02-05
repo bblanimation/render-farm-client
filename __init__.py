@@ -3,7 +3,7 @@
 bl_info = {
     "name"        : "Server Farm Client",
     "author"      : "Christopher Gearhart <chris@bblanimation.com>",
-    "version"     : (0, 7, 0),
+    "version"     : (0, 7, 1),
     "blender"     : (2, 78, 0),
     "description" : "Render your scene on a remote server farm with this addon.",
     "location"    : "View3D > Tools > Render",
@@ -31,25 +31,21 @@ def register():
     bpy.utils.register_module(__name__)
     bpy.types.INFO_MT_render.append(more_menu_options)
 
-    # initialize check box for displaying render sampling details
     bpy.types.Scene.showAdvanced = BoolProperty(
         name="Show Advanced",
         description="Display advanced remote server settings",
         default=False)
 
-    # unpack the files automatically after packing them into the .blend file
     bpy.types.Scene.unpack = BoolProperty(
         name="Auto-unpack files",
         description="Unpack the files that got packed for remote servers after saving",
         default=True)
 
-    # initialize frame range string text box
     bpy.types.Scene.frameRanges = StringProperty(
-        name="Frames"
-        description="define frame ranges to render, separated by commas. (e.g. '1,3,6-10')"
+        name="Frames",
+        description="define frame ranges to render, separated by commas. (e.g. '1,3,6-10')",
         default="")
 
-    # initialize frame range string text box
     bpy.types.Scene.tempFilePath = StringProperty(
         name="Remote Path",
         description="File path on host server (temporary storage location)",

@@ -63,18 +63,18 @@ class refreshNumAvailableServers(Operator):
                 return{"FINISHED"}
 
             if self.process.returncode != None:
-                print("Process " + str(self.state) + " finished! (return code: " + str(self.process.returncode) + ")\n")
+                print("Process " + str(self.state) + " finished! (return code: " + str(self.process.returncode) + ")")
 
                 # check the number of available servers through the host
                 if self.state == 1:
-                    print("Running 'checkNumAvailServers' function...")
                     self.process = self.checkNumAvailServers()
                     self.state += 1
                     return{"PASS_THROUGH"}
 
                 elif self.state == 2:
                     self.updateAvailServerInfo()
-                    self.report({"INFO"}, "Refresh process completed")
+                    scn = context.scene
+                    self.report({"INFO"}, "Refresh process completed (" + str(len(scn['availableServers'])) + " servers available)")
                     return{"FINISHED"}
                 else:
                     self.report({"ERROR"}, "ERROR: Current state not recognized.")
@@ -83,6 +83,7 @@ class refreshNumAvailableServers(Operator):
         return{"PASS_THROUGH"}
 
     def execute(self, context):
+        print("\nRunning 'checkNumAvailServers' function...")
         scn = context.scene
         writeServersFile(bpy.props.servers, scn.serverGroups)
 
@@ -97,7 +98,6 @@ class refreshNumAvailableServers(Operator):
         wm.modal_handler_add(self)
 
         # start initial process
-        print("Copying project files...")
         self.process = copyFiles()
         self.state = 1  # initializes state for modal
 
@@ -174,7 +174,7 @@ class sendFrame(Operator):
                     return{"FINISHED"}
 
                 # handle and report errors for 'blender_task' process
-                elif self.process.return{code == 1 and self.state == 3:
+                elif self.process.returncode == 1 and self.state == 3:
                     if self.process.stderr:
                         self.stderr = self.process.stderr.readlines()
                         print("\nERRORS:")
@@ -189,11 +189,10 @@ class sendFrame(Operator):
                         except:
                             sys.stderr.write("Couldn't read last line of process output as integer")
 
-                print("Process " + str(self.state) + " finished! (return code: " + str(self.process.returncode) + ")\n")
+                print("Process " + str(self.state) + " finished! (return code: " + str(self.process.returncode) + ")")
 
                 # copy files to host server
                 if self.state == 1:
-                    print("Copying files to host server...")
                     self.process = copyFiles()
                     self.state += 1
                     return{"PASS_THROUGH"}
@@ -207,7 +206,6 @@ class sendFrame(Operator):
 
                 # get rendered frames from remote servers and archive old render files
                 elif self.state == 3:
-                    print("Fetching render files...")
                     self.process = getFrames(self.projectName)
                     self.state += 1
                     if not self.alreadyCalled:
@@ -221,10 +219,12 @@ class sendFrame(Operator):
                     if not self.alreadyCalled:
                         setRenderStatus("image", "Complete!")
                         self.report({"INFO"}, "Render completed" + failedFramesString + "! View the rendered image in your UV/Image_Editor")
+                        appendViewable("image")
                     else:
+                        # TODO: Fix functionality so it averages images even when process is cancelled before it gets there
                         setRenderStatus("image", "Partial completetion")
-                        self.report({"INFO"}, "Render partially completed" + failedFramesString + " - View the rendered image in your UV/Image_Editor")
-                    appendViewable("image")
+                        self.report({"INFO"}, "Render partially completed" + failedFramesString + " - Functionality not yet implemented to view rendered result")
+                        removeViewable("image")
                     return{"FINISHED"}
                 else:
                     self.report({"ERROR"}, "ERROR: Current state not recognized.")
@@ -246,6 +246,8 @@ class sendFrame(Operator):
         if getRenderStatus("image") in ["Rendering...", "Preparing files..."]:
             self.report({"WARNING"}, "Render in progress...")
             return{"FINISHED"}
+
+        print("\nRunning sendFrame function...")
 
         # ensure the job won't break the script
         jobValidityDict = jobIsValid("image", self.projectName)
@@ -311,7 +313,6 @@ class sendAnimation(Operator):
                 setRenderStatus("animation", "Cancelled")
                 return{"CANCELLED"}
 
-
         if event.type == "TIMER":
             self.process.poll()
 
@@ -356,11 +357,10 @@ class sendAnimation(Operator):
                         except:
                             sys.stderr.write("Couldn't read last line of process output as integer")
 
-                print("Process " + str(self.state) + " finished! (return code: " + str(self.process.returncode) + ")\n")
+                print("Process " + str(self.state) + " finished! (return code: " + str(self.process.returncode) + ")")
 
                 # copy files to host server
                 if self.state == 1:
-                    print("Copying files to host server...")
                     self.process = copyFiles()
                     self.state += 1
                     return{"PASS_THROUGH"}
@@ -382,7 +382,6 @@ class sendAnimation(Operator):
 
                 # get rendered frames from remote servers and archive old render files
                 elif self.state == 3:
-                    print("Fetching render files...")
                     self.process = getFrames(self.projectName)
                     if not self.alreadyCalled:
                         setRenderStatus("animation", "Finishing...")
@@ -424,12 +423,14 @@ class sendAnimation(Operator):
             self.report({"WARNING"}, "Render in progress...")
             return{"FINISHED"}
 
+        print("\nRunning sendAnimation function...")
+        
         # ensure the job won't break the script
         jobValidityDict = jobIsValid("animation", self.projectName)
         if jobValidityDict["errorType"] != None:
             self.report({jobValidityDict["errorType"]}, jobValidityDict["errorMessage"])
         else:
-            self.report({"INFO"}, "Rendering current frame on " + str(len(scn["availableServers"])) + " servers.")
+            self.report({"INFO"}, "Rendering animation on " + str(len(scn["availableServers"])) + " servers.")
         if not jobValidityDict["valid"]:
             return{"FINISHED"}
 
@@ -457,7 +458,6 @@ class sendAnimation(Operator):
         self.process = copyProjectFile(self.projectName)
         self.state = 1   # initializes state for modal
 
-        self.report({"INFO"}, "Rendering animation on " + str(len(scn["availableServers"])) + " servers.")
         setRenderStatus("animation", "Preparing files...")
 
         return{"RUNNING_MODAL"}

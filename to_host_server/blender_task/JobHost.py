@@ -18,7 +18,7 @@ class JobHost(threading.Thread):
         # The name of the host this object represents
         self.hostname = hostname
         # This is the name of the thread.
-        self.name = "Thread-" + hostname
+        self.name = "Thread-{hostname}".format(hostname=hostname)
 
         # Set until it is verified that we can reach the host.
         self.reachable = False
@@ -93,11 +93,12 @@ class JobHost(threading.Thread):
 
     def print_job_status(self, state, job=None):
         if self.verbose >= 1:
-            print("Job " + state + " on host", self.get_hostname(), end="")
+            tmpString = ""
+            if state == "finished":
+                tmpString = " ({task_count} jobs remaining)".format(task_count=task_count)
+            pflush("Job {state} on host {hostname}{tmpString}".format(state=state, hostname=self.get_hostname(), tmpString=tmpString))
             if self.verbose >= 2:
-                print(":", job)
-            else:
-                print()
+                pflush(job + "\n")
 
     def run(self):
         # Should thread terminate once jobs are finished, or stay alive?

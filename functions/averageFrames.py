@@ -16,9 +16,9 @@ def averageFrames(projectPath, projectName):
     if not imList:
         sys.stderr.write("No valid image files to average.")
         sys.exit(1)
-        
+
     # Assuming all images are the same size, get dimensions of first image
-    imRef = Image.open(imlist[0])
+    imRef = Image.open(imList[0])
     w, h = imRef.size
     mode = imRef.mode
     N = len(imList)
@@ -51,7 +51,7 @@ def averageFrames(projectPath, projectName):
     # Generate, save and preview final image
     out = Image.fromarray(arr, mode=mode)
     print("saving averaged image...")
-    out.save(os.path.join(projectPath, "render-dump/", projectName, "_average.tga"))
+    out.save(os.path.join(projectPath, "render-dump", projectName + "_average.tga"))
 
 def main():
     projectPath = args.project_path.replace(" ", "\\ ")

@@ -4,7 +4,7 @@ import bpy, subprocess, os, sys
 from .setupServerVars import *
 
 def jobIsValid(jobType, projectName):
-    """ Verifies that the job is valid before sending it to the host server """
+    """ verifies that the job is valid before sending it to the host server """
 
     # verify that project has been saved
     if projectName == "":
@@ -37,6 +37,8 @@ def jobIsValid(jobType, projectName):
     return {"valid":True, "errorType":None, "errorMessage":None}
 
 def getFrames(projectName):
+    """ rsync rendered frames from host server to local machine """
+
     dumpLocation = bpy.path.abspath("//")+ "render-dump/"
     scn = bpy.context.scene
 
@@ -52,12 +54,15 @@ def getFrames(projectName):
     return process
 
 def buildFrameRangesString(frameRanges):
+    """ builds frame range list of lists/ints from user-entered frameRanges string """
+
     frameRangeList = frameRanges.replace(" ", "").split(",")
     newFrameRangeList = []
     invalidDict = {"valid":False, "string":None}
     for string in frameRangeList:
         try:
             newInt = int(string)
+            newFrameRangeList.append(newInt)
         except:
             if "-" in string:
                 newString = string.split("-")
@@ -77,6 +82,8 @@ def buildFrameRangesString(frameRanges):
     return {"valid":True, "string":str(newFrameRangeList).replace(" ", "")}
 
 def copyProjectFile(projectName):
+    """ copies project file from local machine to host server """
+
     scn = bpy.context.scene
     bpy.ops.file.pack_all()
     bpy.ops.wm.save_as_mainfile(filepath=scn.tempLocalDir + projectName + ".blend", copy=True)
@@ -85,22 +92,20 @@ def copyProjectFile(projectName):
 
     # copies blender project file to host server
     rsyncCommand = "rsync --copy-links --progress --rsync-path='mkdir -p " + scn.tempFilePath + projectName + "/toRemote/ && rsync' -qazx --include=" + projectName + ".blend --exclude='*' -e 'ssh -T -o Compression=no -x' '" + scn.tempLocalDir + "' '" + bpy.props.hostServerLogin + ":" + scn.tempFilePath + projectName + "/toRemote/'"
-
-    print("copying blender project files...")
     process = subprocess.Popen(rsyncCommand, shell=True)
     return process
 
 def copyFiles():
+    """ copies necessary files to host server """
     scn = bpy.context.scene
 
-    # copies necessary files to host server (currently unnecessary to run 'mkdir', as the functionality exists in 'copyProjectFile()')
+    # currently unnecessary to run 'mkdir', as the functionality exists in 'copyProjectFile()'
     rsyncCommand = "rsync -qax -e 'ssh -T -o Compression=no -x' '" + os.path.join(getLibraryPath(), "to_host_server") + "/' '" + bpy.props.hostServerLogin + ":" + scn.tempFilePath + "'"
-
     process = subprocess.Popen(rsyncCommand, stdout=subprocess.PIPE, shell=True)
     return process
 
 def renderFrames(frameRange, projectName, averageFrames=False):
-    """ Define what the function does """
+    """ calls 'blender_task' on host server """
 
     scn = bpy.context.scene
     extraFlags = ""
@@ -119,10 +124,8 @@ def renderFrames(frameRange, projectName, averageFrames=False):
 
     # runs blender command to render given range from the remote server
     renderCommand = "ssh -T -x " + bpy.props.hostServerLogin + " 'python " + scn.tempFilePath + "blender_task -v -p -n " + projectName + " -l " + frameRange.replace(" ", "") + " --hosts_file " + scn.tempFilePath + "servers.txt -R " + scn.tempFilePath + " --max_server_load " + str(scn.maxServerLoad) + extraFlags + "'"
-    print("Running command: " + renderCommand)
-
-    print("Process sent to remote servers!\n")
     process = subprocess.Popen(renderCommand, stderr=subprocess.PIPE, shell=True)
+    print("Process sent to remote servers!")
     return process
 
 def setRenderStatus(key, status):
@@ -137,7 +140,15 @@ def appendViewable(typeOfRender):
     if typeOfRender not in bpy.context.scene.renderType:
         bpy.context.scene.renderType.append(typeOfRender)
 
+def removeViewable(typeOfRender):
+    try:
+        bpy.context.scene.renderType.remove(typeOfRender)
+    except:
+        return
+
 def expandFrames(frame_range):
+    """ Helper function takes frame range string and returns list with frame ranges expanded """
+
     frames = []
     for i in frame_range:
         if type(i) == list:
@@ -150,7 +161,7 @@ def expandFrames(frame_range):
     return list(set(frames))
 
 def listMissingFiles(filename, frameRange):
-    """ Lists all missing files from local 'render-dump' directory """
+    """ lists all missing files from local 'render-dump' directory """
 
     try:
         allFiles = os.listdir(os.path.join(bpy.path.abspath("//"), "render-dump"))

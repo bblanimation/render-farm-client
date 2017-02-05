@@ -84,8 +84,7 @@ class JobHostManager():
     def host_failed_job(self, hostname, job):
         error_string = "Failed Job on {hostname}: {job}".format(hostname=hostname, job=job)
 
-        sys.stderr.write(error_string)
-        sys.stderr.flush()
+        eflush(error_string)
 
         if self.verbose >= 3:
             print(error_string)
