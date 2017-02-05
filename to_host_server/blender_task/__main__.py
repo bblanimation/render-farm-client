@@ -2,7 +2,9 @@
 
 from __future__ import print_function
 import argparse
-import os,getpass,sys
+import os
+import getpass
+import sys
 import subprocess
 import threading
 import telnetlib
@@ -18,109 +20,92 @@ from VerboseAction import verbose_action
 
 status_regex = r"Fra:(\d+)\s.*Time:(\d{2}:\d{2}\.\d{2}).*Remaining:(\d{2}:\d+\.\d+)\s.*"
 
-HOSTS = {    'cse103group': [   'cse10301','cse10302','cse10303','cse10304','cse10305','cse10306','cse10307',
-                                'cse10309','cse10310','cse10311','cse10312','cse10315','cse10316','cse10317',
-                                'cse10318','cse10319','cse103podium'
-                            ],
-            'cse201group':  [   'cse20101','cse20102','cse20103','cse20104','cse20105','cse20106','cse20107',
-                                'cse20108','cse20109','cse20110','cse20111','cse20112','cse20113','cse20114',
-                                'cse20116','cse20117','cse20118','cse20119','cse20120','cse20121','cse20122',
-                                'cse20123','cse20124','cse20125','cse20126','cse20127','cse20128','cse20129',
-                                'cse20130','cse20131','cse20132','cse20133','cse20134','cse20135','cse20136'
-                            ],
-            'cse21801group':[  'cse21801','cse21802','cse21803','cse21804','cse21805','cse21806','cse21807',
-                               'cse21808','cse21809','cse21810','cse21811','cse21812'
-                            ],
-            'cse217group' : [   'cse21701','cse21702','cse21703','cse21704','cse21705','cse21706','cse21707',
-                                'cse21708','cse21709','cse21710','cse21711','cse21712','cse21713','cse21714',
-                                'cse21715','cse21716'
-                            ]
-}
-
 parser = argparse.ArgumentParser()
 
-parser.add_argument('-l','--frame_range',action='store',default="[]")
+parser.add_argument("-l", "--frame_range", action="store", default="[]")
 # Takes a string dictionary of hosts
 # If neither of these arguments are provided, then use the default hosts file to load hosts
-parser.add_argument('-d','--hosts',action='store',default=None,help='Pass a dictionary or list of hosts. Should be valid json.')
-parser.add_argument('-H','--hosts_online',action='store_true',default=None,help='Telnets to ports to find out if a host is availible to ssh into, skips everything else.')
-parser.add_argument('-i','--hosts_file',action='store',default='remoteServers.txt',help='Pass a filename from which to load hosts. Should be valid json format.')
-parser.add_argument('-m','--max_server_load',action='store',default=None,help='Max render processes to run on each server at a time.')
-parser.add_argument('-a','--average_results',action='store_true',default=None,help='Average frames when finished.')
-
+parser.add_argument("-d", "--hosts", action="store", default=None, help="Pass a dictionary or list of hosts. Should be valid json.")
+parser.add_argument("-H", "--hosts_online", action="store_true", default=None, help="Telnets to ports to find out if a host is availible to ssh into, skips everything else.")
+parser.add_argument("-i", "--hosts_file", action="store", default="remoteServers.txt", help="Pass a filename from which to load hosts. Should be valid json format.")
+parser.add_argument("-m", "--max_server_load", action="store", default=None, help="Max render processes to run on each server at a time.")
+parser.add_argument("-a", "--average_results", action="store_true", default=None, help="Average frames when finished.")
 # NOTE: this parameter is currently required
-parser.add_argument('-n','--project_name',action='store',default=False) # just project name. default path will be in /tmp/blenderProjects
+parser.add_argument("-n", "--project_name", action="store", default=False) # just project name. default path will be in /tmp/blenderProjects
 # TODO: test this for directories other than toRemote
-parser.add_argument('-s','--local_sync',action='store',default='./toRemote',help='Pass a full path or relative path to sync to the project directory on remote.')
+parser.add_argument("-s", "--local_sync", action="store", default="./toRemote", help="Pass a full path or relative path to sync to the project directory on remote.")
 # NOTE: remote_sync will sync the directory at results
-parser.add_argument('-r','--remote_sync',action='store',default='results',help='Pass a path to the directory that should be synced back.')
+parser.add_argument("-r", "--remote_sync", action="store", default="results", help="Pass a path to the directory that should be synced back.")
 # NOTE: passing the contents flag will sync back the contents from the directory given in remote_sync
-parser.add_argument('-c','--contents',action='store_true',default=False,help='Pass a path to the directory that should be synced back.')
-parser.add_argument('-C','--command',action='store',help='Run the command on the remote host.')
-parser.add_argument('-v','--verbose',action=verbose_action,nargs='?',default=0)
-parser.add_argument('-p','--progress',action='store_true',help='Prints the progress to stdout as a json object.')
-parser.add_argument('-R','--project_root',action='store',help='Root path for storing project files on host server.')
-parser.add_argument('-o','--output_file_path',action='store',default=False,help='Local file to rsync files back into when done')
-parser.add_argument('-O','--name_output_files',action='store',default=False,help='Name to use for output files in results directory.')
+parser.add_argument("-c", "--contents", action="store_true", default=False, help="Pass a path to the directory that should be synced back.")
+parser.add_argument("-C", "--command", action="store", help="Run the command on the remote host.")
+parser.add_argument("-v", "--verbose", action=verbose_action, nargs="?", default=0)
+parser.add_argument("-p", "--progress", action="store_true", help="Prints the progress to stdout as a json object.")
+parser.add_argument("-R", "--project_root", action="store", help="Root path for storing project files on host server.")
+parser.add_argument("-o", "--output_file_path", action="store", default=False, help="Local file to rsync files back into when done")
+parser.add_argument("-O", "--name_output_files", action="store", default=False, help="Name to use for output files in results directory.")
 
 # the following two functions are exclusively for use with parallel process
-def hostsStatus(hosts_file=None,hosts=None,hosts_online=False,verbose=False):
+def hostsStatus(hosts_file=None, hosts=None, hosts_online=False, verbose=False):
     global HOSTS # Using the global HOSTS variable
-    if( hosts ):
+    if hosts:
         HOSTS = json.loads(args.hosts)
-    elif( hosts_file ):
-        HOSTS = setServersDict( hosts_file )
-    jobs            = []
-    tmp_hosts       = get_hosts()
-    hosts           = []
-    unreachable     = [] # jobList is a list of lists containing start and end values
+    elif hosts_file:
+        HOSTS = setServersDict(hosts_file)
+    jobs = []
+    tmp_hosts = get_hosts()
+    hosts = []
+    unreachable = [] # jobList is a list of lists containing start and end values
     for host in tmp_hosts:
         try:
-            tn = telnetlib.Telnet(host,22,.5)
-            hosts.append(host.encode('utf-8'))
+            tn = telnetlib.Telnet(host, 22, .5)
+            hosts.append(host.encode("utf-8"))
         except:
-            unreachable.append(host.encode('utf-8'))
-    numHosts = len( hosts )
-    if( not(hosts_online) ):
+            unreachable.append(host.encode("utf-8"))
+    numHosts = len(hosts)
+    if not hosts_online:
         print("")
         print("Could not reach the following hosts: ")
         print(unreachable)
         print("Using the following %d hosts: " % (numHosts))
-        print( hosts )
+        print(hosts)
         print("")
         sys.stdout.flush()
     else:
-        print( hosts )
-        print( unreachable )
+        print(hosts)
+        print(unreachable)
     return hosts
-def get_hosts(groupName=None,hosts=None):
+
+def get_hosts(groupName=None, hosts=None):
     global HOSTS
-    if(groupName):
+    if groupName:
         return HOSTS[groupName]
-    elif(hosts):
-        return [ i for k in HOSTS.keys() for i in hosts[k]]
+    elif hosts:
+        return [i for k in HOSTS.keys() for i in hosts[k]]
     else:
-        return [ i for k in HOSTS.keys() for i in HOSTS[k]]
+        return [i for k in HOSTS.keys() for i in HOSTS[k]]
 
 def main():
-    startTime=time.time()
-    args    = parser.parse_args()
+    """ Main function runs when blender_task is called """
+
+    startTime = time.time()
+    args = parser.parse_args()
     verbose = args.verbose
 
     # Getting hosts from some source
-    if( args.hosts_file ):
-        hosts = listHosts( setServersDict(args.hosts_file) )
-    elif( args.hosts ):
-        hosts = listHosts( args.hosts )
+    if args.hosts_file:
+        hosts = listHosts(setServersDict(args.hosts_file))
+    elif args.hosts:
+        hosts = listHosts(args.hosts)
     else:
-        hosts = listHosts( HOSTS )
+        hosts = listHosts(HOSTS)
 
     host_objects = dict()
-    hosts_online    = list()
-    hosts_offline   = list()
+    hosts_online = list()
+    hosts_offline = list()
     for host in hosts:
-        jh = JobHost( hostname=host,thread_func=start_split_tasks,verbose=verbose )
-        if( jh.is_reachable() ):
+        jh = JobHost(hostname=host, thread_func=start_split_tasks, verbose=verbose)
+        if jh.is_reachable():
             hosts_online.append(str(host))
         else:
             hosts_offline.append(str(host))
@@ -128,102 +113,102 @@ def main():
     numHosts = len(hosts_online)
 
     # Printing the start message
-    if(not( args.hosts_online )):
-        if(verbose >= 1):
-            print ("Starting distribute task...")
+    if not args.hosts_online:
+        if verbose >= 1:
+            print("Starting distribute task...")
             sys.stdout.flush()
-        if (len(hosts_online) == 0):
+        if len(hosts_online) == 0:
             sys.stderr.write("No hosts available.")
             sys.exit(58)
     else:
-        if( verbose >= 1 ): print( "Hosts Online : " )
+        if verbose >= 1: print("Hosts Online : ")
         print(hosts_online)
-        if( verbose >= 1 ): print( "Hosts Offline: " )
+        if verbose >= 1: print("Hosts Offline: ")
         print(hosts_offline)
         sys.exit(0)
 
-    username    = getpass.getuser()
-    if ( not(args.project_root) ):
+    username = getpass.getuser()
+    if not args.project_root:
         projectRoot = "/tmp/%s" % (username)
     else:
         if args.project_root[-1] == "/":
             args.project_root = args.project_root[:-1]
         projectRoot = args.project_root
 
-    if(args.project_name):
+    if args.project_name:
 
-        if(not(args.name_output_files)):
-            args.name_output_files =  args.project_name
+        if not args.name_output_files:
+            args.name_output_files = args.project_name
 
-        projectName         = args.project_name
-        projectPath         = '{projectRoot}/{projectName}'.format(projectRoot=projectRoot,projectName=projectName)
+        projectName = args.project_name
+        projectPath = "{projectRoot}/{projectName}".format(projectRoot=projectRoot, projectName=projectName)
         # Make the <projectRoot>/<projectname> directory
-        if(not (os.path.exists(projectPath))):
+        if not os.path.exists(projectPath):
             os.mkdir(projectPath)
 
-        if( not(args.local_sync) or args.local_sync == './toRemote' ):
-            workingDir      = os.path.dirname(os.path.abspath(__file__))
+        if not args.local_sync or args.local_sync == "./toRemote":
+            workingDir = os.path.dirname(os.path.abspath(__file__))
             # Defaults to ./toRemote directory in working directory
-            if(os.path.exists(os.path.join(workingDir,'toRemote'))):
-                projectSyncPath = '{workingDir}/toRemote/'.format(workingDir=workingDir)
+            if os.path.exists(os.path.join(workingDir, "toRemote")):
+                projectSyncPath = "{workingDir}/toRemote/".format(workingDir=workingDir)
             # Otherwise, tries to find toRemote in <projectRoot>/<projectname>/toRemote
             else:
-                tmpDir = os.path.join(projectPath,'toRemote')
+                tmpDir = os.path.join(projectPath, "toRemote")
                 # If this is the case, we literally have nothing to sync :(
-                if(not(os.path.exists(tmpDir))):
+                if not os.path.exists(tmpDir):
                     os.mkdir(tmpDir)
-                projectSyncPath = '{tmpDir}/'.format(tmpDir=tmpDir)
+                projectSyncPath = "{tmpDir}/".format(tmpDir=tmpDir)
         else:
             projectSyncPath = args.local_sync
 
-        remoteProjectPath       = '{projectRoot}/{projectName}'.format(projectRoot=projectRoot,projectName=projectName)
-        if(args.remote_sync == 'results'):
-            remoteSyncBack      = '{remoteProjectPath}/results'.format(remoteProjectPath=remoteProjectPath)
+        remoteProjectPath = "{projectRoot}/{projectName}".format(projectRoot=projectRoot, projectName=projectName)
+        if args.remote_sync == "results":
+            remoteSyncBack = "{remoteProjectPath}/results".format(remoteProjectPath=remoteProjectPath)
         else:
-            remoteSyncBack      = args.remote_sync
-        if(args.contents):
-            remoteSyncBack      = remoteSyncBack + "/*"
+            remoteSyncBack = args.remote_sync
+        if args.contents:
+            remoteSyncBack = remoteSyncBack + "/*"
     else:
         print("sorry, please give your project a name using the -n or --project_name flags.")
         sys.exit(0)
 
-    if( not(args.output_file_path) ):
+    if not args.output_file_path:
         for file in os.listdir(projectPath):
-            if( fnmatch.fnmatch(file,'*_seed-*') or fnmatch.fnmatch(file,'*.tga') ):
+            if fnmatch.fnmatch(file, "*_seed-*") or fnmatch.fnmatch(file, "*.tga"):
                 projectOutputFile = os.path.join(projectPath, file)
-                if( verbose > 1 ):
-                    print( "Removing {projectOutputFile} from project dir.".format(projectOutputFile=projectOutputFile) )
+                if verbose > 1:
+                    print("Removing {projectOutputFile} from project dir.".format(projectOutputFile=projectOutputFile))
                 os.remove(projectOutuptFile)
     else:
-         projectOutuptFile = args.output_file_path
+        projectOutuptFile = args.output_file_path
 
     # Copy blender_p.py to project folder
     subprocess.call("rsync -e 'ssh -oStrictHostKeyChecking=no' -a '" + os.path.join(projectRoot, "blender_p.py") + "' '" + os.path.join(projectPath, "toRemote", "blender_p.py") + "'", shell=True)
 
-    if( verbose >= 1 ):
-        print( "Rendering frames {frameRange} in {projectName}".format(frameRange=args.frame_range,projectName=projectName) )
+    if verbose >= 1:
+        print("Rendering frames {frameRange} in {projectName}".format(frameRange=args.frame_range, projectName=projectName))
         sys.stdout.flush()
 
     frame_range = json.loads(args.frame_range)
 
-    frames      = expandFrames(frame_range)
-    jobStrings  = buildJobStrings(frames,projectName,projectPath,args.name_output_files,numHosts)
+    frames = expandFrames(frame_range)
+    jobStrings = buildJobStrings(frames, projectName, projectPath, args.name_output_files, numHosts)
 
     # for split processing
     if int(args.max_server_load) > 0:
-        job_args =  {
-            'projectName':      projectName,
-            'projectPath':      projectPath,
-            'projectSyncPath':  projectSyncPath,
-            'remoteProjectPath':   remoteProjectPath,
-            'username':         username,
-            'verbose':          verbose,
-            'projectOutuptFile' :projectOutuptFile,
-            'remoteSyncBack':   remoteSyncBack,
+        job_args = {
+            "projectName":       projectName,
+            "projectPath":       projectPath,
+            "projectSyncPath":   projectSyncPath,
+            "remoteProjectPath": remoteProjectPath,
+            "username":          username,
+            "verbose":           verbose,
+            "projectOutuptFile": projectOutuptFile,
+            "remoteSyncBack":    remoteSyncBack
         }
 
         # Sets up kwargs, and callbacks on the hosts
-        jhm = JobHostManager(jobs=jobStrings,hosts=host_objects,function_args=job_args,verbose=verbose,max_on_hosts=2)
+        jhm = JobHostManager(jobs=jobStrings, hosts=host_objects, function_args=job_args, verbose=verbose, max_on_hosts=2)
         jhm.start()
         status = jhm.get_cumulative_status()
 
@@ -232,38 +217,38 @@ def main():
 
     # for parallel processing
     else:
-        if(args.verbose >= 2):
-            print ("Frames: ", frames)
-            print ("Blender Commands: ", jobStrings)
+        if args.verbose >= 2:
+            print("Frames: ", frames)
+            print("Blender Commands: ", jobStrings)
         rsync_threads = {}
         jobStatus = {}
 
-        for idx,jobString in enumerate(jobStrings):
+        for idx, jobString in enumerate(jobStrings):
             # Get the job string at the index of this host and pass to the thread with other info
-            hostname = hosts_online[ idx % (numHosts) ]
+            hostname = hosts_online[idx % (numHosts)]
 
-            if(len(frames)==1):
+            if len(frames) == 1:
                 frame = frames[0]
             else:
                 frame = frames[idx]
 
-            job_args =  {
-                'projectName':      projectName,
-                'projectPath':      projectPath,
-                'projectSyncPath':  projectSyncPath,
-                'remoteProjectPath':   remoteProjectPath,
-                'hostname':         hostname,
-                'username':         username,
-                'verbose':          args.verbose,
-                'projectOutuptFile' :projectOutuptFile,
-                'jobString' :       jobString,
-                'jobStatus' :       jobStatus,
-                'progress' :        args.progress,
-                'frame' :           frame,
-                'remoteSyncBack':   remoteSyncBack
+            job_args = {
+                "projectName":      projectName,
+                "projectPath":      projectPath,
+                "projectSyncPath":  projectSyncPath,
+                "remoteProjectPath":remoteProjectPath,
+                "hostname":         hostname,
+                "username":         username,
+                "verbose":          args.verbose,
+                "projectOutuptFile":projectOutuptFile,
+                "jobString":        jobString,
+                "jobStatus":        jobStatus,
+                "progress":         args.progress,
+                "frame":            frame,
+                "remoteSyncBack":   remoteSyncBack
             }
 
-            thread = threading.Thread(target=start_parallel_tasks,kwargs=job_args)
+            thread = threading.Thread(target=start_parallel_tasks, kwargs=job_args)
             rsync_threads[hostname] = thread
             thread.start()
 
@@ -271,17 +256,16 @@ def main():
         for hostname in rsync_threads.keys():
             rsync_threads[hostname].join()
 
-
         failed = 0
         for job in jobStrings:
-            if(job not in jobStatus):
+            if job not in jobStatus:
                 sys.stderr.write("Render task did not complete. Command: %s" % (job) + "\n")
                 sys.stdout.flush()
                 failed += 1
 
     endTime = time.time()
     timer = stopWatch(endTime-startTime)
-    if( verbose >= 1 ):
+    if verbose >= 1:
         print("")
         print("Elapsed time: " + timer)
         if int(args.max_server_load) > 0:
@@ -294,7 +278,7 @@ def main():
             #     sys.stderr.write("Render failed for %d jobs" % (failed) + "\n")
             #     sys.stderr.flush()
         else:
-            if(failed==0):
+            if failed == 0:
                 print("Render completed successfully!")
                 sys.stdout.flush()
                 sys.exit(0)
@@ -303,9 +287,9 @@ def main():
                 sys.stdout.flush()
                 sys.exit(1)
 
-    if( verbose >= 3 ):
+    if verbose >= 3:
         print("\nJob exit statuses:")
         jhm.print_jobs_status()
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

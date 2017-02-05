@@ -14,221 +14,209 @@ def pflush(string):
     print(string)
     sys.stdout.flush()
 
-def process_blender_output(hostname,line):
+def process_blender_output(hostname, line):
     status_regex = r"Fra:(\d+)\s.*Time:(\d{2}:\d{2}\.\d{2}).*Remaining:(\d{2}:\d+\.\d+)\s.*"
     hostcount = {}
-    
+
     # Parsing the following output
     matches = re.finditer(status_regex, line)
-    mod     = 100
+    mod = 100
     for matchNum, match in enumerate(matches):
         matchNum = matchNum + 1
         frame = match.group(1)
         elapsed = match.group(2)
         remainingTime = match.group(3)
-        json_obj = json.loads("{{ \"hn\" : \"{hostname}\", \"rt\" : \"{remainingTime}\", \"cf\" : \"{frame}\", \"et\" : \"{elapsed}\" }}".format( hostname=hostname ,elapsed = elapsed,frame = frame,remainingTime = remainingTime))
+        json_obj = json.loads("{{ \"hn\" : \"{hostname}\", \"rt\" : \"{remainingTime}\", \"cf\" : \"{frame}\", \"et\" : \"{elapsed}\" }}".format(hostname=hostname, elapsed=elapsed, frame=frame, remainingTime=remainingTime))
 
-        if(hostname not in hostcount):
+        if hostname not in hostcount:
             hostcount[hostname] = 0
 
         currentCount = hostcount[hostname]
-        if( currentCount % mod == 99 ):
+        if currentCount % mod == 99:
             # We want this to go out over stdout
             print("##JSON##" + json.dumps(json_obj) + "##JSON##")
 
         hostcount[hostname] += 1
         sys.stdout.flush()
 
-def ssh_string(username,hostname,verbose=0):
-    tmpStr = "ssh -oStrictHostKeyChecking=no %s@%s" % (username,hostname)
-    if( verbose >= 3 ):
+def ssh_string(username, hostname, verbose=0):
+    tmpStr = "ssh -oStrictHostKeyChecking=no %s@%s" % (username, hostname)
+    if verbose >= 3:
         pflush(tmpStr)
     return tmpStr
 
-def mkdir_string(path,verbose=0):
+def mkdir_string(path, verbose=0):
     tmpStr = "mkdir -p %s" % (path)
-    if( verbose >= 3 ):
+    if verbose >= 3:
         pflush(tmpStr)
     return tmpStr
 
-def rsync_files_to_node_string(projectFullPath,username,hostname,remoteFullPath,verbose=0):
-    tmpStr = "rsync -e 'ssh -oStrictHostKeyChecking=no' -a %s %s@%s:%s/" % (projectFullPath,username,hostname,remoteFullPath)
-    if( verbose >= 3 ):
+def rsync_files_to_node_string(projectFullPath, username, hostname, remoteFullPath, verbose=0):
+
+    tmpStr = "rsync -e 'ssh -oStrictHostKeyChecking=no' -a %s %s@%s:%s/" % (projectFullPath, username, hostname, remoteFullPath)
+    if verbose >= 3:
         pflush(tmpStr)
     return tmpStr
 
-def rsync_files_from_node_string(username,hostname,remoteProjectPath,projectName,projectOutuptFile,verbose=0):
-    tmpStr = "rsync -atu --remove-source-files %s@%s:%s %s" % (username,hostname,remoteProjectPath,projectOutuptFile)
-    if(verbose >= 3 ):
+def rsync_files_from_node_string(username, hostname, remoteProjectPath, projectName, projectOutuptFile, verbose=0):
+
+    tmpStr = "rsync -atu --remove-source-files %s@%s:%s %s" % (username, hostname, remoteProjectPath, projectOutuptFile)
+    if verbose >= 3:
         pflush(tmpStr)
     return tmpStr
 
-def start_split_tasks(
-    projectName, projectPath,
-    projectSyncPath, hostname,
-    username, jobString,
-    projectOutuptFile, remoteProjectPath,
-    remoteSyncBack,
-    progress=False, verbose=0 ):
+def start_split_tasks(projectName, projectPath, projectSyncPath, hostname, username, jobString, projectOutuptFile, remoteProjectPath, remoteSyncBack, progress=False, verbose=0):
 
     # First copy the files over using rsync
-    rsync_to            = rsync_files_to_node_string( projectSyncPath, username, hostname, remoteProjectPath, verbose )
-    rsync_from          = rsync_files_from_node_string( username, hostname, remoteSyncBack, projectName, projectOutuptFile, verbose )
-    mkdir_local_string  = mkdir_string( projectPath, verbose )
-    mkdir_remote_string = mkdir_string( remoteProjectPath + '/results', verbose )
-    ssh_c_string        = ssh_string( username, hostname, verbose )
-
+    rsync_to            = rsync_files_to_node_string(projectSyncPath, username, hostname, remoteProjectPath, verbose)
+    rsync_from          = rsync_files_from_node_string(username, hostname, remoteSyncBack, projectName, projectOutuptFile, verbose)
+    mkdir_local_string  = mkdir_string(projectPath, verbose)
+    mkdir_remote_string = mkdir_string(remoteProjectPath + "/results", verbose)
+    ssh_c_string        = ssh_string(username, hostname, verbose)
     ssh_mkdir           = ssh_c_string + " '" + mkdir_remote_string + "'"
     ssh_blender         = ssh_c_string + " '" + jobString + "' "
     pull_from           = mkdir_remote_string + ";" + rsync_from
-
-    run_status          = { 'p' : -1,'q' : -1,'r' : -1 }
-    if(verbose >= 3):
-        print("Syncing project file %s.blend to %s" % (projectName,hostname))
+    run_status          = {"p":-1, "q":-1, "r":-1}
+    
+    if verbose >= 3:
+        print("Syncing project file %s.blend to %s" % (projectName, hostname))
         print("rsync command: %s" % (rsync_to))
-    t = subprocess.call(ssh_mkdir,shell=True )
+    t = subprocess.call(ssh_mkdir, shell=True)
     p = subprocess.call(rsync_to, shell=True)
-    if( verbose >= 3 ):
+    if verbose >= 3:
         print("Finished the rsync to host %s" % (hostname))
-    if( verbose >= 3 ):
+    if verbose >= 3:
         print("Returned from rsync command: %d" % (p))
         sys.stdout.flush()
-    if(p == 0):
-        run_status['p'] = 0
+    if p == 0:
+        run_status["p"] = 0
     else:
-        run_status['p'] = 1
+        run_status["p"] = 1
     # Now start the blender command
-    if(verbose >= 3):
-        print ( "blender command: %s" % (jobString))
+    if verbose >= 3:
+        print("blender command: %s" % (jobString))
 
-    q = subprocess.Popen(shlex.split(ssh_blender),stdout=subprocess.PIPE)
+    q = subprocess.Popen(shlex.split(ssh_blender), stdout=subprocess.PIPE)
     # This blocks til q is done
-    while( type(q.poll()) == type(None) ):
+    while type(q.poll()) == type(None):
         # This blocks til there is something to read
         line = q.stdout.readline()
-        if( progress ):
-            process_blender_output(hostname,line)
+        if progress:
+            process_blender_output(hostname, line)
 
     # Successful blender
-    if( q.returncode == 0 ):
-        run_status['q'] = 0
+    if q.returncode == 0:
+        run_status["q"] = 0
         sys.stdout.flush()
     else:
         sys.stderr.write("blender error: %d" % (q.returncode))
         sys.stderr.flush()
-        run_status['q'] = 1
+        run_status["q"] = 1
 
     # Now rsync the files in /tmp/<name>/render back to this host.
-    if( verbose >= 3 ):
-        print("rsync pull: " + pull_from )
+    if verbose >= 3:
+        print("rsync pull: " + pull_from)
         sys.stdout.flush()
 
-    r = subprocess.call(pull_from,shell=True)
+    r = subprocess.call(pull_from, shell=True)
 
-    if( r == 0 and q.returncode == 0 ):
-        run_status['r'] = 0
+    if r == 0 and q.returncode == 0:
+        run_status["r"] = 0
     else:
         sys.stderr.write("rsync error: %d" % (r))
         sys.stderr.flush()
-        run_status['r'] = 1
+        run_status["r"] = 1
 
-    return run_status['p'] + run_status['q'] + run_status['r']
+    return run_status["p"] + run_status["q"] + run_status["r"]
 
-def start_parallel_tasks(
-    projectName, projectPath,
-    projectSyncPath, hostname,
-    username, jobString,
-    projectOutuptFile, jobStatus,
-    remoteProjectPath, frame,
-    remoteSyncBack, progress=False,
-    verbose=0 ):
+def start_parallel_tasks(projectName, projectPath, projectSyncPath, hostname, username, jobString, projectOutuptFile, jobStatus, remoteProjectPath, frame, remoteSyncBack, progress=False, verbose=0):
 
-    pflush("Starting thread. Rendering frame %s on %s" % (frame,hostname))
+    pflush("Starting thread. Rendering frame %s on %s" % (frame, hostname))
     # First copy the files over using rsync
-    rsync_to            = rsync_files_to_node_string( projectSyncPath, username, hostname, remoteProjectPath )
-    rsync_from          = rsync_files_from_node_string( username, hostname, remoteSyncBack, projectName, projectOutuptFile )
-    mkdir_local_string  = mkdir_string( projectPath )
-    mkdir_remote_string = mkdir_string( remoteProjectPath + '/results' )
-    ssh_c_string        = ssh_string( username, hostname )
+    rsync_to            = rsync_files_to_node_string(projectSyncPath, username, hostname, remoteProjectPath)
+    rsync_from          = rsync_files_from_node_string(username, hostname, remoteSyncBack, projectName, projectOutuptFile)
+    mkdir_local_string  = mkdir_string(projectPath)
+    mkdir_remote_string = mkdir_string(os.path.join(remoteProjectPath, "/results"))
+    ssh_c_string        = ssh_string(username, hostname)
 
     ssh_mkdir           = ssh_c_string + " '" + mkdir_remote_string + "'"
     ssh_blender         = ssh_c_string + " '" + jobString + "' "
     pull_from           = mkdir_remote_string + ";" + rsync_from
 
-    if(verbose >= 3):
-        print("Syncing project file %s.blend to %s" % (projectName,hostname))
+    if verbose >= 3:
+        print("Syncing project file %s.blend to %s" % (projectName, hostname))
         print("rsync command: %s" % (rsync_to))
-    t = subprocess.call(ssh_mkdir,shell=True )
+    t = subprocess.call(ssh_mkdir, shell=True)
     p = subprocess.call(rsync_to, shell=True)
-    if(verbose >= 3):
+    if verbose >= 3:
         print("Finished the rsync to host %s" % (hostname))
-    if(verbose >= 3):
+    if verbose >= 3:
         print("Returned from rsync command: %d" % (p))
         sys.stdout.flush()
-        if(p == 0): print ("Success!")
+        if p == 0: print("Success!")
     # Now start the blender command
 
-    if(verbose >= 3):
-        print ( "blender command: %s" % (jobString))
+    if verbose >= 3:
+        print("blender command: %s" % (jobString))
 
-    q = subprocess.Popen(shlex.split(ssh_blender),stdout=subprocess.PIPE)
+    q = subprocess.Popen(shlex.split(ssh_blender), stdout=subprocess.PIPE)
     # This blocks til q is done
-    while(type(q.poll()) == type(None)):
+    while type(q.poll()) == type(None):
         # This blocks til there is something to read
         line = q.stdout.readline()
-        if( progress ):
-            process_blender_output(hostname,line)
+        if progress:
+            process_blender_output(hostname, line)
 
-    if( q.returncode == 0 ):
-        if( verbose >= 1 ):
-            print ("Successfully completed render for frame (%s) on hostname %s." % (frame,hostname))
+    if q.returncode == 0:
+        if verbose >= 1:
+            print("Successfully completed render for frame (%s) on hostname %s." % (frame, hostname))
             sys.stdout.flush()
         jobStatus[jobString] = dict()
-        jobStatus[jobString]['blend'] = 0
+        jobStatus[jobString]["blend"] = 0
     else:
         sys.stderr.write("blender error: %d" % (q.returncode))
     # Now rsync the files in /tmp/<name>/render back to this host.
 
-    if( verbose >= 3 ):
-        print("rsync pull: " + pull_from )
-    r = subprocess.call(pull_from,shell=True)
+    if verbose >= 3:
+        print("rsync pull: " + pull_from)
+    r = subprocess.call(pull_from, shell=True)
 
-    if( r == 0 and q.returncode == 0 ):
-        jobStatus[jobString]['rsync'] = 0
-        if( verbose >= 1 ):
-            print( "Render frame (%s) has been copied back from hostname %s" % (frame,hostname))
+    if r == 0 and q.returncode == 0:
+        jobStatus[jobString]["rsync"] = 0
+        if verbose >= 1:
+            print("Render frame (%s) has been copied back from hostname %s" % (frame, hostname))
             sys.stdout.flush()
     else:
         sys.stderr.write("rsync error: %d" % (r))
 
-def buildJobStrings(frames,projectName,projectPath,nameOutputFiles,servers=1): # jobList is a list of lists containing start and end values
+def buildJobStrings(frames, projectName, projectPath, nameOutputFiles, servers=1): # jobList is a list of lists containing start and end values
     jobStrings = []
     seedString = ""
-    if(len(frames) == 1):
+    if len(frames) == 1:
         # TODO: zero pad str(i) to three digits
         frame = frames[0]
         for i in range(servers):
             seedString = "_seed-" + str(i)
-            builtString = "blender -b " + projectPath+"/"+projectName + ".blend -x 1 -o //results/" + nameOutputFiles + seedString + "_####.png -s " + str(frame) + " -e " + str(frame) + " -P " + projectPath + "/blender_p.py -a"
+            builtString = "blender -b " + projectPath + "/" + projectName + ".blend -x 1 -o //results/" + nameOutputFiles + seedString + "_####.png -s " + str(frame) + " -e " + str(frame) + " -P " + projectPath + "/blender_p.py -a"
             jobStrings.append(builtString)
     else:
         for frame in frames:
-            builtString = "blender -b " + projectPath+"/"+projectName + ".blend -x 1 -o //results/" + nameOutputFiles + "_####.png -s " + str(frame) + " -e " + str(frame) +  " -P " + projectPath + "/blender_p.py -a"
+            builtString = "blender -b " + projectPath + "/" + projectName + ".blend -x 1 -o //results/" + nameOutputFiles + "_####.png -s " + str(frame) + " -e " + str(frame) +  " -P " + projectPath + "/blender_p.py -a"
             jobStrings.append(builtString)
     return jobStrings
 
-def expandFrames( frame_range ):
+def expandFrames(frame_range):
     # TODO: fix the start stop values and use frame_range
     frames = []
     sequential = False
-    junk        = True
+    junk = True
     for i in frame_range:
-        if( type(i) == list ):
-            frames += range(i[0],i[1]+1)
-            if( junk ):
-                sequential  = True
-                junk        = False
-        elif( type(i) == int ):
+        if type(i) == list:
+            frames += range(i[0], i[1]+1)
+            if junk:
+                sequential = True
+                junk = False
+        elif type(i) == int:
             frames.append(i)
             sequential = False
         else:
@@ -243,7 +231,7 @@ def readFileFor(f, flagName):
     # skip lines leading up to '### BEGIN flagName ###'
     nextLine = f.readline()
     numIters = 0
-    while(nextLine != "### BEGIN " + flagName + " ###\n"):
+    while nextLine != "### BEGIN " + flagName + " ###\n":
         nextLine = f.readline()
         numIters += 1
         if numIters >= 250:
@@ -253,7 +241,7 @@ def readFileFor(f, flagName):
     # read following lines leading up to '### END flagName ###'
     nextLine = f.readline()
     numIters = 0
-    while(nextLine != "### END " + flagName + " ###\n"):
+    while nextLine != "### END " + flagName + " ###\n":
         readLines += nextLine.replace(" ", "").replace("\n", "").replace("\t", "")
         nextLine = f.readline()
         numIters += 1
@@ -264,23 +252,23 @@ def readFileFor(f, flagName):
     return readLines
 
 def setServersDict(hostDirPath="remoteServers.txt"):
-    if(hostDirPath == "remoteServers.txt"):
-        serverFile = open(os.path.dirname(os.path.abspath(__file__)) + "/remoteServers.txt",'r')
+    if hostDirPath == "remoteServers.txt":
+        serverFile = open(os.path.dirname(os.path.abspath(__file__)) + "/remoteServers.txt", "r")
     else:
-        serverFile = open(hostDirPath,'r')
+        serverFile = open(hostDirPath, "r")
     servers = json.loads(readFileFor(serverFile, "REMOTE SERVERS DICTIONARY"))
     return servers
 
 def listHosts(hostDict):
-    if(type(hostDict) == list):
+    if type(hostDict) == list:
         return hostDict
-    return [ j for i in hostDict.keys() for j in hostDict[i] ]
+    return [j for i in hostDict.keys() for j in hostDict[i]]
 
 
 def stopWatch(value):
-    '''From seconds to Days;Hours:Minutes;Seconds'''
+    """From seconds to Days;Hours:Minutes;Seconds"""
 
-    valueD = (((value/365)/24)/60)
+    valueD = ((value/365)/24)/60
     Days = int(valueD)
 
     valueH = (valueD-Days)*365
@@ -307,59 +295,53 @@ def stopWatch(value):
 
     return Days + ";" + Hours + ":" + Minutes + ";" + Seconds
 
-def averageFrames(renderedFramesPath, projectName, verbose=0):
-    if( verbose >= 2 ):
-        print "running averageFrames()... (currently only supports '.png' and '.tga')"
+def averageFrames(projectPath, projectName):
+    """ Averages each pixel from all final rendered images to present one render result """
 
-    # ensure 'renderedFramesPath' has trailing "/"
-    if renderedFramesPath[-1] != "/":
-        renderedFramesPath = renderedFramesPath + "/"
-
-    # get image files to average from 'renderedFramesPath'
-    allfiles=os.listdir(renderedFramesPath)
-    imlist=[filename for filename in allfiles if  (filename[-4:] in [".tga",".TGA"] and filename[-5] != "e" and "_seed-" in filename)]
-    for i in range(len(imlist)):
-        imlist[i] = renderedFramesPath + imlist[i]
-    if len(imlist) == 0:
-        sys.stderr.write("There were no image files to average...")
-        return;
-
-    if ( verbose >= 3):
-        print "Averaging the following images:"
-        for image in imlist:
-            print image
+    if verbose >= 3:
+        print("running averageFrames()... (currently only supports '.png' and '.tga')")
+    allFiles = os.listdir(os.path.join(projectPath, "render-dump"))
+    imList = [filename for filename in allFiles if (filename[-3:] in ["tga", "TGA", "png", "PNG"] and filename[-11:-4] != "average" and "_seed-" in filename)]
+    imList = [os.path.join(projectPath, "render-dump", im) for im in imList]
+    if not imList:
+        sys.stderr.write("No valid image files to average.")
+        sys.exit(1)
 
     # Assuming all images are the same size, get dimensions of first image
     imRef = Image.open(imlist[0])
-    w,h=imRef.size
-    mode=imRef.mode
-    N=len(imlist)
+    w, h = imRef.size
+    mode = imRef.mode
+    N = len(imList)
 
     # Create a numpy array of floats to store the average
     if mode == "RGB":
-        arr=numpy.zeros((h,w,3),numpy.float)
+        arr = numpy.zeros((h, w, 3), numpy.float)
     elif mode == "RGBA":
-        arr=numpy.zeros((h,w,4),numpy.float)
+        arr = numpy.zeros((h, w, 4), numpy.float)
     elif mode == "L":
-        arr=numpy.zeros((h,w),numpy.float)
+        arr = numpy.zeros((h, w), numpy.float)
     else:
-        sys.stderr.write("ERROR: Unsupported image type. Supported types: ['RGB', 'RGBA', 'BW']")
-        sys.exit(0)
+        sys.stderr.write("Unsupported image type. Supported types: ['RGB', 'RGBA', 'BW']")
+        sys.exit(1)
 
     # Build up average pixel intensities, casting each image as an array of floats
-    for im in imlist:
-        # load image
-        imarr=numpy.array(Image.open(im),dtype=numpy.float)
-        arr=arr+imarr/N
+    if verbose >= 3:
+        print("Averaging the following images:")
+    for im in imList:
+        if verbose >= 3:
+            print(im)
+        imarr = numpy.array(Image.open(im), dtype=numpy.float)
+        arr = arr+imarr/N
 
     # Round values in array and cast as 8-bit integer
-    arr=numpy.array(numpy.round(arr),dtype=numpy.uint8)
+    arr = numpy.array(numpy.round(arr), dtype=numpy.uint8)
 
-    if ( verbose >= 3):
-        print "Averaged successfully!"
+    # Print details
+    if verbose >= 2:
+        print("Averaged successfully!")
 
     # Generate, save and preview final image
-    out=Image.fromarray(arr,mode=mode)
-    if ( verbose >= 3):
-        print "saving averaged image..."
-    out.save(renderedFramesPath + projectName + "_average.tga")
+    out = Image.fromarray(arr, mode=mode)
+    if verbose >= 3:
+        print("saving averaged image...")
+    out.save(os.path.join(projectPath, "render-dump/", projectName, "_average.tga"))

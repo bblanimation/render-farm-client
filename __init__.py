@@ -21,7 +21,6 @@ from .functions.setupServerVars import *
 def more_menu_options(self, context):
     layout = self.layout
     layout.separator()
-
     layout.operator("sendFrame", text="Render Image on Servers", icon='RENDER_STILL')
     layout.operator("sendAnimation", text="Render Image on Servers", icon='RENDER_ANIMATION')
 
@@ -37,6 +36,8 @@ def register():
         name="Show Advanced",
         description="Display advanced remote server settings",
         default=False)
+
+    # unpack the files automatically after packing them into the .blend file
     bpy.types.Scene.unpack = BoolProperty(
         name="Auto-unpack files",
         description="Unpack the files that got packed for remote servers after saving",
@@ -44,7 +45,9 @@ def register():
 
     # initialize frame range string text box
     bpy.types.Scene.frameRanges = StringProperty(
-        name="Frames")
+        name="Frames"
+        description="define frame ranges to render, separated by commas. (e.g. '1,3,6-10')"
+        default="")
 
     # initialize frame range string text box
     bpy.types.Scene.tempFilePath = StringProperty(
@@ -52,6 +55,7 @@ def register():
         description="File path on host server (temporary storage location)",
         maxlen=128,
         default="/tmp/renderFarm/")
+
     bpy.types.Scene.tempLocalDir = StringProperty(
         name="Temp Local Path",
         description="File path on local drive to store temporary project files",
@@ -111,6 +115,8 @@ def unregister():
     del bpy.types.Scene.frameRanges
     del bpy.types.Scene.tempFilePath
     del bpy.types.Scene.tempLocalDir
+    del bpy.types.Scene.nameOutputFiles
+    del bpy.types.Scene.maxServerLoad
     del bpy.types.Scene.renderType
     del bpy.types.Scene.renderStatus
     del bpy.props.servers
@@ -121,10 +127,9 @@ def unregister():
     wm = bpy.context.window_manager
     for km in addon_keymaps:
         wm.keyconfigs.addon.keymaps.remove(km)
+
     # clear the list
     addon_keymaps.clear()
 
 if __name__ == "__main__":
     register()
-
-print("'server_farm_client_add_on' Script Loaded")

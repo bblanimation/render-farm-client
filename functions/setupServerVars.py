@@ -48,20 +48,20 @@ def setupServerVars():
     serverFile = open(os.path.join(libraryServersPath, "remoteServers.txt"),"r")
 
     # Set SSH login information for host server
-    username    = readFileFor(serverFile, "SSH USERNAME").replace("\"", "")
-    hostServer  = readFileFor(serverFile, "HOST SERVER").replace("\"", "")
-    extension   = readFileFor(serverFile, "EXTENSION").replace("\"", "")
+    username = readFileFor(serverFile, "SSH USERNAME").replace("\"", "")
+    hostServer = readFileFor(serverFile, "HOST SERVER").replace("\"", "")
+    extension = readFileFor(serverFile, "EXTENSION").replace("\"", "")
     hostServerLogin = username + "@" + hostServer + extension
 
     # Set server dictionary
     servers = json.loads(readFileFor(serverFile, "REMOTE SERVERS DICTIONARY"))
-    return { "servers":servers, "hostServerLogin":hostServerLogin }
+    return {"servers":servers, "hostServerLogin":hostServerLogin}
 
 def writeServersFile(serverDict, serverGroups):
     f = open(os.path.join(getLibraryPath(), "to_host_server", "servers.txt"), "w")
 
     # define dictionary 'serversToUse'
-    if(serverGroups == "All Servers"):
+    if serverGroups == "All Servers":
         serversToUse = serverDict
     else:
         serversToUse = {}

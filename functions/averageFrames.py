@@ -11,13 +11,12 @@ def averageFrames(projectPath, projectName):
 
     print("running averageFrames()... (currently only supports '.png' and '.tga')")
     allFiles = os.listdir(os.path.join(projectPath, "render-dump/"))
-    imList = [filename for filename in allFiles if (filename[-4:] in [".tga", ".TGA"] and filename[-5] != "e" and "_seed-" in filename)]
-    for i in enumerate(imList):
-        imList[i] = os.path.join(projectPath, "render-dump/", imList[i])
-    if len(imList) == 0:
-        sys.stderr.write("There were no image files to average...")
+    imList = [filename for filename in allFiles if (filename[-3:] in ["tga", "TGA", "png", "PNG"] and filename[-11:-4] != "average" and "_seed-" in filename)]
+    imList = [os.path.join(projectPath, "render-dump", im) for im in imList]
+    if not imList:
+        sys.stderr.write("No valid image files to average.")
         sys.exit(1)
-
+        
     # Assuming all images are the same size, get dimensions of first image
     imRef = Image.open(imlist[0])
     w, h = imRef.size

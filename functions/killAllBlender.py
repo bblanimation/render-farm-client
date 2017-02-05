@@ -17,8 +17,8 @@ def killBlenderOnAvailServers(username, hosts, extension):
         subprocess.call("ssh " + username + "@" + host + extension + " 'killall blender'", shell=True)
 
 def main():
-    username  = args.username
-    hosts     = json.loads(args.servers_to_kill)
+    username = args.username
+    hosts = json.loads(args.servers_to_kill)
     extension = args.extension
     killBlenderOnAvailServers(username, hosts, extension)
 
