@@ -37,18 +37,18 @@ def register():
         default=False)
 
     bpy.types.Scene.unpack = BoolProperty(
-        name="Auto-unpack files",
-        description="Unpack the files that got packed for remote servers after saving",
+        name="Unpack",
+        description="Auto-unpack files after auto-packing on 'render' command",
         default=True)
 
     bpy.types.Scene.frameRanges = StringProperty(
         name="Frames",
-        description="define frame ranges to render, separated by commas. (e.g. '1,3,6-10')",
+        description="Define frame ranges to render, separated by commas (e.g. '1,3,6-10')",
         default="")
 
     bpy.types.Scene.tempFilePath = StringProperty(
-        name="Remote Path",
-        description="File path on host server (temporary storage location)",
+        name="Path",
+        description="Temporary remote filepath for output files on host server",
         maxlen=128,
         default="/tmp/renderFarm/")
 
@@ -60,20 +60,20 @@ def register():
         subtype="DIR_PATH")
 
     bpy.types.Scene.nameOutputFiles = StringProperty(
-        name="Name Output Files",
-        description="Custom name used for rendered frames in 'render_dump' folder (prepended to: '_####')",
+        name="Name",
+        description="Name output files in 'render_dump' folder (prepended to: '_####')",
         maxlen=128,
         default="")
 
     bpy.types.Scene.maxServerLoad = IntProperty(
         name="Max Server Load",
-        description="Set a limit on the number of frames to be rendered in parallel by each server",
+        description="Maximum number of frames to be handled at once by each server",
         min=1, max=8,
         default=1)
 
     bpy.types.Scene.connectionTimeout = FloatProperty(
-        name="Connection Timeout",
-        description="Time (in seconds) to wait for client servers to respond.",
+        name="Timeout",
+        description="Time (in seconds) to wait for client servers to respond",
         min=.001, max=1,
         default=.01)
 
@@ -86,11 +86,18 @@ def register():
     bpy.props.hostServerLogin = serverVars["hostServerLogin"]
     writeServersFile(bpy.props.servers, "All Servers")
     bpy.props.requiredFileRead = False
+    bpy.props.animFirstFrame = []
+
+    # TODO: Set default to False for public release (True for testing purposes)
+    bpy.props.needsUpdating = True
+
+    bpy.props.imExtension = ".tga"
+    bpy.props.animExtension = ".tga"
 
     # initialize server groups enum property
     groupNames = [("All Servers", "All Servers", "Render on all servers")]
     for groupName in serverVars["servers"]:
-        tmpList = [groupName, groupName, "Render only servers on this group"]
+        tmpList = [groupName, groupName, "Render only servers in this group"]
         groupNames.append(tuple(tmpList))
     bpy.types.Scene.serverGroups = EnumProperty(
         attr="serverGroups",
@@ -125,6 +132,10 @@ def unregister():
     del bpy.props.servers
     del bpy.props.hostServerLogin
     del bpy.props.requiredFileRead
+    del bpy.props.animFirstFrame
+    del bpy.props.imExtension
+    del bpy.props.animExtension
+    del bpy.props.needsUpdating
     del bpy.types.Scene.serverGroups
 
     wm = bpy.context.window_manager

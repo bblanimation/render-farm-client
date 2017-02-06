@@ -147,7 +147,7 @@ def main():
         if not os.path.exists(localResultsPath):
             os.mkdir(localResultsPath)
         for file in os.listdir(localResultsPath):
-            if fnmatch.fnmatch(file, '*_seed-*') or fnmatch.fnmatch(file, '*.tga'):
+            if fnmatch.fnmatch(file, '*_seed-*') or file[-3:] in getSupportedFileTypes():
                 outputFile = os.path.join(localResultsPath, file)
                 if args.verbose >= 3:
                     pflush('Removing {outputFile} from project dir.'.format(outputFile=outputFile))

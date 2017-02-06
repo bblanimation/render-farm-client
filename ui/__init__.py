@@ -112,7 +112,7 @@ class frameRangePanel(Panel):
             col = layout.column(align=True)
             col.active = bpy.path.display_name_from_filepath(bpy.data.filepath) != ""
             row = col.row(align=True)
-            row.operator("scene.list_files", text="List Missing Files", icon="LONGDISPLAY")
+            row.operator("scene.list_frames", text="List Missing Frames", icon="LONGDISPLAY")
             row = col.row(align=True)
             row.operator("scene.set_to_missing_frames", text="Set to Missing Frames", icon="FILE_PARENT")
 
@@ -134,24 +134,28 @@ class serversPanel(Panel):
             col = layout.column(align=True)
             row = col.row(align=True)
             row.operator("scene.edit_servers_dict", text="Edit Remote Servers", icon="TEXT")
-            row = col.row(align=True)
-            row.operator("scene.restart_remote_servers", text="Restart Remote Servers", icon="FILE_REFRESH")
+            # row = col.row(align=True)
+            # row.operator("scene.restart_remote_servers", text="Restart Remote Servers", icon="FILE_REFRESH")
 
             col = layout.column(align=True)
             row = col.row(align=True)
             box = row.box()
             box.prop(scn, "showAdvanced")
             if scn.showAdvanced:
-                row = box.row(align=True)
-                row.prop(scn, "nameOutputFiles")
-                row = box.row(align=True)
-                row.prop(scn, "tempFilePath")
-                row = box.row(align=True)
-                row.prop(scn, "unpack")
-                col = box.column(align=True)
+                col = box.column()
+                col.label(text="Output:")
+                col.prop(scn, "nameOutputFiles")
+                col.prop(scn, "tempFilePath")
+
+                layout.separator()
+
+                col = box.column()
+                col.prop(scn, "unpack")
+
+                col = box.column()
                 col.label(text="Performance:")
                 col.prop(scn, "maxServerLoad")
                 col.prop(scn, "connectionTimeout")
                 # The following is probably unnecessary
-                # row = box.row(align=True)
-                # row.prop(scn, "tempLocalDir")
+                # col = box.row(align=True)
+                # col.prop(scn, "tempLocalDir")

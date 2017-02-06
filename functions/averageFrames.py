@@ -11,8 +11,10 @@ def averageFrames(projectPath, projectName):
 
     print("running averageFrames()... (currently only supports '.png' and '.tga')")
     allFiles = os.listdir(os.path.join(projectPath, "render-dump/"))
-    imList = [filename for filename in allFiles if (filename[-3:] in ["tga", "TGA", "png", "PNG"] and filename[-11:-4] != "average" and "_seed-" in filename)]
+    supportedFileTypes = ["png", "tga", "tif", "jpg", "jp2", "bmp", "cin", "dpx", "exr", "hdr", "rgb"]
+    imList = [filename for filename in allFiles if (filename[-3:] in supportedFileTypes and filename[-11:-4] != "average" and "_seed-" in filename)]
     imList = [os.path.join(projectPath, "render-dump", im) for im in imList]
+    extension = imList[0][-3:]
     if not imList:
         sys.stderr.write("No valid image files to average.")
         sys.exit(1)
@@ -51,7 +53,7 @@ def averageFrames(projectPath, projectName):
     # Generate, save and preview final image
     out = Image.fromarray(arr, mode=mode)
     print("saving averaged image...")
-    out.save(os.path.join(projectPath, "render-dump", projectName + "_average.tga"))
+    out.save(os.path.join(projectPath, "render-dump", projectName + "_average." + extension))
 
 def main():
     projectPath = args.project_path.replace(" ", "\\ ")

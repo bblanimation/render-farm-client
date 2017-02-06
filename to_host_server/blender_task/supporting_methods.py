@@ -202,6 +202,8 @@ def testHosts(host, hosts_online, hosts_offline, start_tasks, verbose=0):
     else:
         hosts_offline.append(str(host))
 
+def getSupportedFileTypes():
+    return ["png", "tga", "tif", "jpg", "jp2", "bmp", "cin", "dpx", "exr", "hdr", "rgb"]
 
 def listHosts(hostDict):
     if type(hostDict) == list:
@@ -241,17 +243,15 @@ def stopWatch(value):
 def averageFrames(renderedFramesPath, projectName, verbose=0):
     """ Averages each pixel from all final rendered images to present one render result """
 
-    if verbose >= 3:
-        pflush("running averageFrames()... (currently only supports '.png' and '.tga')")
-
     # ensure 'renderedFramesPath' has trailing "/"
     if renderedFramesPath[-1] != "/":
         renderedFramesPath = renderedFramesPath + "/"
 
     # get image files to average from 'renderedFramesPath'
     allFiles = os.listdir(renderedFramesPath)
-    imList = [filename for filename in allFiles if (filename[-3:] in ["tga", "png"] and filename[-11:-4] != "average" and "_seed-" in filename)]
+    imList = [filename for filename in allFiles if filename[-3:] in getSupportedFileTypes() and filename[-11:-4] != "average" and "_seed-" in filename]
     imList = [os.path.join(renderedFramesPath, im) for im in imList]
+    extension = imList[0][-3:]
     if not imList:
         eflush("No valid image files to average.")
         sys.exit(1)
@@ -293,4 +293,4 @@ def averageFrames(renderedFramesPath, projectName, verbose=0):
     out = Image.fromarray(arr, mode=mode)
     if verbose >= 3:
         pflush("saving averaged image...")
-    out.save(os.path.join(renderedFramesPath, projectName + "_average.tga"))
+    out.save(os.path.join(renderedFramesPath, "{projectName}_average.{extension}".format(extension=extension, projectName=projectName)))

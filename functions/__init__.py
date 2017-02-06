@@ -18,6 +18,10 @@ def jobIsValid(jobType, projectName):
     elif bpy.context.scene.camera is None:
         return {"valid":False, "errorType":"ERROR", "errorMessage":"RENDER FAILED: No camera in scene."}
 
+    # verify image file format
+    elif bpy.context.scene.render.image_settings.file_format in ["AVI_JPEG", "AVI_RAW", "FRAMESERVER", "H264", "FFMPEG", "THEORA", "QUICKTIME", "XVID"]:
+        return {"valid":False, "errorType":"ERROR", "errorMessage":"RENDER FAILED: Movie file formats not supported. Please choose an image file format in the 'Render > Output' panel"}
+
     # verify that sampling is high enough to provide expected results
     elif jobType == "image":
         if bpy.context.scene.cycles.progressive == "PATH":
@@ -99,8 +103,11 @@ def copyFiles():
     """ copies necessary files to host server """
     scn = bpy.context.scene
 
-    # currently unnecessary to run 'mkdir', as the functionality exists in 'copyProjectFile()'
-    rsyncCommand = "rsync -qax -e 'ssh -T -o Compression=no -x' '" + os.path.join(getLibraryPath(), "to_host_server") + "/' '" + bpy.props.hostServerLogin + ":" + scn.tempFilePath + "'"
+    # write out the servers file for remote servers
+    writeServersFile(bpy.props.servers, scn.serverGroups)
+
+    # rsync setup files to host server ('servers.txt', 'blender_p.py', 'blender_task' module)
+    rsyncCommand = "rsync -qax -e 'ssh -T -o Compression=no -x' --rsync-path='mkdir -p {tempFilePath} && rsync' '{to_host_server}/' '{username}:{tempFilePath}'".format(tempFilePath=scn.tempFilePath, to_host_server=os.path.join(getLibraryPath(), "to_host_server"), username=bpy.props.hostServerLogin)
     process = subprocess.Popen(rsyncCommand, stdout=subprocess.PIPE, shell=True)
     return process
 
@@ -146,6 +153,18 @@ def removeViewable(typeOfRender):
     except:
         return
 
+def handleError(process):
+    # if error message available, print in Info window and define errorMessage string
+    if process.stderr != None:
+        errorMessage = "Error message available in terminal/Info window."
+        for line in self.process.stderr.readlines():
+            self.report({"WARNING"}, str(line, "utf-8").replace("\n", ""))
+    else:
+        errorMessage = "No error message to print."
+
+    self.report({"ERROR"}, "Process " + str(self.state-1) + " gave return code " + str(self.process.returncode) + ". " + errorMessage)
+    return{"FINISHED"}
+
 def expandFrames(frame_range):
     """ Helper function takes frame range string and returns list with frame ranges expanded """
 
@@ -170,7 +189,7 @@ def listMissingFiles(filename, frameRange):
         return ""
     imList = []
     for f in allFiles:
-        if f.endswith(".tga") and f[-11:-4] != "average" and "seed" not in f and f[:len(filename)] == filename:
+        if f.endswith(bpy.props.animExtension) and f[-11:-4] != "average" and "seed" not in f and f[:len(filename)] == filename:
             imList.append(int(f[len(filename)+1:len(filename)+5]))
     compList = expandFrames(json.loads(frameRange))
 
