@@ -3,7 +3,7 @@
 bl_info = {
     "name"        : "Server Farm Client",
     "author"      : "Christopher Gearhart <chris@bblanimation.com>",
-    "version"     : (0, 7, 1),
+    "version"     : (0, 7, 2),
     "blender"     : (2, 78, 0),
     "description" : "Render your scene on a remote server farm with this addon.",
     "location"    : "View3D > Tools > Render",
@@ -36,11 +36,6 @@ def register():
         description="Display advanced remote server settings",
         default=False)
 
-    bpy.types.Scene.unpack = BoolProperty(
-        name="Unpack",
-        description="Auto-unpack files after auto-packing on 'render' command",
-        default=True)
-
     bpy.types.Scene.frameRanges = StringProperty(
         name="Frames",
         description="Define frame ranges to render, separated by commas (e.g. '1,3,6-10')",
@@ -71,7 +66,7 @@ def register():
         min=1, max=8,
         default=1)
 
-    bpy.types.Scene.connectionTimeout = FloatProperty(
+    bpy.types.Scene.timeout = FloatProperty(
         name="Timeout",
         description="Time (in seconds) to wait for client servers to respond",
         min=.001, max=1,
@@ -86,13 +81,14 @@ def register():
     bpy.props.hostServerLogin = serverVars["hostServerLogin"]
     writeServersFile(bpy.props.servers, "All Servers")
     bpy.props.requiredFileRead = False
-    bpy.props.animFirstFrame = []
+    bpy.props.animFrameRange = []
+    bpy.props.lastTempFilePath = bpy.types.Scene.tempFilePath
 
     # TODO: Set default to False for public release (True for testing purposes)
     bpy.props.needsUpdating = True
 
-    bpy.props.imExtension = ".tga"
-    bpy.props.animExtension = ".tga"
+    bpy.props.imExtension = False
+    bpy.props.animExtension = False
 
     # initialize server groups enum property
     groupNames = [("All Servers", "All Servers", "Render on all servers")]
@@ -120,19 +116,18 @@ def unregister():
     bpy.utils.unregister_module(__name__)
     bpy.types.INFO_MT_render.remove(more_menu_options)
     del bpy.types.Scene.showAdvanced
-    del bpy.types.Scene.unpack
     del bpy.types.Scene.frameRanges
     del bpy.types.Scene.tempFilePath
     del bpy.types.Scene.tempLocalDir
     del bpy.types.Scene.nameOutputFiles
     del bpy.types.Scene.maxServerLoad
-    del bpy.types.Scene.connectionTimeout
+    del bpy.types.Scene.timeout
     del bpy.types.Scene.renderType
     del bpy.types.Scene.renderStatus
     del bpy.props.servers
     del bpy.props.hostServerLogin
     del bpy.props.requiredFileRead
-    del bpy.props.animFirstFrame
+    del bpy.props.animFrameRange
     del bpy.props.imExtension
     del bpy.props.animExtension
     del bpy.props.needsUpdating

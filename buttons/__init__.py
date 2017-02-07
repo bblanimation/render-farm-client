@@ -20,7 +20,7 @@ class refreshNumAvailableServers(Operator):
 
     def checkNumAvailServers(self):
         scn = bpy.context.scene
-        command = "ssh -T -x " + bpy.props.hostServerLogin + " 'python " + scn.tempFilePath + "blender_task -H --connection_timeout " + str(scn.connectionTimeout) + " --hosts_file " + scn.tempFilePath + "servers.txt'"
+        command = "ssh -T -x {hostServerLogin} 'python {tempFilePath}blender_task -H --connection_timeout {timeout} --hosts_file {tempFilePath}servers.txt'".format(hostServerLogin=bpy.props.hostServerLogin, tempFilePath=scn.tempFilePath, timeout=str(scn.timeout))
         process = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
         return process
 
@@ -49,21 +49,14 @@ class refreshNumAvailableServers(Operator):
         if event.type == "TIMER":
             self.process.poll()
 
+            # if process finished and error thrown
             if self.process.returncode != 0 and self.process.returncode != None:
-
-                # if error message available, print in Info window and define errorMessage string
-                if self.process.stderr != None:
-                    errorMessage = "Error message available in terminal/Info window."
-                    for line in self.process.stderr.readlines():
-                        self.report({"WARNING"}, str(line, "utf-8").replace("\n", ""))
-                else:
-                    errorMessage = "No error message to print."
-
-                self.report({"ERROR"}, "Process " + str(self.state-1) + " gave return code " + str(self.process.returncode) + ". " + errorMessage)
+                handleError(self, "Process {curState}".format(curState=str(self.state-1)))
                 return{"FINISHED"}
 
+            # if process finished and no errors
             if self.process.returncode != None:
-                print("Process " + str(self.state) + " finished! (return code: " + str(self.process.returncode) + ")")
+                print("Process {curState} finished! (return code: {returnCode})".format(curState=str(self.state-1), returnCode=str(self.process.returncode)))
 
                 # check the number of available servers through the host
                 if self.state == 1:
@@ -74,7 +67,7 @@ class refreshNumAvailableServers(Operator):
                 elif self.state == 2:
                     self.updateAvailServerInfo()
                     scn = context.scene
-                    self.report({"INFO"}, "Refresh process completed (" + str(len(scn['availableServers'])) + " servers available)")
+                    self.report({"INFO"}, "Refresh process completed ({numAvailable} servers available)".format(numAvailable=str(len(scn['availableServers']))))
                     return{"FINISHED"}
                 else:
                     self.report({"ERROR"}, "ERROR: Current state not recognized.")
@@ -86,10 +79,10 @@ class refreshNumAvailableServers(Operator):
         print("\nRunning 'checkNumAvailServers' function...")
         scn = context.scene
 
-        # verify user input for tempFilePath string
+        # format user input for tempFilePath string
         scn.tempFilePath.replace(" ", "_")
-        if scn.tempFilePath[-1] != "/":
-            scn.tempFilePath = scn.tempFilePath + "/"
+        if not scn.tempFilePath.endswith("/"):
+            scn.tempFilePath += "/"
 
         # create timer for modal
         wm = context.window_manager
@@ -98,9 +91,10 @@ class refreshNumAvailableServers(Operator):
 
         # start initial process
         self.state = 1 # initializes state for modal
-        if bpy.props.needsUpdating:
+        if bpy.props.needsUpdating or bpy.props.lastTempFilePath != scn.tempFilePath:
             self.process = copyFiles()
             bpy.props.needsUpdating = False
+            bpy.props.lastTempFilePath = scn.tempFilePath
         else:
             self.process = self.checkNumAvailServers()
             self.state += 1
@@ -120,20 +114,27 @@ class sendFrame(Operator):
     bl_label = "Render Current Frame"                                           # display name in the interface.
     bl_options = {"REGISTER", "UNDO"}                                           # enable undo for the operator.
 
+    def averageFrames(self, scn):
+        averageScriptPath = os.path.join(getLibraryPath(), "functions", "averageFrames.py")
+        if scn.nameOutputFiles != "":
+            self.nameOutputFiles = scn.nameOutputFiles
+        else:
+            self.nameOutputFiles = self.projectName
+        runScriptCommand = "python " + averageScriptPath.replace(" ", "\\ ") + " -v -p " + getRenderDumpFolder() + " -n " + self.nameOutputFiles
+        process = subprocess.Popen(runScriptCommand, shell=True)
+        return process
 
     def modal(self, context, event):
         if event.type in {"ESC"} and not self.renderCancelled:
+            print("Process cancelled")
+            setRenderStatus("image", "Cancelled")
             if self.state == 3:
                 self.renderCancelled = True
                 self.process.kill()
                 self.report({"INFO"}, "Render process cancelled. Fetching frames...")
-                print("Process cancelled")
-                setRenderStatus("image", "Cancelled")
             else:
                 self.cancel(context)
                 self.report({"INFO"}, "Render process cancelled")
-                print("Process cancelled")
-                setRenderStatus("image", "Cancelled")
                 return{"CANCELLED"}
 
         if self.process.stdout and self.state == 3:
@@ -156,17 +157,10 @@ class sendFrame(Operator):
                 # handle unidentified errors
                 if self.process.returncode > 1:
                     if self.renderCancelled:
+                        setRenderStatus("image", "Cancelled")
                         self.report({"INFO"}, "Process cancelled - No rendered frames found.")
                     else:
                         setRenderStatus("image", "ERROR")
-
-                        # if error message available, print in Info window and define errorMessage string
-                        if self.process.stderr != None:
-                            errorMessage = "Error message available in terminal/Info window."
-                            for line in self.process.stderr.readlines():
-                                self.report({"WARNING"}, str(line, "utf-8").replace("\n", ""))
-                        else:
-                            errorMessage = "No error message to print."
 
                         # define self.errorSource string
                         if not self.state == 3:
@@ -174,26 +168,15 @@ class sendFrame(Operator):
                         else:
                             self.errorSource = "blender_task"
 
-                        self.report({"ERROR"}, self.errorSource + " gave return code " + str(self.process.returncode) + ". " + errorMessage)
+                        handleError(self, self.errorSource)
                     return{"FINISHED"}
 
                 # handle and report errors for 'blender_task' process
                 elif self.process.returncode == 1 and self.state == 3:
-                    if self.process.stderr:
-                        self.stderr = self.process.stderr.readlines()
-                        print("\nERRORS:")
-                        for line in self.stderr:
-                            line = line.decode("ASCII").replace("\\n", "")[:-1]
-                            self.report({"ERROR"}, "blender_task error: '" + line + "'")
-                            print("blender_task error: '" + line + "'")
-                            sys.stderr.write(line)
-                        errorMsg = self.stderr[-1].decode("ASCII")
-                        try:
-                            self.numFailedFrames = int(errorMsg[18:-5])
-                        except:
-                            sys.stderr.write("Couldn't read last line of process output as integer")
+                    handleBTError(self)
 
-                print("Process " + str(self.state) + " finished! (return code: " + str(self.process.returncode) + ")")
+                # if no errors, print process finished!
+                print("Process {curState} finished! (return code: {returnCode})".format(curState=str(self.state-1), returnCode=str(self.process.returncode)))
 
                 # copy files to host server
                 if self.state == 1:
@@ -203,7 +186,7 @@ class sendFrame(Operator):
 
                 # start render process at current frame
                 elif self.state == 2:
-                    self.process = renderFrames("[" + str(self.curFrame) + "]", self.projectName, True)
+                    self.process = renderFrames("[{curFrame}]".format(curFrame=str(self.curFrame)), self.projectName, True)
                     self.state += 1
                     setRenderStatus("image", "Rendering...")
                     return{"PASS_THROUGH"}
@@ -211,24 +194,27 @@ class sendFrame(Operator):
                 # get rendered frames from remote servers and archive old render files
                 elif self.state == 3:
                     self.process = getFrames(self.projectName)
-                    self.state += 1
+                    self.state += 2
+                    if self.renderCancelled:
+                        self.state -= 1
                     if not self.renderCancelled:
                         setRenderStatus("image", "Finishing...")
                     return{"PASS_THROUGH"}
 
-                elif self.state == 4:
-                    failedFramesString = ""
-                    if self.numFailedFrames > 0:
-                        failedFramesString = " (failed for " + str(self.numFailedFrames) + " frames)"
-                    if not self.renderCancelled:
-                        setRenderStatus("image", "Complete!")
-                        self.report({"INFO"}, "Render completed" + failedFramesString + "! View the rendered image in your UV/Image_Editor")
-                        appendViewable("image")
-                    else:
-                        # TODO: Fix functionality so it averages images even when process is cancelled before it gets there
-                        setRenderStatus("image", "Partial completetion")
-                        self.report({"INFO"}, "Render partially completed" + failedFramesString + " - Functionality not yet implemented to view rendered result")
-                        removeViewable("image")
+                # average the rendered frames (skipped unless render cancelled)
+                elif(self.state == 4):
+                    self.process = self.averageFrames(context.scene)
+                    self.state += 1
+                    return{'PASS_THROUGH'}
+
+                elif self.state == 5:
+                    framesString = ""
+                    numRenderedFiles = len([f for f in os.listdir(getRenderDumpFolder()) if "_seed-" in f])
+                    numSamples=self.sampleSize*numRenderedFiles
+                    setRenderStatus("image", "Complete!")
+                    self.report({"INFO"}, "Render completed at {numSamples} samples! View the rendered image in your UV/Image_Editor".format(numSamples=str(numSamples)))
+                    appendViewable("image")
+                    removeViewable("animation")
                     return{"FINISHED"}
                 else:
                     self.report({"ERROR"}, "ERROR: Current state not recognized.")
@@ -244,7 +230,7 @@ class sendFrame(Operator):
         #for testing purposes only (saves unsaved file as 'unsaved_file.blend')
         if self.projectName == "":
             self.projectName = "unsaved_file"
-            bpy.ops.wm.save_mainfile(filepath=scn.tempLocalDir + self.projectName + ".blend")
+            bpy.ops.wm.save_mainfile(filepath="{tempLocalDir}{projectName}.blend".format(tempLocalDir=scn.tempLocalDir, projectName=self.projectName))
 
         # ensure no other render processes are running
         runningStatus = ["Rendering...", "Preparing files..."]
@@ -255,20 +241,21 @@ class sendFrame(Operator):
         print("\nRunning sendFrame function...")
 
         # ensure the job won't break the script
-        jobValidityDict = jobIsValid("image", self.projectName)
-        if jobValidityDict["errorType"] != None:
-            self.report({jobValidityDict["errorType"]}, jobValidityDict["errorMessage"])
-        if not jobValidityDict["valid"]:
+        if not jobIsValid("image", self):
             return{"FINISHED"}
-        self.report({"INFO"}, "Rendering current frame on " + str(len(scn["availableServers"])) + " servers.")
 
-        # verify user input for tempFilePath string
+        # format user input for tempFilePath string
         scn.tempFilePath.replace(" ", "_")
-        if scn.tempFilePath[-1] != "/":
-            scn.tempFilePath = scn.tempFilePath + "/"
+        if not scn.tempFilePath.endswith("/"):
+            scn.tempFilePath += "/"
 
         # set the file extension for use with 'open image' button
         bpy.props.imExtension = bpy.context.scene.render.file_extension
+
+        # Store current sample size for use in computing render results
+        self.sampleSize = context.scene.cycles.samples
+        if context.scene.cycles.use_square_samples:
+            self.sampleSize = self.sampleSize**2
 
         # create timer for modal
         wm = context.window_manager
@@ -279,17 +266,19 @@ class sendFrame(Operator):
         self.stdout = None
         self.stderr = None
         self.renderCancelled = False
-        self.numFailedFrames = 0
+        self.numSuccessFrames = 0
         self.finishedFrames = 0
         self.curFrame = context.scene.frame_current
         self.process = copyProjectFile(self.projectName)
         self.state = 1  # initializes state for modal
-        if not bpy.props.needsUpdating:
-            self.state += 1
-        else:
+        if bpy.props.needsUpdating or bpy.props.lastTempFilePath != scn.tempFilePath:
             bpy.props.needsUpdating = False
+            bpy.props.lastTempFilePath = scn.tempFilePath
+        else:
+            self.state += 1
 
         setRenderStatus("image", "Preparing files...")
+        setRenderStatus("animation", "None")
 
         return{"RUNNING_MODAL"}
 
@@ -308,17 +297,15 @@ class sendAnimation(Operator):
         scn = context.scene
 
         if event.type in {"ESC"} and not self.renderCancelled:
+            print("Process cancelled")
+            setRenderStatus("animation", "Cancelled")
             if self.state == 3:
                 self.renderCancelled = True
                 self.process.kill()
                 self.report({"INFO"}, "Render process cancelled. Fetching frames...")
-                print("Process cancelled")
-                setRenderStatus("animation", "Cancelled")
             else:
                 self.cancel(context)
                 self.report({"INFO"}, "Render process cancelled")
-                print("Process cancelled")
-                setRenderStatus("animation", "Cancelled")
                 return{"CANCELLED"}
 
         if event.type == "TIMER":
@@ -328,44 +315,26 @@ class sendAnimation(Operator):
                 # handle unidentified errors
                 if self.process.returncode > 1:
                     if self.renderCancelled:
+                        setRenderStatus("animation", "Cancelled")
                         self.report({"INFO"}, "Process cancelled - No rendered frames found.")
                     else:
                         setRenderStatus("animation", "ERROR")
 
-                        # if error message available, print in Info window and define errorMessage string
-                        if self.process.stderr != None:
-                            errorMessage = "Error message available in terminal/Info window."
-                            for line in self.process.stderr.readlines():
-                                self.report({"WARNING"}, str(line, "utf-8").replace("\n", ""))
-                        else:
-                            errorMessage = "No error message to print."
-
                         # define self.errorSource string
                         if not self.state == 3:
-                            self.errorSource = "Process " + str(self.state-1)
+                            self.errorSource = "Process {state}".format(state=str(self.state-1))
                         else:
                             self.errorSource = "blender_task"
 
-                        self.report({"ERROR"}, self.errorSource + " gave return code " + str(self.process.returncode) + ". " + errorMessage)
+                        handleError(self, self.errorSource)
                     return{"FINISHED"}
 
                 # handle and report errors for 'blender_task' process
                 elif self.process.returncode == 1 and self.state == 3:
-                    if self.process.stderr:
-                        self.stderr = self.process.stderr.readlines()
-                        print("\nERRORS:")
-                        for line in self.stderr:
-                            line = line.decode("ASCII").replace("\\n", "")[:-1]
-                            self.report({"ERROR"}, "blender_task error: '" + line + "'")
-                            print("blender_task error: '" + line + "'")
-                            sys.stderr.write(line)
-                        errorMsg = self.stderr[-1].decode("ASCII")
-                        try:
-                            self.numFailedFrames = int(errorMsg[18:-5])
-                        except:
-                            sys.stderr.write("Couldn't read last line of process output as integer")
+                    handleBTError(self)
 
-                print("Process " + str(self.state) + " finished! (return code: " + str(self.process.returncode) + ")")
+                # if no errors, print process finished!
+                print("Process {curState} finished! (return code: {returnCode})".format(curState=str(self.state-1), returnCode=str(self.process.returncode)))
 
                 # copy files to host server
                 if self.state == 1:
@@ -375,17 +344,13 @@ class sendAnimation(Operator):
 
                 # start render process from the defined start and end frames
                 elif self.state == 2:
-                    if scn.frameRanges == "":
-                        self.frameRangesDict = {"string":"[[" + str(context.scene.frame_start) + "," + str(context.scene.frame_end) + "]]"}
-                    else:
-                        self.frameRangesDict = buildFrameRangesString(scn.frameRanges)
-                        if not self.frameRangesDict["valid"]:
-                            self.report({"ERROR"}, "ERROR: Invalid frame ranges given.")
-                            setRenderStatus("animation", "ERROR")
-                            return{"FINISHED"}
-                    expandedFrameRange = str(expandFrames(json.loads(self.frameRangesDict["string"])))
-                    self.process = renderFrames(expandedFrameRange, self.projectName, False)
-                    bpy.props.animFirstFrame = expandedFrameRange
+                    # initializes self.frameRangesDict (returns False if frame range invalid)
+                    if not setFrameRangesDict(self):
+                        setRenderStatus("animation", "ERROR")
+                        return{"FINISHED"}
+                    expandedFrameRange = expandFrames(json.loads(self.frameRangesDict["string"]))
+                    self.process = renderFrames(str(expandedFrameRange), self.projectName, False)
+                    bpy.props.animFrameRange = expandedFrameRange
                     setRenderStatus("animation", "Rendering...")
                     self.state += 1
                     return{"PASS_THROUGH"}
@@ -401,13 +366,13 @@ class sendAnimation(Operator):
                 elif self.state == 4:
                     failedFramesString = ""
                     if self.numFailedFrames > 0:
-                        failedFramesString = " (failed for " + str(self.numFailedFrames) + " frames)"
+                        failedFramesString = " (failed for {numFailedFrames} frames)".format(numFailedFrames=str(self.numFailedFrames))
                     missingFrames = listMissingFiles(self.projectName, self.frameRangesDict["string"])
                     if len(missingFrames) > 0:
                         self.report({"WARNING"}, "Missing Files: ")
                         self.report({"WARNING"}, missingFrames)
                     if not self.renderCancelled:
-                        self.report({"INFO"}, "Render completed" + failedFramesString + "! View the rendered animation in '//render/'")
+                        self.report({"INFO"}, "Render completed{failedFramesString}! View the rendered animation in '//render/'".format(failedFramesString=failedFramesString))
                         setRenderStatus("animation", "Complete!")
                     else:
                         self.report({"INFO"}, "Render partially completed - View rendered frames in '//render/'")
@@ -427,7 +392,7 @@ class sendAnimation(Operator):
         #for testing purposes only (saves unsaved file as 'unsaved_file.blend')
         if self.projectName == "":
             self.projectName = "unsaved_file"
-            bpy.ops.wm.save_mainfile(filepath=scn.tempLocalDir + self.projectName + ".blend")
+            bpy.ops.wm.save_mainfile(filepath="{tempLocalDir}{projectName}.blend".format(tempLocalDir=scn.tempLocalDir, projectName=self.projectName))
 
         # ensure no other render processes are running
         runningStatus = ["Rendering...", "Preparing files..."]
@@ -438,17 +403,13 @@ class sendAnimation(Operator):
         print("\nRunning sendAnimation function...")
 
         # ensure the job won't break the script
-        jobValidityDict = jobIsValid("animation", self.projectName)
-        if jobValidityDict["errorType"] != None:
-            self.report({jobValidityDict["errorType"]}, jobValidityDict["errorMessage"])
-        if not jobValidityDict["valid"]:
+        if not jobIsValid("animation", self):
             return{"FINISHED"}
-        self.report({"INFO"}, "Rendering animation on " + str(len(scn["availableServers"])) + " servers.")
 
-        # verify user input for tempFilePath string
+        # format user input for tempFilePath string
         scn.tempFilePath.replace(" ", "_")
-        if scn.tempFilePath[-1] != "/":
-            scn.tempFilePath = scn.tempFilePath + "/"
+        if not scn.tempFilePath.endswith("/"):
+            scn.tempFilePath += "/"
 
         # set the file extension for use with 'open animation' button
         bpy.props.animExtension = bpy.context.scene.render.file_extension
@@ -468,12 +429,14 @@ class sendAnimation(Operator):
         self.numFrames = str(int(scn.frame_end) - int(scn.frame_start))
         self.process = copyProjectFile(self.projectName)
         self.state = 1   # initializes state for modal
-        if not bpy.props.needsUpdating:
-            self.state += 1
-        else:
+        if bpy.props.needsUpdating or bpy.props.lastTempFilePath != scn.tempFilePath:
             bpy.props.needsUpdating = False
+            bpy.props.lastTempFilePath = scn.tempFilePath
+        else:
+            self.state += 1
 
         setRenderStatus("animation", "Preparing files...")
+        setRenderStatus("image", "None")
 
         return{"RUNNING_MODAL"}
 
@@ -508,16 +471,27 @@ class openRenderedAnimationInUI(Operator):
     def execute(self, context):
         self.frameRangesDict = buildFrameRangesString(context.scene.frameRanges)
         self.projectName = bpy.path.display_name_from_filepath(bpy.data.filepath)
-        self.firstFrame = bpy.props.animFirstFrame
 
-        # open rendered image
+        # change contexts
+        lastAreaType = context.area.type
         context.area.type = "CLIP_EDITOR"
-        image_sequence_filepath = "{dumpFolder}/".format(dumpFolder=os.path.join(bpy.path.abspath("//"), "render-dump"))
 
         # opens first frame of image sequence (blender imports full sequence)
-        image_filename = "{projectName}_{firstFrame}{extension}".format(projectName=self.projectName, firstFrame=self.firstFrame, extension=bpy.props.animExtension)
-        bpy.ops.clip.open(directory=image_sequence_filepath, files=[{"name":image_filename}])
-        bpy.ops.clip.reload()
+        openedFile = False
+        image_sequence_filepath = "{dumpFolder}/".format(dumpFolder=getRenderDumpFolder())
+        for frame in bpy.props.animFrameRange:
+            try:
+                image_filename = "{projectName}_{frame}{extension}".format(projectName=self.projectName, frame=str(frame).zfill(4), extension=bpy.props.animExtension)
+                bpy.ops.clip.open(directory=image_sequence_filepath, files=[{"name":image_filename}])
+                openedFile = True
+                break
+            except:
+                pass
+        if openedFile:
+            bpy.ops.clip.reload()
+        else:
+            context.area.type = lastAreaType
+            self.report({"ERROR"}, "Could not open rendered animation. View files in file browser in the following folder: '<project_folder>/render-dump'.")
 
         return{"FINISHED"}
 
@@ -534,69 +508,9 @@ class editRemoteServersDict(Operator):
             bpy.ops.text.open(filepath=os.path.join(libraryServersPath, "remoteServers.txt"))
             self.report({"INFO"}, "Opened 'remoteServers.txt'")
             bpy.props.requiredFileRead = True
+            bpy.props.needsUpdating = True
         except:
             self.report({"ERROR"}, "ERROR: Could not open 'remoteServers.txt'. If the problem persists, try reinstalling the add-on.")
-        return{"FINISHED"}
-
-class restartRemoteServers(Operator):
-    """Restart active remote servers group"""                                   # blender will use this as a tooltip for menu items and buttons.
-    bl_idname = "scene.restart_remote_servers"                                  # unique identifier for buttons and menu items to reference.
-    bl_label = "Restart Remote Servers"                                         # display name in the interface.
-    bl_options = {"REGISTER", "UNDO"}                                           # enable undo for the operator.
-
-    # def restartServers(self, scn):
-    #     # for security reasons, read password in from external file on local machine
-    #     f = open("/Users/cgear13/loginValue.txt", "r")
-    #     encodedPassword = f.readline()[:-1]
-    #
-    #     # decode password from 'loginValue.txt'
-    #     decodedPassword = ""
-    #     for i in range(len(encodedPassword)):
-    #         decodedPassword += chr(ord(encodedPassword[i])-2)
-    #
-    #     # build and execute curl command
-    #     if(scn.serverGroups == "All Servers"):
-    #         serversToRestart = "all"
-    #     else:
-    #         serversToRestart = "lab=" + scn.serverGroups
-    #     curlCommand = "curl --user cgearhar:" + decodedPassword + " -X GET -H 'Content-type: application/json' -H 'Accept: application/json' 'http://fog.cse.taylor.edu/lab-resource/restart?" + serversToRestart + "&os=linux&fork=" + str(len(bpy.props.servers[scn.serverGroups])) + "'"
-    #     sshCurlCommand = "ssh " + bpy.props.hostServerLogin + ":'" + curlCommand + "'"
-    #     process = subprocess.Popen(sshCurlCommand, stdout=subprocess.PIPE, shell=True)
-    #     return process
-    #
-    # def modal(self, context, event):
-    #     scn = context.scene
-    #
-    #     if event.type == 'TIMER':
-    #         self.process.poll()
-    #
-    #         if self.process.returncode != None and self.process.returncode > 1:
-    #             if self.process.stderr != None:
-    #                 errorMessage = "Error message available in terminal/Info window."
-    #                 for line in self.process.stderr.readlines():
-    #                     self.report({'WARNING'}, str(line, 'utf-8').replace("\n",""))
-    #             else:
-    #                 errorMessage = "No error message to print."
-    #             self.report({'ERROR'}, "Process " + str(self.state-1) + " gave return code " + str(self.process.returncode) + ". " + errorMessage)
-    #             return{'FINISHED'}
-    #         if self.process.returncode != None:
-    #             self.report({'INFO'}, "Remote servers have been restarted")
-    #             return{'FINISHED'}
-    #
-    #     return{'PASS_THROUGH'}
-
-    def execute(self, context):
-        # # create timer for modal
-        # wm = context.window_manager
-        # self._timer = wm.event_timer_add(0.1, context.window)
-        # wm.modal_handler_add(self)
-        #
-        # # start initial process
-        # self.process = self.restartServers(context.scene)
-        # self.state   = 1
-        # self.report({"INFO"}, "Restarting remote servers")
-        #
-        # return{"RUNNING_MODAL"}
         return{"FINISHED"}
 
 class listMissingFrames(Operator):
@@ -611,19 +525,17 @@ class listMissingFrames(Operator):
             self.fileName = scn.nameOutputFiles
         else:
             self.fileName = bpy.path.display_name_from_filepath(bpy.data.filepath)
-        bpy.props.needsUpdating = True
 
-        if scn.frameRanges == "":
-            self.frameRangesDict = {"string":"[[" + str(context.scene.frame_start) + "," + str(context.scene.frame_end) + "]]"}
-        else:
-            self.frameRangesDict = buildFrameRangesString(scn.frameRanges)
-            if not self.frameRangesDict["valid"]:
-                self.report({"ERROR"}, "ERROR: Invalid frame ranges given.")
-                return{"FINISHED"}
+        # initializes self.frameRangesDict (returns False if frame range invalid)
+        if not setFrameRangesDict(self):
+            return{"FINISHED"}
 
         # list all missing files from start frame to end frame in render-dump location
         missingFrames = listMissingFiles(self.fileName, self.frameRangesDict["string"])
-        self.report({"INFO"}, "Missing frames: " + missingFrames)
+        if len(missingFrames) > 0:
+            self.report({"INFO"}, "Missing frames: {missingFrames}".format(missingFrames=missingFrames))
+        else:
+            self.report({"INFO"}, "All frames accounted for!")
 
         return{"FINISHED"}
 
@@ -642,67 +554,11 @@ class setToMissingFrames(Operator):
         else:
             self.fileName = bpy.path.display_name_from_filepath(bpy.data.filepath)
 
-        if scn.frameRanges == "":
-            self.frameRangesDict = {"string":"[[" + str(context.scene.frame_start) + "," + str(context.scene.frame_end) + "]]"}
-        else:
-            self.frameRangesDict = buildFrameRangesString(scn.frameRanges)
-            if not self.frameRangesDict["valid"]:
-                self.report({"ERROR"}, "ERROR: Invalid frame ranges given.")
-                return{"FINISHED"}
+        # initializes self.frameRangesDict (returns False if frame range invalid)
+        if not setFrameRangesDict(self):
+            return{"FINISHED"}
 
         # list all missing files from start frame to end frame in render-dump location
         scn.frameRanges = listMissingFiles(self.fileName, self.frameRangesDict["string"])
 
         return{"FINISHED"}
-
-class setupHostServer(Operator):
-    """Prepare host server for refresh and render jobs"""                       # blender will use this as a tooltip for menu items and buttons.
-    bl_idname = "scene.setup_update_servers"                                    # unique identifier for buttons and menu items to reference.
-    bl_label = "Setup/Update Servers"                                           # display name in the interface.
-    bl_options = {"REGISTER", "UNDO"}                                           # enable undo for the operator.
-
-    def modal(self, context, event):
-        if event.type in {"ESC"}:
-            self.cancel(context)
-            self.report({"INFO"}, "Render process cancelled")
-            return{"CANCELLED"}
-
-        if event.type == "TIMER":
-            self.process.poll()
-
-            if self.process.returncode != 0 and self.process.returncode != None:
-
-                # if error message available, print in Info window and define errorMessage string
-                if self.process.stderr != None:
-                    errorMessage = "Error message available in terminal/Info window."
-                    for line in self.process.stderr.readlines():
-                        self.report({"WARNING"}, str(line, "utf-8").replace("\n", ""))
-                else:
-                    errorMessage = "No error message to print."
-
-                self.report({"ERROR"}, "Process " + str(self.state-1) + " gave return code " + str(self.process.returncode) + ". " + errorMessage)
-                return{"FINISHED"}
-
-            if self.process.returncode != None:
-                self.report({"INFO"}, "Preferences updated on host server!")
-                return{"FINISHED"}
-
-        return{"PASS_THROUGH"}
-
-    def execute(self, context):
-        print("\nRunning 'checkNumAvailServers' function...")
-
-        # create timer for modal
-        wm = context.window_manager
-        self._timer = wm.event_timer_add(0.1, context.window)
-        wm.modal_handler_add(self)
-
-        # start process
-        self.process = copyFiles()
-
-        return{"RUNNING_MODAL"}
-
-    def cancel(self, context):
-        wm = context.window_manager
-        wm.event_timer_remove(self._timer)
-        self.process.kill()

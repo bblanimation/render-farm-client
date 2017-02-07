@@ -50,7 +50,6 @@ def main():
     startTime = time.time()
     args = parser.parse_args()
     verbose = args.verbose
-    max_server_load = int(args.max_server_load)
 
     # Getting hosts from some source
     if args.hosts_file:
@@ -81,9 +80,6 @@ def main():
         if verbose >= 2: print("Hosts Offline: ")
         print(hosts_offline)
         sys.exit(0)
-    elif verbose >= 1:
-        print("hosts available: {numHostsOnline}".format(numHostsOnline=len(hosts_online)))
-
     # Print the start message
     elif verbose >= 1:
         pflush("Starting distribute task...")
@@ -92,6 +88,8 @@ def main():
     if len(hosts_online) == 0:
         sys.stderr.write("No hosts available.")
         sys.exit(58)
+    elif verbose >= 1:
+        print("hosts available: {numHostsOnline}".format(numHostsOnline=len(hosts_online)))
 
     # Set up 'projectRoot' as root path for project on host and client servers
     username = getpass.getuser()
@@ -135,7 +133,7 @@ def main():
         if args.contents:
             remoteResultsPath = os.path.join(remoteResultsPath, "*")
         elif not remoteResultsPath.endswith("/"):
-            remoteResultsPath = "{remoteResultsPath}/".format(remoteResultsPath=remoteResultsPath)
+            remoteResultsPath += "/"
 
     else:
         pflush("sorry, please give your project a name using the -n or --project_name flags.")
@@ -165,12 +163,8 @@ def main():
     if verbose >= 1:
         pflush("{numFrames} frames queued from project '{projectName}': {frameRange}".format(numFrames=str(len(frames)), frameRange=str(frames), projectName=projectName))
 
-    if args.average_results and len(frames) > 1:
-        signal.signal(signal.SIGINT, averageFrames(localResultsPath, projectName, verbose))
-        signal.signal(signal.SIGTERM, averageFrames(localResultsPath, projectName, verbose))
-
     # set up variables for threads
-    jobStrings = buildJobStrings(frames, projectName, projectPath, args.name_output_files, numHosts)
+    jobStrings = buildJobStrings(frames, projectName, projectPath, args.name_output_files, args.average_results, numHosts)
     job_args = {
         "projectName":      projectName,
         "projectPath":      projectPath,
@@ -182,52 +176,30 @@ def main():
         "progress":         args.progress
     }
 
-    # if max server load specified, uses JobHostManager class
-
-    # if max_server_load > 0:
     # Sets up kwargs, and callbacks on the hosts
-    jhm = JobHostManager(jobs=jobStrings, hosts=host_objects, function_args=job_args, verbose=verbose, max_on_hosts=max_server_load)
+    max_server_load = int(args.max_server_load)
+    jhm = JobHostManager(jobs=jobStrings, average_results=args.average_results, localResultsPath=localResultsPath, projectName=projectName, hosts=host_objects, function_args=job_args, verbose=verbose, max_on_hosts=max_server_load)
+    if args.average_results:
+        signal.signal(signal.SIGINT, jhm.average_frames_on_kill)
+        signal.signal(signal.SIGTERM, jhm.average_frames_on_kill)
     jhm.start()
     status = jhm.get_cumulative_status()
 
     if verbose >= 3:
         pflush("\nJob exit statuses:")
         jhm.print_jobs_status()
-    # # otherwise, start threads from this context to conserve time
-    # # TODO: Make JobHostManager more efficient so this else statement isn't necessary
-    # else:
-    #     rsync_threads = {}
-    #     for idx, jobString in enumerate(jobStrings):
-    #         # Get the job string at the index of this host and pass to the thread with other info
-    #         hostname = hosts_online[idx % (numHosts)]
-    #
-    #         if len(frames) == 1:
-    #             frame = frames[0]
-    #         else:
-    #             frame = frames[idx]
-    #
-    #         job_args["hostname"] = hostname
-    #         job_args["frame"] = frame
-    #         job_args["jobString"] = jobString
-    #
-    #         thread = threading.Thread(target=start_tasks, kwargs=job_args)
-    #         rsync_threads[hostname] = thread
-    #         thread.start()
-    #
-    #     # Blocks `til all threads are done
-    #     for hostname in rsync_threads.keys():
-    #         rsync_threads[hostname].join()
     if args.average_results:
         averageFrames(localResultsPath, projectName, verbose)
 
     # report on the success/failure of the tasks
     endTime = time.time()
+    jhm.stop()
     timer = stopWatch(endTime-startTime)
     if verbose >= 1:
         pflush("Elapsed time: {timer}".format(timer=timer))
         # TODO: Define failed earlier on... keep the strings the same to preserve render status
         failed = "?"
-        if(status==0):
+        if status == 0:
             pflush("Render completed successfully!")
         else:
             eflush("Render failed for {numFailed} jobs\n".format(numFailed=failed))

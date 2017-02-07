@@ -13,13 +13,13 @@ class renderOnServersPanel(Panel):
     bl_idname      = "VIEW3D_PT_tools_render_on_servers"
     bl_context     = "objectmode"
     bl_category    = "Render"
-    COMPAT_ENGINES = {'CYCLES'}
+    COMPAT_ENGINES = {"CYCLES"}
 
     def draw(self, context):
         layout = self.layout
         scn = context.scene
 
-        if scn.render.engine != 'CYCLES':
+        if scn.render.engine != "CYCLES":
             col = layout.column(align=True)
             row = col.row(align=True)
             row.label("Please switch to Cycles")
@@ -30,13 +30,13 @@ class renderOnServersPanel(Panel):
             # Available Servers Info
             col = layout.column(align=True)
             row = col.row(align=True)
-            availableServerString = 'Available Servers: ' + str(len(scn['availableServers'])) + " / " + str(len(scn['availableServers']) + len(scn['offlineServers']))
+            availableServerString = "Available Servers: {available} / {total}".format(available=str(len(scn["availableServers"])),total=str(len(scn["availableServers"]) + len(scn["offlineServers"])))
             row.operator("scene.refresh_num_available_servers", text=availableServerString, icon="FILE_REFRESH")
 
             # Render Buttons
             row = col.row(align=True)
-            row.alignment = 'EXPAND'
-            row.active = len(scn['availableServers']) > 0
+            row.alignment = "EXPAND"
+            row.active = len(scn["availableServers"]) > 0
             row.operator("scene.render_frame_on_servers", text="Render", icon="RENDER_STILL")
             row.operator("scene.render_animation_on_servers", text="Animation", icon="RENDER_ANIMATION")
             col = layout.column(align=True)
@@ -51,20 +51,14 @@ class renderOnServersPanel(Panel):
             row.prop(scn, "serverGroups")
 
             # Render Status Info
-            if(imRenderStatus != "None" and animRenderStatus != "None"):
+            if(imRenderStatus != "None"):
                 col = layout.column(align=True)
                 row = col.row(align=True)
-                row.label('Render Status (f): ' + imRenderStatus)
-                row = col.row(align=True)
-                row.label('Render Status (a):  ' + animRenderStatus)
-            elif(imRenderStatus != "None"):
-                col = layout.column(align=True)
-                row = col.row(align=True)
-                row.label('Render Status: ' + imRenderStatus)
+                row.label("Render Status: {imRenderStatus}".format(imRenderStatus=imRenderStatus))
             elif(animRenderStatus != "None"):
                 col = layout.column(align=True)
                 row = col.row(align=True)
-                row.label('Render Status: ' + animRenderStatus)
+                row.label("Render Status: {animRenderStatus}".format(animRenderStatus=animRenderStatus))
 
 
             # display buttons to view render(s)
@@ -78,17 +72,17 @@ def menu_draw(self, context):
     layout = self.layout
     scn = context.scene
 
-    if scn.render.engine == 'CYCLES' and not scn.cycles.progressive == 'BRANCHED_PATH':
+    if scn.render.engine == "CYCLES" and not scn.cycles.progressive == "BRANCHED_PATH":
         # Basic Render Samples Info
         col = layout.column(align=True)
         row = col.row(align=True)
         sampleSize = scn.cycles.samples
-        if(scn.cycles.use_square_samples):
+        if scn.cycles.use_square_samples:
             sampleSize = sampleSize**2
         if sampleSize < 10:
-            row.label('Too few samples')
+            row.label("Too few samples")
         else:
-            row.label("Samples on Servers: " + str(math.floor(sampleSize*len(scn['availableServers']))))
+            row.label("Samples on Servers: {numSamples}".format(numSamples=str(math.floor(sampleSize*len(scn["availableServers"])))))
 
 bpy.types.CyclesRender_PT_sampling.append(menu_draw)
 
@@ -99,13 +93,13 @@ class frameRangePanel(Panel):
     bl_idname      = "VIEW3D_PT_frame_range"
     bl_context     = "objectmode"
     bl_category    = "Render"
-    COMPAT_ENGINES = {'CYCLES'}
+    COMPAT_ENGINES = {"CYCLES"}
 
     def draw(self, context):
         layout = self.layout
         scn = context.scene
 
-        if scn.render.engine == 'CYCLES':
+        if scn.render.engine == "CYCLES":
             col = layout.column(align=True)
             row = col.row(align=True)
             row.prop(scn, "frameRanges")
@@ -123,22 +117,21 @@ class serversPanel(Panel):
     bl_idname      = "VIEW3D_PT_servers"
     bl_context     = "objectmode"
     bl_category    = "Render"
-    bl_options     = {'DEFAULT_CLOSED'}
-    COMPAT_ENGINES = {'CYCLES'}
+    # bl_options     = {"DEFAULT_CLOSED"}
+    COMPAT_ENGINES = {"CYCLES"}
 
     def draw(self, context):
         layout = self.layout
         scn = context.scene
 
-        if scn.render.engine == 'CYCLES':
+        if scn.render.engine == "CYCLES":
             col = layout.column(align=True)
             row = col.row(align=True)
             row.operator("scene.edit_servers_dict", text="Edit Remote Servers", icon="TEXT")
-            # row = col.row(align=True)
-            # row.operator("scene.restart_remote_servers", text="Restart Remote Servers", icon="FILE_REFRESH")
 
             col = layout.column(align=True)
             row = col.row(align=True)
+
             box = row.box()
             box.prop(scn, "showAdvanced")
             if scn.showAdvanced:
@@ -149,13 +142,10 @@ class serversPanel(Panel):
 
                 layout.separator()
 
-                col = box.column()
-                col.prop(scn, "unpack")
-
-                col = box.column()
+                col = box.column(align=True)
                 col.label(text="Performance:")
                 col.prop(scn, "maxServerLoad")
-                col.prop(scn, "connectionTimeout")
+                col.prop(scn, "timeout")
                 # The following is probably unnecessary
                 # col = box.row(align=True)
                 # col.prop(scn, "tempLocalDir")

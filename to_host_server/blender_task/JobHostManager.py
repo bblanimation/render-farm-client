@@ -1,11 +1,13 @@
 #!/usr/bin/env python
 
 from JobHost import *
+from supporting_methods import averageFrames
+import signal
 
 class JobHostManager():
     """ Manages and distributes jobs for all available hosts """
 
-    def __init__(self, jobs=None, hosts=None, max_on_hosts=1, verbose=0, function_args=None):
+    def __init__(self, average_results=False, localResultsPath=None, projectName=None, jobs=None, hosts=None, max_on_hosts=1, verbose=0, function_args=None):
         self.jobs               = jobs
         self.original_jobs      = list(jobs)
         self.function_args      = function_args
@@ -14,19 +16,33 @@ class JobHostManager():
         if not hosts: self.hosts = dict()
         else: self.add_hosts(hosts)
 
+        # set up for use in 'average_fames_on_kill()'
+        self.localResultsPath = localResultsPath
+        self.projectName = projectName
+        self.average_results = average_results
+
         self.hosts_with_jobs = dict()
         self.job_status      = dict()
         self.errors          = list()
         self.verbose         = verbose
         self.max_on_hosts    = max_on_hosts
+        self.stop_now        = False
         if self.jobs:
             self.process_jobs()
 
     def start(self):
         self.process_jobs()
 
+    def average_frames_on_kill(self):
+        if self.verbose >= 1:
+            print("Kill signal caught by 'average_frames_on_kill'")
+        averageFrames(self.localResultsPath, self.projectName, self.verbose)
+
     # This blocks
     def process_jobs(self):
+        if self.average_results:
+            signal.signal(signal.SIGINT, self.average_frames_on_kill)
+            signal.signal(signal.SIGTERM, self.average_frames_on_kill)
         jobAccepted = False
         while True: # maybe set a flag here if I ever decide to make this a thread
             for aHost in self.hosts.keys():
@@ -43,9 +59,9 @@ class JobHostManager():
                         host.start()
                     numQueued = str(len(self.jobs))
                     pflush("Job sent to host '{hostname}' ({numQueued} jobs remain in queue)".format(hostname=hostname, numQueued=numQueued))
-                if self.jobs_complete():
+                if self.jobs_complete() or self.stop_now:
                     break
-            if self.jobs_complete():
+            if self.jobs_complete() or self.stop_now:
                 break
         for hostname in self.hosts_with_jobs.keys():
             tHost = self.hosts[hostname]
@@ -93,7 +109,6 @@ class JobHostManager():
 
     def host_failed_job(self, hostname, job):
         error_string = "Failed Job on {hostname}: {job}".format(hostname=hostname, job=job)
-
         eflush(error_string)
 
         if self.verbose >= 3:
@@ -123,6 +138,9 @@ class JobHostManager():
                 print(self.get_cumulative_status())
         else:
             print("Jobs not yet completed.")
+
+    def stop(self):
+        self.stop_now = True
 
     def __str__(self):
         acc = ''
