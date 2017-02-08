@@ -51,15 +51,14 @@ class renderOnServersPanel(Panel):
             row.prop(scn, "serverGroups")
 
             # Render Status Info
-            if(imRenderStatus != "None"):
+            if imRenderStatus != "None":
                 col = layout.column(align=True)
                 row = col.row(align=True)
                 row.label("Render Status: {imRenderStatus}".format(imRenderStatus=imRenderStatus))
-            elif(animRenderStatus != "None"):
+            elif animRenderStatus != "None":
                 col = layout.column(align=True)
                 row = col.row(align=True)
                 row.label("Render Status: {animRenderStatus}".format(animRenderStatus=animRenderStatus))
-
 
             # display buttons to view render(s)
             row = layout.row(align=True)
@@ -146,6 +145,7 @@ class serversPanel(Panel):
                 col.label(text="Performance:")
                 col.prop(scn, "maxServerLoad")
                 col.prop(scn, "timeout")
+                col.prop(scn, "maxSamples")
                 # The following is probably unnecessary
                 # col = box.row(align=True)
                 # col.prop(scn, "tempLocalDir")

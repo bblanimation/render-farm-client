@@ -22,13 +22,13 @@ def averageFrames(renderedFramesPath, projectName, verbose=0):
 
     # get image files to average from 'renderedFramesPath'
     allFiles = os.listdir(renderedFramesPath)
-    supportedFileTypes = ["png", "tga", "tif", "jpg", "jp2", "bmp", "cin", "dpx", "exr", "hdr", "rgb"]
+    supportedFileTypes = ["png", "tga", "tif", "jpg", "jp2", "bmp"]
     imList = [filename for filename in allFiles if (filename[-3:] in supportedFileTypes and filename[-11:-4] != "average" and "_seed-" in filename)]
     imList = [os.path.join(renderedFramesPath, im) for im in imList]
-    extension = imList[0][-3:]
     if not imList:
         sys.stderr.write("No valid image files to average.")
         sys.exit(1)
+    extension = imList[0][-3:]
 
     # Assuming all images are the same size, get dimensions of first image
     imRef = Image.open(imList[0])

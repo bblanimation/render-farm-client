@@ -136,11 +136,14 @@ def buildJobString(projectPath, projectName, nameOutputFiles, frame, seedString=
     builtString = "blender -b {projectPath}/{projectName}.blend -x 1 -o //results/{nameOutputFiles}{seedString}_####.png -s {frame} -e {frame} -P {projectPath}/blender_p.py -a".format(projectPath=projectPath, projectName=projectName, nameOutputFiles=nameOutputFiles, seedString=seedString, frame=str(frame))
     return builtString
 
-def buildJobStrings(frames, projectName, projectPath, nameOutputFiles, averageResults=False, servers=1): # jobList is a list of lists containing start and end values
+def buildJobStrings(frames, projectName, projectPath, nameOutputFiles, jobsPerFrame=False, averageResults=False, servers=1): # jobList is a list of lists containing start and end values
     """ Helper function to build Blender job strings to be sent to client servers """
 
     jobStrings = []
-    jobsPerFrame = servers/len(frames)
+    if not jobsPerFrame:
+        jobsPerFrame = servers/len(frames)
+    else:
+        jobsPerFrame = int(jobsPerFrame)
     if averageResults and jobsPerFrame > 1:
         tmpInt = 0
         for i in range(jobsPerFrame):
@@ -242,10 +245,10 @@ def averageFrames(renderedFramesPath, projectName, verbose=0):
     supportedFileTypes = ["png", "tga", "tif", "jpg", "jp2", "bmp", "cin", "dpx", "exr", "hdr", "rgb"]
     imList = [filename for filename in allFiles if (filename[-3:] in supportedFileTypes and filename[-11:-4] != "average" and "_seed-" in filename)]
     imList = [os.path.join(renderedFramesPath, im) for im in imList]
-    extension = imList[0][-3:]
     if not imList:
         sys.stderr.write("No valid image files to average.")
         sys.exit(1)
+    extension = imList[0][-3:]
 
     # Assuming all images are the same size, get dimensions of first image
     imRef = Image.open(imList[0])

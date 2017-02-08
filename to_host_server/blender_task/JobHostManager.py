@@ -17,8 +17,8 @@ class JobHostManager():
         else: self.add_hosts(hosts)
 
         # set up for use in 'average_fames_on_kill()'
-        self.localResultsPath = localResultsPath
-        self.projectName = projectName
+        # self.localResultsPath = localResultsPath
+        # self.projectName = projectName
         self.average_results = average_results
 
         self.hosts_with_jobs = dict()
@@ -33,16 +33,16 @@ class JobHostManager():
     def start(self):
         self.process_jobs()
 
-    def average_frames_on_kill(self):
-        if self.verbose >= 1:
-            print("Kill signal caught by 'average_frames_on_kill'")
-        averageFrames(self.localResultsPath, self.projectName, self.verbose)
+    # def average_frames_on_kill(self):
+    #     if self.verbose >= 1:
+    #         print("Kill signal caught by 'average_frames_on_kill'")
+    #     averageFrames(self.localResultsPath, self.projectName, self.verbose)
 
     # This blocks
     def process_jobs(self):
-        if self.average_results:
-            signal.signal(signal.SIGINT, self.average_frames_on_kill)
-            signal.signal(signal.SIGTERM, self.average_frames_on_kill)
+        # if self.average_results:
+        #     signal.signal(signal.SIGINT, self.average_frames_on_kill)
+        #     signal.signal(signal.SIGTERM, self.average_frames_on_kill)
         jobAccepted = False
         while True: # maybe set a flag here if I ever decide to make this a thread
             for aHost in self.hosts.keys():

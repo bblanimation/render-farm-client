@@ -3,9 +3,9 @@
 bl_info = {
     "name"        : "Server Farm Client",
     "author"      : "Christopher Gearhart <chris@bblanimation.com>",
-    "version"     : (0, 7, 2),
+    "version"     : (0, 7, 3),
     "blender"     : (2, 78, 0),
-    "description" : "Render your scene on a remote server farm with this addon.",
+    "description" : "Render your scene on a custom server farm with this addon.",
     "location"    : "View3D > Tools > Render",
     "warning"     : "Relatively stable but still work in progress",
     "wiki_url"    : "",
@@ -65,6 +65,12 @@ def register():
         description="Maximum number of frames to be handled at once by each server",
         min=1, max=8,
         default=1)
+
+    bpy.types.Scene.maxSamples = IntProperty(
+        name="Max Samples",
+        description="Maximum number of samples to render when rendering current frame",
+        min=100, max=2000,
+        default=1000)
 
     bpy.types.Scene.timeout = FloatProperty(
         name="Timeout",

@@ -13,7 +13,7 @@ Scripts and associated files for rendering from Blender files on CSE remote serv
   * For documentation
       * Let them know that all external files are packed into the .blend
   * Required python modules:
-      * bpy, subprocess, telnetlib, sys, os, numpy, time, json, math
+      * bpy, subprocess, telnetlib, sys, io os, numpy, time, json, math, fnmatch
   * Required local packages:
       * rsync, curl
   * Required packages on host server:
@@ -22,7 +22,6 @@ Scripts and associated files for rendering from Blender files on CSE remote serv
       * blender
 
 ## Server-side improvements to be made:
-* Give user some sort of status for the render (e.g. 5% done)
 * Optimize default render settings
 * Re-render failed frames automatically
 * Detect when SSH keys have not been set up

@@ -12,6 +12,7 @@ import json
 import re
 import fnmatch
 import shlex
+import math
 import json
 import signal
 from JobHost import *
@@ -28,6 +29,7 @@ parser.add_argument("-H", "--hosts_online", action="store_true", default=None, h
 parser.add_argument("-i", "--hosts_file", action="store", default="remoteServers.txt", help="Pass a filename from which to load hosts. Should be valid json format.")
 parser.add_argument("-m", "--max_server_load", action="store", default=1, help="Max render processes to run on each server at a time.")
 parser.add_argument("-a", "--average_results", action="store_true", default=None, help="Average frames when finished.")
+parser.add_argument("-j", "--jobs_per_frame", action="store", default=False, help="Number of jobs to queue for each frame")
 parser.add_argument("-t", "--connection_timeout", action="store", default=.01, help="Pass a float for the timeout in seconds for telnet connections to client servers.")
 # NOTE: this parameter is currently required
 parser.add_argument("-n", "--project_name", action="store", default=False) # just project name. default path will be in /tmp/blenderProjects
@@ -164,7 +166,7 @@ def main():
         pflush("{numFrames} frames queued from project '{projectName}': {frameRange}".format(numFrames=str(len(frames)), frameRange=str(frames), projectName=projectName))
 
     # set up variables for threads
-    jobStrings = buildJobStrings(frames, projectName, projectPath, args.name_output_files, args.average_results, numHosts)
+    jobStrings = buildJobStrings(frames, projectName, projectPath, args.name_output_files, int(args.jobs_per_frame), args.average_results, numHosts)
     job_args = {
         "projectName":      projectName,
         "projectPath":      projectPath,
@@ -179,9 +181,10 @@ def main():
     # Sets up kwargs, and callbacks on the hosts
     max_server_load = int(args.max_server_load)
     jhm = JobHostManager(jobs=jobStrings, average_results=args.average_results, localResultsPath=localResultsPath, projectName=projectName, hosts=host_objects, function_args=job_args, verbose=verbose, max_on_hosts=max_server_load)
-    if args.average_results:
-        signal.signal(signal.SIGINT, jhm.average_frames_on_kill)
-        signal.signal(signal.SIGTERM, jhm.average_frames_on_kill)
+    # if args.average_results:
+    #     signal.signal(signal.SIGINT, jhm.average_frames_on_kill)
+    #     signal.signal(signal.SIGTERM, jhm.average_frames_on_kill)
+    #     signal.signal(signal.SIGKILL, jhm.average_frames_on_kill)
     jhm.start()
     status = jhm.get_cumulative_status()
 
