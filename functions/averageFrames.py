@@ -5,15 +5,15 @@ from PIL import Image
 from VerboseAction import verbose_action
 
 parser = argparse.ArgumentParser()
-parser.add_argument("-p", "--path_to_images", help="Full path to Blender project file", action="store")
-parser.add_argument("-n", "--project_name", help="Name of Blender project file", action="store")
+parser.add_argument("-p", "--path_to_images", action="store", help="Full path to Blender project file")
+parser.add_argument("-n", "--project_name", action="store", help="Name of Blender project file")
 parser.add_argument("-v", "--verbose", action=verbose_action, nargs="?", default=0)
 args = parser.parse_args()
 
 def averageFrames(renderedFramesPath, projectName, verbose=0):
     """ Averages each pixel from all final rendered images to present one render result """
 
-    if verbose >= 3:
+    if verbose >= 1:
         print("Averaging images...")
 
     # ensure 'renderedFramesPath' has trailing "/"
@@ -23,7 +23,7 @@ def averageFrames(renderedFramesPath, projectName, verbose=0):
     # get image files to average from 'renderedFramesPath'
     allFiles = os.listdir(renderedFramesPath)
     supportedFileTypes = ["png", "tga", "tif", "jpg", "jp2", "bmp"]
-    imList = [filename for filename in allFiles if (filename[-3:] in supportedFileTypes and filename[-11:-4] != "average" and "_seed-" in filename)]
+    imList = [filename for filename in allFiles if (filename[-3:] in supportedFileTypes and filename[-11:-3] != "average." and "_seed-" in filename)]
     imList = [os.path.join(renderedFramesPath, im) for im in imList]
     if not imList:
         sys.stderr.write("No valid image files to average.")
@@ -48,11 +48,11 @@ def averageFrames(renderedFramesPath, projectName, verbose=0):
         sys.exit(1)
 
     # Build up average pixel intensities, casting each image as an array of floats
-    if verbose >= 3:
+    if verbose >= 2:
         print("Averaging the following images:")
     for im in imList:
         # load image
-        if verbose >= 3:
+        if verbose >= 2:
             print(im)
         imarr = numpy.array(Image.open(im), dtype=numpy.float)
         arr = arr+imarr/N
@@ -61,13 +61,13 @@ def averageFrames(renderedFramesPath, projectName, verbose=0):
     arr = numpy.array(numpy.round(arr), dtype=numpy.uint8)
 
     # Print details
-    if verbose >= 2:
+    if verbose >= 1:
         print("Averaged successfully!")
 
     # Generate, save and preview final image
     out = Image.fromarray(arr, mode=mode)
-    if verbose >= 3:
-        pflush("saving averaged image...")
+    if verbose >= 2:
+        print("saving averaged image...")
     out.save(os.path.join(renderedFramesPath, "{projectName}_average.{extension}".format(extension=extension, projectName=projectName)))
 
 def main():

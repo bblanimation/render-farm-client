@@ -7,8 +7,6 @@ import shlex
 import subprocess
 import re
 import numpy
-import PIL
-from PIL import Image
 
 def pflush(string):
     """ Helper function that prints and flushes a string """
@@ -136,7 +134,7 @@ def buildJobString(projectPath, projectName, nameOutputFiles, frame, seedString=
     builtString = "blender -b {projectPath}/{projectName}.blend -x 1 -o //results/{nameOutputFiles}{seedString}_####.png -s {frame} -e {frame} -P {projectPath}/blender_p.py -a".format(projectPath=projectPath, projectName=projectName, nameOutputFiles=nameOutputFiles, seedString=seedString, frame=str(frame))
     return builtString
 
-def buildJobStrings(frames, projectName, projectPath, nameOutputFiles, jobsPerFrame=False, averageResults=False, servers=1): # jobList is a list of lists containing start and end values
+def buildJobStrings(frames, projectName, projectPath, nameOutputFiles, jobsPerFrame=False, servers=1): # jobList is a list of lists containing start and end values
     """ Helper function to build Blender job strings to be sent to client servers """
 
     jobStrings = []
@@ -144,7 +142,7 @@ def buildJobStrings(frames, projectName, projectPath, nameOutputFiles, jobsPerFr
         jobsPerFrame = servers/len(frames)
     else:
         jobsPerFrame = int(jobsPerFrame)
-    if averageResults and jobsPerFrame > 1:
+    if jobsPerFrame > 1:
         tmpInt = 0
         for i in range(jobsPerFrame):
             for frame in frames:
@@ -227,65 +225,62 @@ def stopWatch(value):
 
     return "{Days};{Hours}:{Minutes};{Seconds}".format(Days=Days, Hours=Hours, Minutes=Minutes, Seconds=Seconds)
 
-def averageFramesOnKill(*args):
-    averageFrames(renderedFramesPath, projectName, verbose)
-
-def averageFrames(renderedFramesPath, projectName, verbose=0):
-    """ Averages each pixel from all final rendered images to present one render result """
-
-    if verbose >= 3:
-        print("Averaging images...")
-
-    # ensure 'renderedFramesPath' has trailing "/"
-    if not renderedFramesPath.endswith("/"):
-        renderedFramesPath += "/"
-
-    # get image files to average from 'renderedFramesPath'
-    allFiles = os.listdir(renderedFramesPath)
-    supportedFileTypes = ["png", "tga", "tif", "jpg", "jp2", "bmp", "cin", "dpx", "exr", "hdr", "rgb"]
-    imList = [filename for filename in allFiles if (filename[-3:] in supportedFileTypes and filename[-11:-4] != "average" and "_seed-" in filename)]
-    imList = [os.path.join(renderedFramesPath, im) for im in imList]
-    if not imList:
-        sys.stderr.write("No valid image files to average.")
-        sys.exit(1)
-    extension = imList[0][-3:]
-
-    # Assuming all images are the same size, get dimensions of first image
-    imRef = Image.open(imList[0])
-    w, h = imRef.size
-    mode = imRef.mode
-    N = len(imList)
-
-    # Create a numpy array of floats to store the average
-    if mode == "RGB":
-        arr = numpy.zeros((h, w, 3), numpy.float)
-    elif mode == "RGBA":
-        arr = numpy.zeros((h, w, 4), numpy.float)
-    elif mode == "L":
-        arr = numpy.zeros((h, w), numpy.float)
-    else:
-        sys.stderr.write("Unsupported image type. Supported types: ['RGB', 'RGBA', 'BW']")
-        sys.exit(1)
-
-    # Build up average pixel intensities, casting each image as an array of floats
-    if verbose >= 3:
-        print("Averaging the following images:")
-    for im in imList:
-        # load image
-        if verbose >= 3:
-            print(im)
-        imarr = numpy.array(Image.open(im), dtype=numpy.float)
-        arr = arr+imarr/N
-
-    # Round values in array and cast as 8-bit integer
-    arr = numpy.array(numpy.round(arr), dtype=numpy.uint8)
-
-    # Print details
-    if verbose >= 2:
-        print("Averaged successfully!")
-
-    # Generate, save and preview final image
-    out = Image.fromarray(arr, mode=mode)
-    if verbose >= 3:
-        pflush("saving averaged image...")
-    out.save(os.path.join(renderedFramesPath, "{projectName}_average.{extension}".format(extension=extension, projectName=projectName)))
+# def averageFrames(renderedFramesPath, projectName, verbose=0):
+#     """ Averages each pixel from all final rendered images to present one render result """
+#
+#     if verbose >= 3:
+#         print("Averaging images...")
+#
+#     # ensure 'renderedFramesPath' has trailing "/"
+#     if not renderedFramesPath.endswith("/"):
+#         renderedFramesPath += "/"
+#
+#     # get image files to average from 'renderedFramesPath'
+#     allFiles = os.listdir(renderedFramesPath)
+#     supportedFileTypes = ["png", "tga", "tif", "jpg", "jp2", "bmp", "cin", "dpx", "exr", "hdr", "rgb"]
+#     imList = [filename for filename in allFiles if (filename[-3:] in supportedFileTypes and filename[-11:-4] != "average" and "_seed-" in filename)]
+#     imList = [os.path.join(renderedFramesPath, im) for im in imList]
+#     if not imList:
+#         sys.stderr.write("No valid image files to average.")
+#         sys.exit(1)
+#     extension = imList[0][-3:]
+#
+#     # Assuming all images are the same size, get dimensions of first image
+#     imRef = Image.open(imList[0])
+#     w, h = imRef.size
+#     mode = imRef.mode
+#     N = len(imList)
+#
+#     # Create a numpy array of floats to store the average
+#     if mode == "RGB":
+#         arr = numpy.zeros((h, w, 3), numpy.float)
+#     elif mode == "RGBA":
+#         arr = numpy.zeros((h, w, 4), numpy.float)
+#     elif mode == "L":
+#         arr = numpy.zeros((h, w), numpy.float)
+#     else:
+#         sys.stderr.write("Unsupported image type. Supported types: ['RGB', 'RGBA', 'BW']")
+#         sys.exit(1)
+#
+#     # Build up average pixel intensities, casting each image as an array of floats
+#     if verbose >= 3:
+#         print("Averaging the following images:")
+#     for im in imList:
+#         # load image
+#         if verbose >= 3:
+#             print(im)
+#         imarr = numpy.array(Image.open(im), dtype=numpy.float)
+#         arr = arr+imarr/N
+#
+#     # Round values in array and cast as 8-bit integer
+#     arr = numpy.array(numpy.round(arr), dtype=numpy.uint8)
+#
+#     # Print details
+#     if verbose >= 2:
+#         print("Averaged successfully!")
+#
+#     # Generate, save and preview final image
+#     out = Image.fromarray(arr, mode=mode)
+#     if verbose >= 3:
+#         pflush("saving averaged image...")
+#     out.save(os.path.join(renderedFramesPath, "{projectName}_average.{extension}".format(extension=extension, projectName=projectName)))

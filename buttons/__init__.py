@@ -55,7 +55,7 @@ class refreshNumAvailableServers(Operator):
 
             # if process finished and no errors
             if self.process.returncode != None:
-                print("Process {curState} finished! (return code: {returnCode})".format(curState=str(self.state-1), returnCode=str(self.process.returncode)))
+                # print("Process {curState} finished! (return code: {returnCode})".format(curState=str(self.state-1), returnCode=str(self.process.returncode)))
 
                 # check the number of available servers through the host
                 if self.state == 1:
@@ -119,7 +119,7 @@ class sendFrame(Operator):
             self.nameOutputFiles = scn.nameOutputFiles
         else:
             self.nameOutputFiles = self.projectName
-        runScriptCommand = "python " + averageScriptPath.replace(" ", "\\ ") + " -v -p " + getRenderDumpFolder() + " -n " + self.nameOutputFiles
+        runScriptCommand = "python {averageScriptPath} -p {renderDumpFolder} -n {nameOutputFiles}".format(averageScriptPath=averageScriptPath.replace(" ", "\\ "), renderDumpFolder=getRenderDumpFolder(), nameOutputFiles=self.nameOutputFiles)
         process = subprocess.Popen(runScriptCommand, shell=True)
         return process
 
@@ -133,7 +133,7 @@ class sendFrame(Operator):
 
         if event.type in {"ESC"} and event.value == "PRESS":
             print("Process cancelled")
-            setRenderStatus("image", "Cancelled")
+            setRenderStatus("image", "Finishing")
             if self.state[0] == 3:
                 self.renderCancelled = True
                 self.processes[0].kill()
@@ -159,11 +159,11 @@ class sendFrame(Operator):
                     # handle rsync error of no output files found on server
                     if self.state[i] in [4, 5] and self.processes[i].returncode == 23:
                         if i == 1 and not self.previewed:
-                            self.report({"INFO"}, "No render files found - try again in a moment")
+                            self.report({"WARNING"}, "No render files found - try again in a moment")
                             self.processes[1] = False
                             self.state[1] = -1
                             break
-                        elif self.renderCancelled:
+                        elif self.renderCancelled and not self.previewed:
                             self.report({"INFO"}, "Process cancelled - No output images found on host server")
                             return{"FINISHED"}
                         elif not self.previewed:
@@ -189,7 +189,7 @@ class sendFrame(Operator):
                         handleBTError(self, i)
 
                     # if no errors, print process finished!
-                    print("Process {curState} finished! (return code: {returnCode})".format(curState=str(self.state[i]-1), returnCode=str(self.processes[i].returncode)))
+                    # print("Process {curState} finished! (return code: {returnCode})".format(curState=str(self.state[i]-1), returnCode=str(self.processes[i].returncode)))
 
                     # copy files to host server
                     if self.state[i] == 1:
@@ -204,7 +204,7 @@ class sendFrame(Operator):
                             self.report({"ERROR"}, "Max Samples / Samples > 100. Try increasing samples or lowering max samples.")
                             setRenderStatus("image", "ERROR")
                             return{"CANCELLED"}
-                        self.processes[i] = renderFrames(str([self.curFrame]), self.projectName, jobsPerFrame, True)
+                        self.processes[i] = renderFrames(str([self.curFrame]), self.projectName, jobsPerFrame)
                         self.state[i] += 1
                         setRenderStatus("image", "Rendering...")
                         return{"PASS_THROUGH"}
@@ -213,25 +213,27 @@ class sendFrame(Operator):
                     elif self.state[i] == 3:
                         if self.processes[1] and self.processes[1].returncode == None:
                             self.processes[1].kill()
-                        self.state[0] += 2
-                        if self.renderCancelled:
-                            self.state[0] -= 1
+                        self.state[i] += 1
                         self.processes[0] = getFrames(self.projectName, not self.previewed)
                         if not self.renderCancelled:
                             setRenderStatus("image", "Finishing...")
                         return{"PASS_THROUGH"}
 
-                    # average the rendered frames (skipped unless render cancelled)
+                    # average the rendered frames if there are new frames to average
                     elif self.state[i] == 4:
-                        self.processes[i] = self.averageFrames(scn)
+                        # only average if there are new frames to average
+                        numLastRenderedFiles = self.numRenderedFiles
+                        self.numRenderedFiles = getNumRenderedFiles("image")
+                        if numLastRenderedFiles != self.numRenderedFiles:
+                            self.processes[i] = self.averageFrames(scn)
                         self.state[i] += 1
                         return{'PASS_THROUGH'}
 
                     elif self.state[i] == 5:
-                        numSamples=self.sampleSize*getNumRenderedFiles("image")
+                        self.numSamples = self.sampleSize * getNumRenderedFiles("image")
                         if i == 0:
                             setRenderStatus("image", "Complete!")
-                            self.report({"INFO"}, "Render completed at {numSamples} samples! View the rendered image in your UV/Image_Editor".format(numSamples=str(numSamples)))
+                            self.report({"INFO"}, "Render completed at {numSamples} samples! View the rendered image in your UV/Image_Editor".format(numSamples=str(self.numSamples)))
                         else:
                             # open preview image in UV/Image_Editor
                             context.area.type = "IMAGE_EDITOR"
@@ -240,7 +242,9 @@ class sendFrame(Operator):
                             bpy.ops.image.reload()
                             self.processes[1] = False
                             self.previewed = True
-                            self.report({"INFO"}, "Render preview loaded ({numSamples} samples)".format(numSamples=str(numSamples)))
+                            previewString = "Render preview loaded ({numSamples} samples)".format(numSamples=str(self.numSamples))
+                            self.report({"INFO"}, previewString)
+                            print(previewString)
                         appendViewable("image")
                         removeViewable("animation")
                         if i == 0:
@@ -304,6 +308,8 @@ class sendFrame(Operator):
         self.numSuccessFrames = 0
         self.finishedFrames = 0
         self.previewed = False
+        self.numSamples = 0
+        self.numRenderedFiles = 0
         self.curFrame = scn.frame_current
         self.processes = [copyProjectFile(self.projectName), False]
         self.state = [1, 0]  # initializes state for modal
@@ -367,11 +373,11 @@ class sendAnimation(Operator):
                     # handle rsync error of no output files found on server
                     if self.state[i] in [4, 5] and self.processes[i].returncode == 23:
                         if i == 1 and not self.statusChecked:
-                            self.report({"INFO"}, "No render files found - try again in a moment")
+                            self.report({"WARNING"}, "No render files found - try again in a moment")
                             self.processes[1] = False
                             self.state[1] = -1
                             break
-                        elif self.renderCancelled:
+                        elif self.renderCancelled and not self.statusChecked:
                             self.report({"INFO"}, "Process cancelled - No output images found on host server")
                             return{"FINISHED"}
                         elif not self.statusChecked:
@@ -397,7 +403,7 @@ class sendAnimation(Operator):
                         handleBTError(self, i)
 
                     # if no errors, print process finished!
-                    print("Process {curState} finished! (return code: {returnCode})".format(curState=str(self.state[i]-1), returnCode=str(self.processes[i].returncode)))
+                    # print("Process {curState} finished! (return code: {returnCode})".format(curState=str(self.state[i]-1), returnCode=str(self.processes[i].returncode)))
 
                     # copy files to host server
                     if self.state[i] == 1:
@@ -412,7 +418,7 @@ class sendAnimation(Operator):
                             setRenderStatus("animation", "ERROR")
                             return{"FINISHED"}
                         expandedFrameRange = expandFrames(json.loads(self.frameRangesDict["string"]))
-                        self.processes[i] = renderFrames(str(expandedFrameRange), self.projectName, False)
+                        self.processes[i] = renderFrames(str(expandedFrameRange), self.projectName)
                         bpy.props.animFrameRange = expandedFrameRange
                         setRenderStatus("animation", "Rendering...")
                         self.state[i] += 1

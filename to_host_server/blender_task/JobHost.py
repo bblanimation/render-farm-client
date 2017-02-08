@@ -92,8 +92,8 @@ class JobHost(threading.Thread):
     def is_started(self):
         return self.started
 
-    def print_job_status(self, state, verboseLevel=1, job=None):
-        if self.verbose >= verboseLevel:
+    def print_job_status(self, state, job=None):
+        if self.verbose >= 2:
             pflush("Job {state} on host {hostname}".format(state=state, hostname=self.get_hostname()))
             if self.verbose >= 2:
                 pflush(job + "\n")
@@ -108,7 +108,7 @@ class JobHost(threading.Thread):
                 self.kwargs["jobString"] = job
                 self.kwargs["hostname"] = self.get_hostname()
                 self.kwargs["firstTime"] = self.firstTime
-                self.print_job_status("started", 2, job)
+                self.print_job_status("started", job)
                 r_value = self.thread_func(**self.kwargs)
                 # Cleanup after job is finished and call callback
                 self.jobs[job]["exit_status"] = r_value
@@ -142,7 +142,7 @@ class JobHost(threading.Thread):
         # Call the callback
         if self.jobs[job]["exit_status"] == 0:
 
-            self.print_job_status("finished", 1, job)
+            self.print_job_status("finished", job)
 
             # Skip callback if there is not one set.
             if self.jobs[job]["get_callback"] != None:

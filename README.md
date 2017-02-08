@@ -5,26 +5,28 @@ Scripts and associated files for rendering from Blender files on CSE remote serv
 ## Server Farm Client Add-On:
   * Features:
       * Clean UI for sending frames to servers and viewing them within Blender
-
+      * Mid-render previews/status updates available with 'SHIFT + P'
+      * Abort render ('ESC')
+      * NOTE: Files are auto-packed into the .blend file with each render process
+  * Required local python modules:
+      * bpy, subprocess, telnetlib, sys, io os, numpy, time, json, math, fnmatch, pillow
+  * Required packages:
+      * Local: rsync, curl
+      * Host Server: rsync
+      * Client Servers: blender
   * Future improvements:
-      * Detect when SSH keys have not been set up
-      * Detect if you've run out of disk space
-      * Don't pack files into the blend file
-  * For documentation
-      * Let them know that all external files are packed into the .blend
-  * Required python modules:
-      * bpy, subprocess, telnetlib, sys, io os, numpy, time, json, math, fnmatch
-  * Required local packages:
-      * rsync, curl
-  * Required packages on host server:
-      * rsync, numpy, pillow
-  * Required packages on client servers:
-      * blender
-
-## Server-side improvements to be made:
-* Optimize default render settings
-* Re-render failed frames automatically
-* Detect when SSH keys have not been set up
-* Detect when necessary packages have not been installed on remote servers (rsync, blender)
-* Detect if you've run out of disk space
-* Send tiles to the various servers based on computer speed
+      * Remove restriction from using spaces in project name
+      * Get all keyboard shortcuts worked out
+      * Handle known errors
+          * Detect when SSH keys have not been set up
+          * Detect when required packages have not been installed on servers (see 'which' command)
+          * Detect if you've run out of disk space
+      * Optimize default render settings
+      * Don't pack files into the blend file?
+      * 'blender_task' module
+          * Integrate max server load functionality to set cap on how many frames will be rendered
+          * Fix broken kill signal handling for 'blender_task' module
+          * If servers available, re-render current jobs until one is finished, then kill the rest
+          * Re-render failed frames automatically
+          * Handle known errors (see 'Handle known errors' list above)
+          * Send tiles to the various servers based on computer speed
