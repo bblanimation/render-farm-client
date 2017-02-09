@@ -25,7 +25,6 @@ Scripts and associated files for rendering from Blender files on CSE remote serv
       * Don't pack files into the blend file?
       * 'blender_task' module
           * Integrate max server load functionality to set cap on how many frames will be rendered
-          * Fix broken kill signal handling for 'blender_task' module
           * If servers available, re-render current jobs until one is finished, then kill the rest
           * Re-render failed frames automatically
           * Handle known errors (see 'Handle known errors' list above)

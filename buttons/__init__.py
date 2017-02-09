@@ -144,10 +144,14 @@ class sendFrame(Operator):
                 print("Process cancelled")
                 return{"CANCELLED"}
 
-        elif self.state[0] < 4 and event.type in {"P"} and self.shift and not self.processes[1]:
-            self.report({"INFO"}, "Preparing render preview...")
-            self.processes[1] = getFrames(self.projectName, not self.previewed)
-            self.state[1] = 4
+        elif event.type in {"P"} and self.shift and not self.processes[1]:
+            if self.state[0] == 3:
+                self.report({"INFO"}, "Preparing render preview...")
+                self.processes[1] = getFrames(self.projectName, not self.previewed)
+                self.state[1] = 4
+            elif self.state[0] < 3:
+                self.report({"WARNING"}, "Files are still transferring - try again in a moment")
+
 
         if event.type == "TIMER":
             numIters = 1
@@ -168,7 +172,7 @@ class sendFrame(Operator):
                             self.report({"INFO"}, "Process cancelled - No output images found on host server")
                             setRenderStatus("image", "Cancelled")
                             print("Process cancelled")
-                            cleanupCancelledRender(self, scn.killPython)
+                            cleanupCancelledRender(self)
                             return{"CANCELLED"}
                         elif not self.previewed:
                             self.report({"INFO"}, "No render files found on host server")
@@ -186,7 +190,8 @@ class sendFrame(Operator):
                             self.errorSource = "blender_task"
 
                         handleError(self, self.errorSource, i)
-                        return{"FINISHED"}
+                        cleanupCancelledRender(self)
+                        return{"CANCELLED"}
 
                     # handle and report errors for 'blender_task' process
                     elif self.processes[i].returncode == 1 and self.state[i] == 3:
@@ -207,7 +212,7 @@ class sendFrame(Operator):
                         if jobsPerFrame > 100:
                             self.report({"ERROR"}, "Max Samples / Samples > 100. Try increasing samples or lowering max samples.")
                             setRenderStatus("image", "ERROR")
-                            cleanupCancelledRender(self, scn.killPython)
+                            cleanupCancelledRender(self)
                             return{"CANCELLED"}
                         self.processes[i] = renderFrames(str([self.curFrame]), self.projectName, jobsPerFrame)
                         self.state[i] += 1
@@ -228,14 +233,14 @@ class sendFrame(Operator):
                     elif self.state[i] == 4:
                         # only average if there are new frames to average
                         numLastRenderedFiles = self.numRenderedFiles
-                        self.numRenderedFiles = getNumRenderedFiles("image")
+                        self.numRenderedFiles = getNumRenderedFiles("image", self.curFrame, None)
                         if numLastRenderedFiles != self.numRenderedFiles:
                             self.processes[i] = self.averageFrames(scn)
                         self.state[i] += 1
                         return{'PASS_THROUGH'}
 
                     elif self.state[i] == 5:
-                        self.numSamples = self.sampleSize * getNumRenderedFiles("image")
+                        self.numSamples = self.sampleSize * getNumRenderedFiles("image", self.curFrame, None)
                         if i == 0:
                             setRenderStatus("image", "Complete!")
                             self.report({"INFO"}, "Render completed at {numSamples} samples! View the rendered image in your UV/Image_Editor".format(numSamples=str(self.numSamples)))
@@ -254,7 +259,7 @@ class sendFrame(Operator):
                         removeViewable("animation")
                         if i == 0:
                             if self.renderCancelled:
-                                cleanupCancelledRender(self, scn.killPython)
+                                cleanupCancelledRender(self)
                                 return{"CANCELLED"}
                             else:
                                 return{"FINISHED"}
@@ -336,7 +341,7 @@ class sendFrame(Operator):
     def cancel(self, context):
         wm = context.window_manager
         wm.event_timer_remove(self._timer)
-        cleanupCancelledRender(self, context.scene.killPython)
+        cleanupCancelledRender(self)
 
 class sendAnimation(Operator):
     """Render animation on remote servers"""                                    # blender will use this as a tooltip for menu items and buttons.
@@ -363,13 +368,16 @@ class sendAnimation(Operator):
                 self.cancel(context)
                 self.report({"INFO"}, "Render process cancelled")
                 setRenderStatus("animation", "Cancelled")
-                cleanupCancelledRender(self, scn.killPython)
+                cleanupCancelledRender(self)
                 return{"CANCELLED"}
 
-        elif self.state[0] < 4 and event.type in {"P"} and self.shift and not self.processes[1]:
-            self.report({"INFO"}, "Checking render status...")
-            self.processes[1] = getFrames(self.projectName, not self.statusChecked)
-            self.state[1] = 4
+        elif event.type in {"P"} and self.shift and not self.processes[1]:
+            if self.state[0] == 3:
+                self.report({"INFO"}, "Checking render status...")
+                self.processes[1] = getFrames(self.projectName, not self.statusChecked)
+                self.state[1] = 4
+            elif self.state[0] < 3:
+                self.report({"WARNING"}, "Files are still transferring - try again in a moment")
 
         if event.type == "TIMER":
             numIters = 1
@@ -390,7 +398,7 @@ class sendAnimation(Operator):
                             self.report({"INFO"}, "Process cancelled - No output images found on host server")
                             setRenderStatus("animation", "Cancelled")
                             print("Process cancelled")
-                            cleanupCancelledRender(self, scn.killPython)
+                            cleanupCancelledRender(self)
                             return{"CANCELLED"}
                         elif not self.statusChecked:
                             self.report({"INFO"}, "No render files found on host server")
@@ -409,7 +417,8 @@ class sendAnimation(Operator):
                             self.errorSource = "blender_task"
 
                         handleError(self, self.errorSource, i)
-                        return{"FINISHED"}
+                        cleanupCancelledRender(self)
+                        return{"CANCELLED"}
 
                     # handle and report errors for 'blender_task' process
                     elif self.processes[i].returncode == 1 and self.state[i] == 3 and self.processes[i].stderr:
@@ -452,7 +461,7 @@ class sendAnimation(Operator):
                             self.fileName = scn.nameOutputFiles
                         else:
                             self.fileName = self.projectName
-                        numCompleted = getNumRenderedFiles("animation", self.fileName)
+                        numCompleted = getNumRenderedFiles("animation", None, self.fileName)
                         if numCompleted > 0:
                             viewString = " - View rendered frames in '//render-dump/'"
                         else:
@@ -464,7 +473,7 @@ class sendAnimation(Operator):
                             self.statusChecked = True
                         elif self.renderCancelled:
                             setRenderStatus("animation", "Complete!")
-                            cleanupCancelledRender(self, scn.killPython)
+                            cleanupCancelledRender(self)
                             return{"CANCELLED"}
                         else:
                             setRenderStatus("animation", "Complete!")
@@ -472,7 +481,7 @@ class sendAnimation(Operator):
                     else:
                         self.report({"ERROR"}, "ERROR: Current state not recognized.")
                         setRenderStatus("animation", "ERROR")
-                        cleanupCancelledRender(self, scn.killPython)
+                        cleanupCancelledRender(self)
                         return{"CANCELLED"}
 
         return{"PASS_THROUGH"}
@@ -537,7 +546,7 @@ class sendAnimation(Operator):
     def cancel(self, context):
         wm = context.window_manager
         wm.event_timer_remove(self._timer)
-        cleanupCancelledRender(self, context.scene.killPython)
+        cleanupCancelledRender(self)
 
 class openRenderedImageInUI(Operator):
     """Open rendered image"""                                                   # blender will use this as a tooltip for menu items and buttons.

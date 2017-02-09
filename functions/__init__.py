@@ -265,18 +265,18 @@ def setFrameRangesDict(classObject):
 def getRenderDumpFolder():
     return os.path.join(bpy.path.abspath("//"), "render-dump")
 
-def getNumRenderedFiles(jobType, fileName=None):
+def getNumRenderedFiles(jobType, frameNumber=None, fileName=None):
     if jobType == "image":
-        numRenderedFiles = len([f for f in os.listdir(getRenderDumpFolder()) if "_seed-" in f])
+        numRenderedFiles = len([f for f in os.listdir(getRenderDumpFolder()) if "_seed-" in f and f.endswith(frameNumber + imExtension)])
     else:
         numRenderedFiles = len([f for f in os.listdir(getRenderDumpFolder()) if fnmatch.fnmatch(f, "{fileName}_????{extension}".format(fileName=fileName, extension=bpy.props.animExtension))])
     return numRenderedFiles
 
-def cleanupCancelledRender(classObject, killPython=False):
+def cleanupCancelledRender(classObject):
     """ Kills running processes when render job cancelled """
-    
+
     for j in range(len(classObject.processes)):
         if classObject.processes[j]:
             classObject.processes[j].kill()
-    if killPython:
-        subprocess.call("ssh {hostServerLogin} 'killall -9 python'".format(hostServerLogin=bpy.props.hostServerLogin), shell=True)
+    if bpy.context.scene.killPython:
+        subprocess.call("ssh -oStrictHostKeyChecking=no {hostServerLogin} 'killall -9 python'".format(hostServerLogin=bpy.props.hostServerLogin), shell=True)
