@@ -46,12 +46,18 @@ parser.add_argument("-R", "--project_root", action="store", help="Root path for 
 parser.add_argument("-o", "--output_file_path", action="store", default=False, help="Local folder to rsync files back into when done")
 parser.add_argument("-O", "--name_output_files", action="store", default=False, help="Name to use for output files in results directory.")
 
+def signal_handler(signal, frame):
+    sys.exit(1)
+
 def main():
     """ Main function runs when blender_task is called """
 
     startTime = time.time()
     args = parser.parse_args()
     verbose = args.verbose
+
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
 
     # Getting hosts from some source
     if args.hosts_file:
@@ -192,7 +198,6 @@ def main():
 
     # report on the success/failure of the tasks
     endTime = time.time()
-    jhm.stop()
     timer = stopWatch(endTime-startTime)
     if verbose >= 1:
         pflush("Elapsed time: {timer}".format(timer=timer))

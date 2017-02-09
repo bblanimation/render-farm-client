@@ -100,7 +100,7 @@ class JobHost(threading.Thread):
 
     def run(self):
         # Should thread terminate once jobs are finished, or stay alive?
-        while self.task_count > 0  or self.persist_thread:
+        while not self.thread_stopped() and (self.task_count > 0  or self.persist_thread):
             if len(self.jobs_list) > 0:
                 self.running_job = True
                 job = self.jobs_list.pop()
@@ -115,8 +115,6 @@ class JobHost(threading.Thread):
                 self.job_complete(job=job)
             else:
                 self.running_job = False
-            if self._stop.isSet():
-                break
         self.thread_stop()
 
     def thread_stop(self):

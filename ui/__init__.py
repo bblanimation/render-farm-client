@@ -146,6 +146,7 @@ class serversPanel(Panel):
                 col.prop(scn, "maxServerLoad")
                 col.prop(scn, "timeout")
                 col.prop(scn, "maxSamples")
+                col.prop(scn, "killPython")
                 # The following is probably unnecessary
                 # col = box.row(align=True)
                 # col.prop(scn, "tempLocalDir")

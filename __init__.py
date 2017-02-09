@@ -36,6 +36,11 @@ def register():
         description="Display advanced remote server settings",
         default=False)
 
+    bpy.types.Scene.killPython = BoolProperty(
+        name="Kill Python on Host",
+        description="Run 'killall -9 python' on host server after render process cancelled",
+        default=True)
+
     bpy.types.Scene.frameRanges = StringProperty(
         name="Frames",
         description="Define frame ranges to render, separated by commas (e.g. '1,3,6-10')",
@@ -128,12 +133,15 @@ def unregister():
     del bpy.types.Scene.nameOutputFiles
     del bpy.types.Scene.maxServerLoad
     del bpy.types.Scene.timeout
+    del bpy.types.Scene.maxSamples
     del bpy.types.Scene.renderType
+    del bpy.types.Scene.killPython
     del bpy.types.Scene.renderStatus
     del bpy.props.servers
     del bpy.props.hostServerLogin
     del bpy.props.requiredFileRead
     del bpy.props.animFrameRange
+    del bpy.props.lastTempFilePath
     del bpy.props.imExtension
     del bpy.props.animExtension
     del bpy.props.needsUpdating

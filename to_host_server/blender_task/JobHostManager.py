@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 
 from JobHost import *
-from supporting_methods import averageFrames
-import signal
+import time
 
 class JobHostManager():
     """ Manages and distributes jobs for all available hosts """
@@ -31,29 +30,30 @@ class JobHostManager():
     # This blocks
     def process_jobs(self):
         jobAccepted = False
-        while True: # maybe set a flag here if I ever decide to make this a thread
-            for aHost in self.hosts.keys():
-                host = self.hosts[aHost]
-                while self.host_can_take_job(host=host) and len(self.jobs) > 0:
-                    hostname = host.get_hostname()
-                    job = self.jobs.pop()
-                    host.add_job(job)
-                    if host not in self.hosts_with_jobs:
-                        self.hosts_with_jobs[hostname] = host.get_task_count()
-                    if not host.is_started() and not host.thread_stopped():
-                        host.start()
-                    numQueued = str(len(self.jobs))
-                    if self.verbose >= 3:
-                        pflush("Running job {job} on host {host}. ({numQueued} jobs remain in queue)".format(job=job, host=hostname, numQueued=numQueued))
-                    elif self.verbose >= 2:
-                        pflush("Job sent to host '{hostname}' ({numQueued} jobs remain in queue)".format(hostname=hostname, numQueued=numQueued))
-                if self.jobs_complete() or self.stop_now:
-                    break
-            if self.jobs_complete() or self.stop_now:
-                break
-        for hostname in self.hosts_with_jobs.keys():
-            tHost = self.hosts[hostname]
-            tHost.thread_stop()
+        try:
+            while not self.jobs_complete() and not self.stop_now:
+                time.sleep(1)
+                for aHost in self.hosts.keys():
+                    host = self.hosts[aHost]
+                    while self.host_can_take_job(host=host) and len(self.jobs) > 0:
+                        time.sleep(.5)
+                        hostname = host.get_hostname()
+                        job = self.jobs.pop()
+                        host.add_job(job)
+                        if host not in self.hosts_with_jobs:
+                            self.hosts_with_jobs[hostname] = host.get_task_count()
+                        if not host.is_started() and not host.thread_stopped():
+                            host.start()
+                        numQueued = str(len(self.jobs))
+                        if self.verbose >= 3:
+                            pflush("Running job {job} on host {host}. ({numQueued} jobs remain in queue)".format(job=job, host=hostname, numQueued=numQueued))
+                        elif self.verbose >= 2:
+                            pflush("Job sent to host '{hostname}' ({numQueued} jobs remain in queue)".format(hostname=hostname, numQueued=numQueued))
+                    if self.jobs_complete() or self.stop_now:
+                        break
+            self.stop_all_threads()
+        except (KeyboardInterrupt, SystemExit):
+            self.stop_all_threads()
 
     def jobs_complete(self):
         for job in self.original_jobs:
@@ -97,12 +97,12 @@ class JobHostManager():
 
     def host_failed_job(self, hostname, job):
         error_string = "Failed Job on {hostname}: {job}".format(hostname=hostname, job=job)
-        eflush(error_string)
+        # eflush(error_string)
 
         if self.verbose >= 3:
             print(error_string)
 
-        self.add_job(job)
+        # self.add_job(job)
         self.job_status[job] = 1
 
     def host_can_take_job(self, hostname=None, host=None):
@@ -126,6 +126,12 @@ class JobHostManager():
                 print(self.get_cumulative_status())
         else:
             print("Jobs not yet completed.")
+
+    def stop_all_threads(self):
+        for hostname in self.hosts_with_jobs.keys():
+            tHost = self.hosts[hostname]
+            tHost.thread_stop()
+            self.stop()
 
     def stop(self):
         self.stop_now = True

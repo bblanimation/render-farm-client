@@ -19,7 +19,7 @@ class refreshNumAvailableServers(Operator):
 
     def checkNumAvailServers(self):
         scn = bpy.context.scene
-        command = "ssh -T -x {hostServerLogin} 'python {tempFilePath}blender_task -H --connection_timeout {timeout} --hosts_file {tempFilePath}servers.txt'".format(hostServerLogin=bpy.props.hostServerLogin, tempFilePath=scn.tempFilePath, timeout=str(scn.timeout))
+        command = "ssh -T -x {hostServerLogin} 'python {tempFilePath}blender_task -H --connection_timeout {timeout} --hosts_file {tempFilePath}servers.txt'".format(hostServerLogin=bpy.props.hostServerLogin, tempFilePath=scn.tempFilePath, timeout=scn.timeout)
         process = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
         return process
 
@@ -132,15 +132,16 @@ class sendFrame(Operator):
             self.shift = False
 
         if event.type in {"ESC"} and event.value == "PRESS":
-            print("Process cancelled")
-            setRenderStatus("image", "Finishing")
             if self.state[0] == 3:
                 self.renderCancelled = True
                 self.processes[0].kill()
+                setRenderStatus("image", "Finishing...")
                 self.report({"INFO"}, "Render process cancelled. Fetching frames...")
             else:
                 self.cancel(context)
                 self.report({"INFO"}, "Render process cancelled")
+                setRenderStatus("image", "Cancelled")
+                print("Process cancelled")
                 return{"CANCELLED"}
 
         elif self.state[0] < 4 and event.type in {"P"} and self.shift and not self.processes[1]:
@@ -165,7 +166,10 @@ class sendFrame(Operator):
                             break
                         elif self.renderCancelled and not self.previewed:
                             self.report({"INFO"}, "Process cancelled - No output images found on host server")
-                            return{"FINISHED"}
+                            setRenderStatus("image", "Cancelled")
+                            print("Process cancelled")
+                            cleanupCancelledRender(self, scn.killPython)
+                            return{"CANCELLED"}
                         elif not self.previewed:
                             self.report({"INFO"}, "No render files found on host server")
                             return{"FINISHED"}
@@ -203,6 +207,7 @@ class sendFrame(Operator):
                         if jobsPerFrame > 100:
                             self.report({"ERROR"}, "Max Samples / Samples > 100. Try increasing samples or lowering max samples.")
                             setRenderStatus("image", "ERROR")
+                            cleanupCancelledRender(self, scn.killPython)
                             return{"CANCELLED"}
                         self.processes[i] = renderFrames(str([self.curFrame]), self.projectName, jobsPerFrame)
                         self.state[i] += 1
@@ -248,11 +253,15 @@ class sendFrame(Operator):
                         appendViewable("image")
                         removeViewable("animation")
                         if i == 0:
-                            return{"FINISHED"}
+                            if self.renderCancelled:
+                                cleanupCancelledRender(self, scn.killPython)
+                                return{"CANCELLED"}
+                            else:
+                                return{"FINISHED"}
                     else:
                         self.report({"ERROR"}, "ERROR: Current state not recognized.")
                         setRenderStatus("image", "ERROR")
-                        return{"FINISHED"}
+                        return{"CANCELLED"}
 
         return{"PASS_THROUGH"}
 
@@ -327,9 +336,7 @@ class sendFrame(Operator):
     def cancel(self, context):
         wm = context.window_manager
         wm.event_timer_remove(self._timer)
-        for j in range(len(self.processes)):
-            if self.processes[j]:
-                self.processes[j].kill()
+        cleanupCancelledRender(self, context.scene.killPython)
 
 class sendAnimation(Operator):
     """Render animation on remote servers"""                                    # blender will use this as a tooltip for menu items and buttons.
@@ -347,14 +354,16 @@ class sendAnimation(Operator):
 
         if event.type in {"ESC"} and event.value == "PRESS":
             print("Process cancelled")
-            setRenderStatus("animation", "Cancelled")
             if self.state[0] == 3:
                 self.renderCancelled = True
                 self.processes[0].kill()
+                setRenderStatus("animation", "Finishing...")
                 self.report({"INFO"}, "Render process cancelled. Fetching frames...")
             else:
                 self.cancel(context)
                 self.report({"INFO"}, "Render process cancelled")
+                setRenderStatus("animation", "Cancelled")
+                cleanupCancelledRender(self, scn.killPython)
                 return{"CANCELLED"}
 
         elif self.state[0] < 4 and event.type in {"P"} and self.shift and not self.processes[1]:
@@ -379,9 +388,13 @@ class sendAnimation(Operator):
                             break
                         elif self.renderCancelled and not self.statusChecked:
                             self.report({"INFO"}, "Process cancelled - No output images found on host server")
-                            return{"FINISHED"}
+                            setRenderStatus("animation", "Cancelled")
+                            print("Process cancelled")
+                            cleanupCancelledRender(self, scn.killPython)
+                            return{"CANCELLED"}
                         elif not self.statusChecked:
                             self.report({"INFO"}, "No render files found on host server")
+                            setRenderStatus("animation", "Complete!")
                             return{"FINISHED"}
                         else:
                             pass
@@ -449,13 +462,18 @@ class sendAnimation(Operator):
                         if i == 1:
                             self.processes[1] = False
                             self.statusChecked = True
+                        elif self.renderCancelled:
+                            setRenderStatus("animation", "Complete!")
+                            cleanupCancelledRender(self, scn.killPython)
+                            return{"CANCELLED"}
                         else:
                             setRenderStatus("animation", "Complete!")
                             return{"FINISHED"}
                     else:
                         self.report({"ERROR"}, "ERROR: Current state not recognized.")
                         setRenderStatus("animation", "ERROR")
-                        return{"FINISHED"}
+                        cleanupCancelledRender(self, scn.killPython)
+                        return{"CANCELLED"}
 
         return{"PASS_THROUGH"}
 
@@ -519,9 +537,7 @@ class sendAnimation(Operator):
     def cancel(self, context):
         wm = context.window_manager
         wm.event_timer_remove(self._timer)
-        for j in range(len(self.processes)):
-            if self.processes[j]:
-                self.processes[j].kill()
+        cleanupCancelledRender(self, context.scene.killPython)
 
 class openRenderedImageInUI(Operator):
     """Open rendered image"""                                                   # blender will use this as a tooltip for menu items and buttons.

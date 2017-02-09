@@ -65,7 +65,7 @@ def rsync_files_from_node_string(username, hostname, remoteResultsPath, localRes
         pflush(tmpStr)
     return tmpStr
 
-def start_tasks(projectName, projectPath, projectSyncPath, hostname, username, jobString, remoteResultsPath, localResultsPath, firstTime=True, frame=False, progress=False, verbose=0):
+def start_tasks(projectName, projectPath, projectSyncPath, hostname, username, jobString, remoteResultsPath, localResultsPath, JobHostObject=None, firstTime=True, frame=False, progress=False, verbose=0):
     """ Write tooltip here """
 
     if verbose >= 1 and frame:
@@ -97,6 +97,7 @@ def start_tasks(projectName, projectPath, projectSyncPath, hostname, username, j
         pflush("blender command: {jobString}".format(jobString=jobString))
 
     q = subprocess.Popen(shlex.split(ssh_blender), stdout=subprocess.PIPE)
+
     # This blocks til q is done
     while type(q.poll()) == type(None):
         # This blocks til there is something to read

@@ -155,7 +155,7 @@ def renderFrames(frameRange, projectName, jobsPerFrame=False):
         extraFlags += " -j {jobsPerFrame}".format(jobsPerFrame=jobsPerFrame)
 
     # runs blender command to render given range from the remote server
-    renderCommand = "ssh -T -x {hostServerLogin} 'python {tempFilePath}blender_task -v -p -n {projectName} -l {frameRange} --hosts_file {tempFilePath}servers.txt -R {tempFilePath} --connection_timeout {t} --max_server_load {maxServerLoad}{extraFlags}'".format(hostServerLogin=bpy.props.hostServerLogin, tempFilePath=scn.tempFilePath, projectName=projectName, frameRange=frameRange.replace(" ", ""), t=str(scn.timeout), maxServerLoad=str(scn.maxServerLoad), extraFlags=extraFlags)
+    renderCommand = "ssh -T -x {hostServerLogin} 'python {tempFilePath}blender_task -v -p -n {projectName} -l {frameRange} --hosts_file {tempFilePath}servers.txt -R {tempFilePath} --connection_timeout {t} --max_server_load {maxServerLoad}{extraFlags}'".format(hostServerLogin=bpy.props.hostServerLogin, tempFilePath=scn.tempFilePath, projectName=projectName, frameRange=frameRange.replace(" ", ""), t=scn.timeout, maxServerLoad=str(scn.maxServerLoad), extraFlags=extraFlags)
     process = subprocess.Popen(renderCommand, stderr=subprocess.PIPE, shell=True)
     print("Process sent to remote servers!")
     return process
@@ -271,3 +271,12 @@ def getNumRenderedFiles(jobType, fileName=None):
     else:
         numRenderedFiles = len([f for f in os.listdir(getRenderDumpFolder()) if fnmatch.fnmatch(f, "{fileName}_????{extension}".format(fileName=fileName, extension=bpy.props.animExtension))])
     return numRenderedFiles
+
+def cleanupCancelledRender(classObject, killPython=False):
+    """ Kills running processes when render job cancelled """
+    
+    for j in range(len(classObject.processes)):
+        if classObject.processes[j]:
+            classObject.processes[j].kill()
+    if killPython:
+        subprocess.call("ssh {hostServerLogin} 'killall -9 python'".format(hostServerLogin=bpy.props.hostServerLogin), shell=True)
