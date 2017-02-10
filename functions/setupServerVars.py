@@ -3,17 +3,14 @@
 import bpy, os, json
 
 def getLibraryPath():
-    # Full path to "/addons/server_farm_client/" -directory
-    paths = bpy.utils.script_paths("addons")
+    # Full path to module directory
+    addons = bpy.context.user_preferences.addons
 
-    libraryPath = 'assets'
-    for path in paths:
-        libraryPath = os.path.join(path, "server_farm_client_add_on")
-        if os.path.exists(libraryPath):
-            break
+    functionsPath = os.path.dirname(os.path.abspath(__file__))
+    libraryPath = functionsPath[:-10]
 
     if not os.path.exists(libraryPath):
-        raise NameError('Did not find assets path from ' + libraryPath)
+        raise NameError("Did not find addon from path {libraryPath}".format(libraryPath=libraryPath))
     return libraryPath
 
 def readFileFor(f, flagName):
@@ -22,7 +19,7 @@ def readFileFor(f, flagName):
     # skip lines leading up to '### BEGIN flagName ###'
     nextLine = f.readline()
     numIters = 0
-    while(nextLine != "### BEGIN " + flagName + " ###\n"):
+    while nextLine != "### BEGIN {flagName} ###\n".format(flagName=flagName):
         nextLine = f.readline()
         numIters += 1
         if numIters >= 300:
@@ -32,7 +29,7 @@ def readFileFor(f, flagName):
     # read the following lines leading up to '### END flagName ###'
     nextLine = f.readline()
     numIters = 0
-    while(nextLine != "### END " + flagName + " ###\n"):
+    while nextLine != "### END " + flagName + " ###\n":
         readLines += nextLine.replace(" ", "").replace("\n", "").replace("\t", "")
         nextLine = f.readline()
         numIters += 1
@@ -51,7 +48,7 @@ def setupServerVars():
     username = readFileFor(serverFile, "SSH USERNAME").replace("\"", "")
     hostServer = readFileFor(serverFile, "HOST SERVER").replace("\"", "")
     extension = readFileFor(serverFile, "EXTENSION").replace("\"", "")
-    hostServerLogin = username + "@" + hostServer + extension
+    hostServerLogin = "{username}@{hostServer}{extension}".format(username=username, hostServer=hostServer, extension=extension)
 
     # Set server dictionary
     servers = json.loads(readFileFor(serverFile, "REMOTE SERVERS DICTIONARY"))
