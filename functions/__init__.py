@@ -73,9 +73,9 @@ def getFrames(projectName, archiveFiles=False):
 
     if archiveFiles:
         # move old render files to backup directory
-        archiveRsyncCommand = "rsync -qx --rsync-path='mkdir -p {basePath}/backups/ && rsync' --remove-source-files --exclude='{projectName}_average.*' {dumpLocation}/* {dumpLocation}/backups/;".format(basePath=basePath, dumpLocation=dumpLocation, projectName=projectName)
+        archiveRsyncCommand = "rsync -qx --rsync-path='mkdir -p {dumpLocation}/backups/ && rsync' --remove-source-files --exclude='{projectName}_average.*' {dumpLocation}/* {dumpLocation}/backups/;".format(dumpLocation=dumpLocation, projectName=projectName)
     else:
-        archiveRsyncCommand = ""
+        archiveRsyncCommand = "mkdir -p {dumpLocation};".format(dumpLocation=dumpLocation)
 
     # rsync files from host server to local directory
     fetchRsyncCommand = "rsync -x --progress --remove-source-files --exclude='*.blend' --exclude='*_average.???' -e 'ssh -T -o Compression=no -x' '{hostServerLogin}:{tempFilePath}{projectName}/results/*' '{dumpLocation}/';".format(hostServerLogin=bpy.props.hostServerLogin, tempFilePath=scn.tempFilePath, projectName=projectName, dumpLocation=dumpLocation)
@@ -112,13 +112,16 @@ def buildFrameRangesString(frameRanges):
                 return invalidDict
     return {"valid":True, "string":str(newFrameRangeList).replace(" ", "")}
 
-def copyProjectFile(projectName):
+def copyProjectFile(projectName, compress):
     """ copies project file from local machine to host server """
 
     scn = bpy.context.scene
     bpy.ops.file.pack_all()
     saveToPath = "{tempLocalDir}{projectName}.blend".format(tempLocalDir=scn.tempLocalDir, projectName=projectName)
-    bpy.ops.wm.save_as_mainfile(filepath=saveToPath, copy=True)
+    if compress:
+        bpy.ops.wm.save_as_mainfile(filepath=saveToPath, compress=True, copy=True)
+    else:
+        bpy.ops.wm.save_as_mainfile(filepath=saveToPath, copy=True)
 
     # copies blender project file to host server
     rsyncCommand = "rsync --copy-links --progress --rsync-path='mkdir -p {tempFilePath}{projectName}/toRemote/ && rsync' -qazx --include={projectName}.blend --exclude='*' -e 'ssh -T -o Compression=no -x' '{tempLocalDir}' '{hostServerLogin}:{tempFilePath}{projectName}/toRemote/'".format(tempFilePath=scn.tempFilePath, projectName=projectName, tempLocalDir=scn.tempLocalDir, hostServerLogin=bpy.props.hostServerLogin)
@@ -267,16 +270,24 @@ def getRenderDumpFolder():
 
 def getNumRenderedFiles(jobType, frameNumber=None, fileName=None):
     if jobType == "image":
-        numRenderedFiles = len([f for f in os.listdir(getRenderDumpFolder()) if "_seed-" in f and f.endswith(frameNumber + imExtension)])
+        numRenderedFiles = len([f for f in os.listdir(getRenderDumpFolder()) if "_seed-" in f and f.endswith(str(frameNumber) + bpy.props.imExtension)])
     else:
         numRenderedFiles = len([f for f in os.listdir(getRenderDumpFolder()) if fnmatch.fnmatch(f, "{fileName}_????{extension}".format(fileName=fileName, extension=bpy.props.animExtension))])
     return numRenderedFiles
 
-def cleanupCancelledRender(classObject):
+def cleanupCancelledRender(classObject, context):
     """ Kills running processes when render job cancelled """
 
+    wm = context.window_manager
+    wm.event_timer_remove(classObject._timer)
     for j in range(len(classObject.processes)):
         if classObject.processes[j]:
             classObject.processes[j].kill()
     if bpy.context.scene.killPython:
         subprocess.call("ssh -oStrictHostKeyChecking=no {hostServerLogin} 'killall -9 python'".format(hostServerLogin=bpy.props.hostServerLogin), shell=True)
+
+def changeContext(context, areaType):
+    """ Changes current context and returns previous area type """
+    lastAreaType = context.area.type
+    context.area.type = areaType
+    return lastAreaType

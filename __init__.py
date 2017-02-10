@@ -37,9 +37,13 @@ def register():
         default=False)
 
     bpy.types.Scene.killPython = BoolProperty(
-        name="Kill Python on Host",
+        name="Kill Python",
         description="Run 'killall -9 python' on host server after render process cancelled",
         default=True)
+    bpy.types.Scene.compress = BoolProperty(
+        name="Compress .blend",
+        description="Send compressed Blender file to host server (slower local save, faster file transfer)",
+        default=False)
 
     bpy.types.Scene.frameRanges = StringProperty(
         name="Frames",
@@ -118,9 +122,12 @@ def register():
     km = wm.keyconfigs.addon.keymaps.new(name='Object Mode', space_type='EMPTY')
     kmi = km.keymap_items.new("scene.render_frame_on_servers", 'F12', 'PRESS', ctrl=True)
     kmi = km.keymap_items.new("scene.render_animation_on_servers", 'F12', 'PRESS', ctrl=True, shift=True)
+    kmi = km.keymap_items.new("scene.open_rendered_image", 'O', 'PRESS', shift=True)
+    kmi = km.keymap_items.new("scene.open_rendered_animation", 'O', 'PRESS', alt=True, shift=True)
+    kmi = km.keymap_items.new("scene.list_frames", 'M', 'PRESS', shift=True)
+    kmi = km.keymap_items.new("scene.set_to_missing_frames", 'M', 'PRESS', alt=True, shift=True)
     kmi = km.keymap_items.new("scene.refresh_num_available_servers", 'R', 'PRESS', ctrl=True)
     kmi = km.keymap_items.new("scene.edit_servers_dict", 'E', 'PRESS', ctrl=True)
-    kmi = km.keymap_items.new("scene.commit_edits", 'C', 'PRESS', ctrl=True, alt=True)
     addon_keymaps.append(km)
 
 def unregister():

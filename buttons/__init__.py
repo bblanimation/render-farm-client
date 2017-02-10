@@ -41,8 +41,8 @@ class refreshNumAvailableServers(Operator):
 
     def modal(self, context, event):
         if event.type in {"ESC"}:
-            self.cancel(context)
             self.report({"INFO"}, "Render process cancelled")
+            self.cancel(context)
             return{"CANCELLED"}
 
         if event.type == "TIMER":
@@ -57,7 +57,7 @@ class refreshNumAvailableServers(Operator):
             if self.process.returncode != None:
                 # print("Process {curState} finished! (return code: {returnCode})".format(curState=str(self.state-1), returnCode=str(self.process.returncode)))
 
-                # check the number of available servers through the host
+                # check number of available servers via host server
                 if self.state == 1:
                     self.process = self.checkNumAvailServers()
                     self.state += 1
@@ -138,10 +138,9 @@ class sendFrame(Operator):
                 setRenderStatus("image", "Finishing...")
                 self.report({"INFO"}, "Render process cancelled. Fetching frames...")
             else:
-                self.cancel(context)
                 self.report({"INFO"}, "Render process cancelled")
                 setRenderStatus("image", "Cancelled")
-                print("Process cancelled")
+                self.cancel(context)
                 return{"CANCELLED"}
 
         elif event.type in {"P"} and self.shift and not self.processes[1]:
@@ -171,8 +170,7 @@ class sendFrame(Operator):
                         elif self.renderCancelled and not self.previewed:
                             self.report({"INFO"}, "Process cancelled - No output images found on host server")
                             setRenderStatus("image", "Cancelled")
-                            print("Process cancelled")
-                            cleanupCancelledRender(self)
+                            self.cancel(context)
                             return{"CANCELLED"}
                         elif not self.previewed:
                             self.report({"INFO"}, "No render files found on host server")
@@ -190,7 +188,7 @@ class sendFrame(Operator):
                             self.errorSource = "blender_task"
 
                         handleError(self, self.errorSource, i)
-                        cleanupCancelledRender(self)
+                        self.cancel(context)
                         return{"CANCELLED"}
 
                     # handle and report errors for 'blender_task' process
@@ -212,7 +210,7 @@ class sendFrame(Operator):
                         if jobsPerFrame > 100:
                             self.report({"ERROR"}, "Max Samples / Samples > 100. Try increasing samples or lowering max samples.")
                             setRenderStatus("image", "ERROR")
-                            cleanupCancelledRender(self)
+                            self.cancel(context)
                             return{"CANCELLED"}
                         self.processes[i] = renderFrames(str([self.curFrame]), self.projectName, jobsPerFrame)
                         self.state[i] += 1
@@ -246,7 +244,7 @@ class sendFrame(Operator):
                             self.report({"INFO"}, "Render completed at {numSamples} samples! View the rendered image in your UV/Image_Editor".format(numSamples=str(self.numSamples)))
                         else:
                             # open preview image in UV/Image_Editor
-                            context.area.type = "IMAGE_EDITOR"
+                            changeContext(context, "IMAGE_EDITOR")
                             averaged_image_filepath = os.path.join(bpy.path.abspath("//"), "render-dump", "{projectName}_average{extension}".format(projectName=self.projectName, extension=bpy.props.imExtension))
                             bpy.ops.image.open(filepath=averaged_image_filepath)
                             bpy.ops.image.reload()
@@ -259,7 +257,7 @@ class sendFrame(Operator):
                         removeViewable("animation")
                         if i == 0:
                             if self.renderCancelled:
-                                cleanupCancelledRender(self)
+                                self.cancel(context)
                                 return{"CANCELLED"}
                             else:
                                 return{"FINISHED"}
@@ -325,7 +323,7 @@ class sendFrame(Operator):
         self.numSamples = 0
         self.numRenderedFiles = 0
         self.curFrame = scn.frame_current
-        self.processes = [copyProjectFile(self.projectName), False]
+        self.processes = [copyProjectFile(self.projectName, scn.compress), False]
         self.state = [1, 0]  # initializes state for modal
         if bpy.props.needsUpdating or bpy.props.lastTempFilePath != scn.tempFilePath:
             bpy.props.needsUpdating = False
@@ -339,9 +337,8 @@ class sendFrame(Operator):
         return{"RUNNING_MODAL"}
 
     def cancel(self, context):
-        wm = context.window_manager
-        wm.event_timer_remove(self._timer)
-        cleanupCancelledRender(self)
+        print("process cancelled")
+        cleanupCancelledRender(self, context)
 
 class sendAnimation(Operator):
     """Render animation on remote servers"""                                    # blender will use this as a tooltip for menu items and buttons.
@@ -358,17 +355,15 @@ class sendAnimation(Operator):
             self.shift = False
 
         if event.type in {"ESC"} and event.value == "PRESS":
-            print("Process cancelled")
             if self.state[0] == 3:
                 self.renderCancelled = True
                 self.processes[0].kill()
                 setRenderStatus("animation", "Finishing...")
                 self.report({"INFO"}, "Render process cancelled. Fetching frames...")
             else:
-                self.cancel(context)
                 self.report({"INFO"}, "Render process cancelled")
                 setRenderStatus("animation", "Cancelled")
-                cleanupCancelledRender(self)
+                self.cancel(context)
                 return{"CANCELLED"}
 
         elif event.type in {"P"} and self.shift and not self.processes[1]:
@@ -388,7 +383,7 @@ class sendAnimation(Operator):
 
                 if self.processes[i].returncode != None:
                     # handle rsync error of no output files found on server
-                    if self.state[i] in [4, 5] and self.processes[i].returncode == 23:
+                    if self.state[i] == 4 and self.processes[i].returncode == 23:
                         if i == 1 and not self.statusChecked:
                             self.report({"WARNING"}, "No render files found - try again in a moment")
                             self.processes[1] = False
@@ -397,8 +392,7 @@ class sendAnimation(Operator):
                         elif self.renderCancelled and not self.statusChecked:
                             self.report({"INFO"}, "Process cancelled - No output images found on host server")
                             setRenderStatus("animation", "Cancelled")
-                            print("Process cancelled")
-                            cleanupCancelledRender(self)
+                            self.cancel(context)
                             return{"CANCELLED"}
                         elif not self.statusChecked:
                             self.report({"INFO"}, "No render files found on host server")
@@ -417,7 +411,7 @@ class sendAnimation(Operator):
                             self.errorSource = "blender_task"
 
                         handleError(self, self.errorSource, i)
-                        cleanupCancelledRender(self)
+                        self.cancel(context)
                         return{"CANCELLED"}
 
                     # handle and report errors for 'blender_task' process
@@ -473,7 +467,7 @@ class sendAnimation(Operator):
                             self.statusChecked = True
                         elif self.renderCancelled:
                             setRenderStatus("animation", "Complete!")
-                            cleanupCancelledRender(self)
+                            self.cancel(context)
                             return{"CANCELLED"}
                         else:
                             setRenderStatus("animation", "Complete!")
@@ -481,7 +475,7 @@ class sendAnimation(Operator):
                     else:
                         self.report({"ERROR"}, "ERROR: Current state not recognized.")
                         setRenderStatus("animation", "ERROR")
-                        cleanupCancelledRender(self)
+                        self.cancel(context)
                         return{"CANCELLED"}
 
         return{"PASS_THROUGH"}
@@ -530,7 +524,7 @@ class sendAnimation(Operator):
         self.endFrame = context.scene.frame_end
         self.numFrames = str(int(scn.frame_end) - int(scn.frame_start))
         self.statusChecked = False
-        self.processes = [copyProjectFile(self.projectName), False]
+        self.processes = [copyProjectFile(self.projectName, scn.compress), False]
         self.state = [1, 0]  # initializes state for modal
         if bpy.props.needsUpdating or bpy.props.lastTempFilePath != scn.tempFilePath:
             bpy.props.needsUpdating = False
@@ -544,9 +538,8 @@ class sendAnimation(Operator):
         return{"RUNNING_MODAL"}
 
     def cancel(self, context):
-        wm = context.window_manager
-        wm.event_timer_remove(self._timer)
-        cleanupCancelledRender(self)
+        print("process cancelled")
+        cleanupCancelledRender(self, context)
 
 class openRenderedImageInUI(Operator):
     """Open rendered image"""                                                   # blender will use this as a tooltip for menu items and buttons.
@@ -555,10 +548,13 @@ class openRenderedImageInUI(Operator):
     bl_options = {"REGISTER", "UNDO"}                                           # enable undo for the operator.
 
     def execute(self, context):
-        self.projectName = bpy.path.display_name_from_filepath(bpy.data.filepath)
+        if context.scene.nameOutputFiles != "":
+            self.fileName = context.scene.nameOutputFiles
+        else:
+            self.fileName = bpy.path.display_name_from_filepath(bpy.data.filepath)
         # open rendered image
-        context.area.type = "IMAGE_EDITOR"
-        averaged_image_filepath = os.path.join(bpy.path.abspath("//"), "render-dump", "{projectName}_average{extension}".format(projectName=self.projectName, extension=bpy.props.imExtension))
+        changeContext(context, "IMAGE_EDITOR")
+        averaged_image_filepath = os.path.join(bpy.path.abspath("//"), "render-dump", "{fileName}_average{extension}".format(fileName=self.fileName, extension=bpy.props.imExtension))
         bpy.ops.image.open(filepath=averaged_image_filepath)
         bpy.ops.image.reload()
 
@@ -573,27 +569,32 @@ class openRenderedAnimationInUI(Operator):
 
     def execute(self, context):
         self.frameRangesDict = buildFrameRangesString(context.scene.frameRanges)
-        self.projectName = bpy.path.display_name_from_filepath(bpy.data.filepath)
+        if context.scene.nameOutputFiles != "":
+            self.fileName = context.scene.nameOutputFiles
+        else:
+            self.fileName = bpy.path.display_name_from_filepath(bpy.data.filepath)
 
         # change contexts
-        lastAreaType = context.area.type
-        context.area.type = "CLIP_EDITOR"
+        lastAreaType = changeContext(context, "CLIP_EDITOR")
 
         # opens first frame of image sequence (blender imports full sequence)
         openedFile = False
         image_sequence_filepath = "{dumpFolder}/".format(dumpFolder=getRenderDumpFolder())
         for frame in bpy.props.animFrameRange:
             try:
-                image_filename = "{projectName}_{frame}{extension}".format(projectName=self.projectName, frame=str(frame).zfill(4), extension=bpy.props.animExtension)
+                print("entering try")
+                image_filename = "{fileName}_{frame}{extension}".format(fileName=self.fileName, frame=str(frame).zfill(4), extension=bpy.props.animExtension)
                 bpy.ops.clip.open(directory=image_sequence_filepath, files=[{"name":image_filename}])
+                print("bpy.ops.clip.open(directory=" + image_sequence_filepath + ", files=[{'name':" + image_filename + "}]")
                 openedFile = True
                 break
             except:
+                print("hit exception")
                 pass
         if openedFile:
             bpy.ops.clip.reload()
         else:
-            context.area.type = lastAreaType
+            changeContext(context, lastAreaType)
             self.report({"ERROR"}, "Could not open rendered animation. View files in file browser in the following folder: '<project_folder>/render-dump'.")
 
         return{"FINISHED"}
@@ -605,7 +606,7 @@ class editRemoteServersDict(Operator):
     bl_options = {"REGISTER", "UNDO"}                                           # enable undo for the operator.
 
     def execute(self, context):
-        context.area.type = "TEXT_EDITOR"
+        changeContext(context, "TEXT_EDITOR")
         try:
             libraryServersPath = os.path.join(getLibraryPath(), "servers")
             bpy.ops.text.open(filepath=os.path.join(libraryServersPath, "remoteServers.txt"))
