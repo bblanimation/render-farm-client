@@ -40,6 +40,7 @@ def register():
         name="Kill Python",
         description="Run 'killall -9 python' on host server after render process cancelled",
         default=True)
+        
     bpy.types.Scene.compress = BoolProperty(
         name="Compress",
         description="Send compressed Blender file to host server (slower local save, faster file transfer)",
@@ -95,6 +96,8 @@ def register():
     bpy.props.servers = serverVars["servers"]
     bpy.props.hostServerLogin = serverVars["hostServerLogin"]
     writeServersFile(bpy.props.servers, "All Servers")
+    bpy.types.Scene.availableServers = IntProperty(name="Available Servers", default=0)
+    bpy.types.Scene.offlineServers = IntProperty(name="Offline Servers", default=0)
     bpy.props.requiredFileRead = False
     bpy.props.lastTempFilePath = bpy.types.Scene.tempFilePath
 

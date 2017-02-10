@@ -31,11 +31,8 @@ class refreshNumAvailableServers(Operator):
         available = json.loads(line1.replace("'", "\""))
         offline = json.loads(line2.replace("'", "\""))
 
-        bpy.types.Scene.availableServers = StringProperty(name="Available Servers")
-        bpy.types.Scene.offlineServers = StringProperty(name="Offline Servers")
-
-        scn["availableServers"] = available
-        scn["offlineServers"] = offline
+        scn.availableServers = len(available)
+        scn.offlineServers = len(offline)
         for a in bpy.context.screen.areas:
             a.tag_redraw()
 
@@ -67,7 +64,7 @@ class refreshNumAvailableServers(Operator):
                 elif self.state == 2:
                     self.updateAvailServerInfo()
                     scn = context.scene
-                    self.report({"INFO"}, "Refresh process completed ({numAvailable} servers available)".format(numAvailable=str(len(scn['availableServers']))))
+                    self.report({"INFO"}, "Refresh process completed ({numAvailable} servers available)".format(numAvailable=str(scn.availableServers)))
                     return{"FINISHED"}
                 else:
                     self.report({"ERROR"}, "ERROR: Current state not recognized.")

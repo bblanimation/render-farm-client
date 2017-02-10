@@ -30,13 +30,13 @@ class renderOnServersPanel(Panel):
             # Available Servers Info
             col = layout.column(align=True)
             row = col.row(align=True)
-            availableServerString = "Available Servers: {available} / {total}".format(available=str(len(scn["availableServers"])),total=str(len(scn["availableServers"]) + len(scn["offlineServers"])))
+            availableServerString = "Available Servers: {available} / {total}".format(available=str(scn.availableServers),total=str(scn.availableServers + scn.offlineServers))
             row.operator("scene.refresh_num_available_servers", text=availableServerString, icon="FILE_REFRESH")
 
             # Render Buttons
             row = col.row(align=True)
             row.alignment = "EXPAND"
-            row.active = len(scn["availableServers"]) > 0
+            row.active = scn.availableServers > 0
             row.operator("scene.render_frame_on_servers", text="Render", icon="RENDER_STILL")
             row.operator("scene.render_animation_on_servers", text="Animation", icon="RENDER_ANIMATION")
             col = layout.column(align=True)
@@ -81,7 +81,7 @@ def menu_draw(self, context):
         if sampleSize < 10:
             row.label("Too few samples")
         else:
-            row.label("Samples on Servers: {numSamples}".format(numSamples=str(math.floor(sampleSize*len(scn["availableServers"])))))
+            row.label("Samples on Servers: {numSamples}".format(numSamples=str(math.floor(sampleSize*scn.availableServers))))
 
 bpy.types.CyclesRender_PT_sampling.append(menu_draw)
 
