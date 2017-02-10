@@ -58,22 +58,32 @@ def rsync_files_to_node_string(remoteResultsPath, projectSyncPath, username, hos
         pflush(tmpStr)
     return tmpStr
 
-def rsync_files_from_node_string(username, hostname, remoteResultsPath, localResultsPath, verbose=0):
+def rsync_files_from_node_string(username, hostname, remoteResultsPath, localResultsPath, outputName="", frameString="", verbose=0):
 
-    tmpStr = "rsync -atu --remove-source-files --rsync-path='mkdir -p {localResultsPath} && rsync' {username}@{hostname}:{remoteResultsPath} {localResultsPath}".format(username=username, hostname=hostname, remoteResultsPath=remoteResultsPath, localResultsPath=localResultsPath)
+    tmpStr = "rsync -atu -e 'ssh -oStrictHostKeyChecking=no' --include='{outputName}{frameString}.???' --exclude='*' --remove-source-files --rsync-path='mkdir -p {localResultsPath} && rsync' {username}@{hostname}:{remoteResultsPath} {localResultsPath}".format(outputName=outputName, username=username, hostname=hostname, remoteResultsPath=remoteResultsPath, frameString=frameString, localResultsPath=localResultsPath)
     if verbose >= 3:
         pflush(tmpStr)
     return tmpStr
 
 def start_tasks(projectName, projectPath, projectSyncPath, hostname, username, jobString, remoteResultsPath, localResultsPath, JobHostObject=None, firstTime=True, frame=False, progress=False, verbose=0):
-    """ Write tooltip here """
+    """ Render frame on remote server and get output file when finished """
 
-    if verbose >= 1 and frame:
+    if verbose >= 2 and frame:
         pflush("Starting thread. Rendering frame {frame} on {hostname}".format(frame=frame, hostname=hostname))
+
+    # get output file name
+    startS = "-o //results/"
+    endS = "_####."
+    outputName = jobString[jobString.find(startS) + len(startS):jobString.find(endS)]
+    if frame:
+        frameString = "_{frame}".format(frame=str(frame).zfill(4))
+    else:
+        frameString = "_????"
+
 
     # First copy the files over using rsync
     rsync_to            = rsync_files_to_node_string(remoteResultsPath, projectSyncPath, username, hostname, projectPath, verbose)
-    rsync_from          = rsync_files_from_node_string(username, hostname, remoteResultsPath, localResultsPath, verbose)
+    rsync_from          = rsync_files_from_node_string(username, hostname, remoteResultsPath, localResultsPath, outputName, frameString, verbose)
     ssh_c_string        = ssh_string(username, hostname, verbose)
     ssh_blender         = "{ssh_c_string} '{jobString}'".format(ssh_c_string=ssh_c_string, jobString=jobString)
     run_status          = {"p":-1, "q":-1, "r":-1}
@@ -109,7 +119,7 @@ def start_tasks(projectName, projectPath, projectSyncPath, hostname, username, j
     if q.returncode == 0:
         run_status["q"] = 0
 
-        if verbose >= 1 and frame:
+        if verbose >= 2 and frame:
             pflush("Successfully completed render for frame ({frame}) on hostname {hostname}.".format(frame=frame, hostname=hostname))
     else:
         eflush("blender error: {returncode}".format(returncode=q.returncode))
@@ -123,7 +133,7 @@ def start_tasks(projectName, projectPath, projectSyncPath, hostname, username, j
 
     if r == 0 and q.returncode == 0:
         run_status["r"] = 0
-        if verbose >= 1 and frame:
+        if verbose >= 2 and frame:
             pflush("Render frame ({frame}) has been copied back from hostname {hostname}".format(frame=frame, hostname=hostname))
     else:
         eflush("rsync error: {r}".format(r=r))

@@ -73,7 +73,7 @@ def getFrames(projectName, archiveFiles=False):
 
     if archiveFiles:
         # move old render files to backup directory
-        archiveRsyncCommand = "rsync -qx --rsync-path='mkdir -p {dumpLocation}/backups/ && rsync' --remove-source-files --exclude='{projectName}_average.*' {dumpLocation}/* {dumpLocation}/backups/;".format(dumpLocation=dumpLocation, projectName=projectName)
+        archiveRsyncCommand = "rsync -qx --rsync-path='mkdir -p {dumpLocation}/backups/ && rsync' --remove-source-files --exclude='{nameImOutputFiles}_average{imExtension}' {dumpLocation}/* {dumpLocation}/backups/;".format(dumpLocation=dumpLocation, nameImOutputFiles=bpy.props.nameImOutputFiles, imExtension=bpy.props.imExtension)
     else:
         archiveRsyncCommand = "mkdir -p {dumpLocation};".format(dumpLocation=dumpLocation)
 
@@ -267,6 +267,16 @@ def setFrameRangesDict(classObject):
 
 def getRenderDumpFolder():
     return os.path.join(bpy.path.abspath("//"), "render-dump")
+
+def getRunningStatuses():
+    return ["Rendering...", "Preparing files...", "Finishing..."]
+
+def getNameOutputFiles():
+    scn = bpy.context.scene
+    if scn.nameOutputFiles != "":
+        return scn.nameOutputFiles
+    else:
+        return bpy.path.display_name_from_filepath(bpy.data.filepath)
 
 def getNumRenderedFiles(jobType, frameNumber=None, fileName=None):
     if jobType == "image":

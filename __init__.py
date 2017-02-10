@@ -41,7 +41,7 @@ def register():
         description="Run 'killall -9 python' on host server after render process cancelled",
         default=True)
     bpy.types.Scene.compress = BoolProperty(
-        name="Compress .blend",
+        name="Compress",
         description="Send compressed Blender file to host server (slower local save, faster file transfer)",
         default=False)
 
@@ -96,14 +96,15 @@ def register():
     bpy.props.hostServerLogin = serverVars["hostServerLogin"]
     writeServersFile(bpy.props.servers, "All Servers")
     bpy.props.requiredFileRead = False
-    bpy.props.animFrameRange = []
     bpy.props.lastTempFilePath = bpy.types.Scene.tempFilePath
 
     # TODO: Set default to False for public release (True for testing purposes)
     bpy.props.needsUpdating = True
 
     bpy.props.imExtension = False
+    bpy.props.nameImOutputFiles = ""
     bpy.props.animExtension = False
+    bpy.props.animFrameRange = []
 
     # initialize server groups enum property
     groupNames = [("All Servers", "All Servers", "Render on all servers")]

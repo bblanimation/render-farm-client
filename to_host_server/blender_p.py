@@ -13,5 +13,6 @@ for scene in bpy.data.scenes:
     scene.cycles.transparent_min_bounces = 0
     scene.cycles.min_bounces = 0
     scene.cycles.blur_glossy = 0
+    bpy.context.scene.render.use_overwrite = True
     if scene.cycles.film_transparent:
         scene.color_mode = 'RGBA'

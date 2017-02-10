@@ -181,8 +181,10 @@ def main():
         "verbose":          verbose,
         "remoteResultsPath":remoteResultsPath,
         "localResultsPath": localResultsPath,
-        "progress":         args.progress
+        "progress":         args.progress,
     }
+    if len(frames) == 1:
+        job_args["frame"] = frames[0]
 
     # Sets up kwargs, and callbacks on the hosts
     max_server_load = int(args.max_server_load)

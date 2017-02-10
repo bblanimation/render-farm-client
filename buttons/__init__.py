@@ -59,6 +59,7 @@ class refreshNumAvailableServers(Operator):
 
                 # check number of available servers via host server
                 if self.state == 1:
+                    bpy.props.needsUpdating = False
                     self.process = self.checkNumAvailServers()
                     self.state += 1
                     return{"PASS_THROUGH"}
@@ -92,7 +93,6 @@ class refreshNumAvailableServers(Operator):
         self.state = 1 # initializes state for modal
         if bpy.props.needsUpdating or bpy.props.lastTempFilePath != scn.tempFilePath:
             self.process = copyFiles()
-            bpy.props.needsUpdating = False
             bpy.props.lastTempFilePath = scn.tempFilePath
         else:
             self.process = self.checkNumAvailServers()
@@ -115,11 +115,8 @@ class sendFrame(Operator):
 
     def averageFrames(self, scn):
         averageScriptPath = os.path.join(getLibraryPath(), "functions", "averageFrames.py")
-        if scn.nameOutputFiles != "":
-            self.nameOutputFiles = scn.nameOutputFiles
-        else:
-            self.nameOutputFiles = self.projectName
-        runScriptCommand = "python {averageScriptPath} -p {renderDumpFolder} -n {nameOutputFiles}".format(averageScriptPath=averageScriptPath.replace(" ", "\\ "), renderDumpFolder=getRenderDumpFolder(), nameOutputFiles=self.nameOutputFiles)
+        bpy.props.nameImOutputFiles = getNameOutputFiles()
+        runScriptCommand = "python {averageScriptPath} -p {renderDumpFolder} -n {nameOutputFiles}".format(averageScriptPath=averageScriptPath.replace(" ", "\\ "), renderDumpFolder=getRenderDumpFolder(), nameOutputFiles=bpy.props.nameImOutputFiles)
         process = subprocess.Popen(runScriptCommand, shell=True)
         return process
 
@@ -206,6 +203,7 @@ class sendFrame(Operator):
 
                     # start render process at current frame
                     elif self.state[i] == 2:
+                        bpy.props.needsUpdating = False
                         jobsPerFrame = scn.maxSamples // self.sampleSize
                         if jobsPerFrame > 100:
                             self.report({"ERROR"}, "Max Samples / Samples > 100. Try increasing samples or lowering max samples.")
@@ -230,9 +228,9 @@ class sendFrame(Operator):
                     # average the rendered frames if there are new frames to average
                     elif self.state[i] == 4:
                         # only average if there are new frames to average
-                        numLastRenderedFiles = self.numRenderedFiles
+                        self.numLastRenderedFiles = self.numRenderedFiles
                         self.numRenderedFiles = getNumRenderedFiles("image", self.curFrame, None)
-                        if numLastRenderedFiles != self.numRenderedFiles:
+                        if self.numLastRenderedFiles != self.numRenderedFiles:
                             self.processes[i] = self.averageFrames(scn)
                         self.state[i] += 1
                         return{'PASS_THROUGH'}
@@ -241,12 +239,18 @@ class sendFrame(Operator):
                         self.numSamples = self.sampleSize * getNumRenderedFiles("image", self.curFrame, None)
                         if i == 0:
                             setRenderStatus("image", "Complete!")
+                            if context.area.type == "IMAGE_EDITOR":
+                                if not self.previewed:
+                                    averaged_image_filepath = os.path.join(bpy.path.abspath("//"), "render-dump", "{fileName}_average{extension}".format(fileName=bpy.props.nameImOutputFiles, extension=bpy.props.imExtension))
+                                    bpy.ops.image.open(filepath=averaged_image_filepath)
+                                bpy.ops.image.reload()
                             self.report({"INFO"}, "Render completed at {numSamples} samples! View the rendered image in your UV/Image_Editor".format(numSamples=str(self.numSamples)))
                         else:
                             # open preview image in UV/Image_Editor
                             changeContext(context, "IMAGE_EDITOR")
-                            averaged_image_filepath = os.path.join(bpy.path.abspath("//"), "render-dump", "{projectName}_average{extension}".format(projectName=self.projectName, extension=bpy.props.imExtension))
-                            bpy.ops.image.open(filepath=averaged_image_filepath)
+                            if not self.previewed:
+                                averaged_image_filepath = os.path.join(bpy.path.abspath("//"), "render-dump", "{fileName}_average{extension}".format(fileName=bpy.props.nameImOutputFiles, extension=bpy.props.imExtension))
+                                bpy.ops.image.open(filepath=averaged_image_filepath)
                             bpy.ops.image.reload()
                             self.processes[1] = False
                             self.previewed = True
@@ -278,8 +282,7 @@ class sendFrame(Operator):
             bpy.ops.wm.save_mainfile(filepath="{tempLocalDir}{projectName}.blend".format(tempLocalDir=scn.tempLocalDir, projectName=self.projectName))
 
         # ensure no other render processes are running
-        runningStatus = ["Rendering...", "Preparing files..."]
-        if getRenderStatus("image") in runningStatus or getRenderStatus("animation") in runningStatus:
+        if getRenderStatus("image") in getRunningStatuses() or getRenderStatus("animation") in getRunningStatuses():
             self.report({"WARNING"}, "Render in progress...")
             return{"FINISHED"}
 
@@ -322,11 +325,11 @@ class sendFrame(Operator):
         self.previewed = False
         self.numSamples = 0
         self.numRenderedFiles = 0
+        self.numLastRenderedFiles = 0
         self.curFrame = scn.frame_current
         self.processes = [copyProjectFile(self.projectName, scn.compress), False]
         self.state = [1, 0]  # initializes state for modal
         if bpy.props.needsUpdating or bpy.props.lastTempFilePath != scn.tempFilePath:
-            bpy.props.needsUpdating = False
             bpy.props.lastTempFilePath = scn.tempFilePath
         else:
             self.state[0] += 1
@@ -429,6 +432,7 @@ class sendAnimation(Operator):
 
                     # start render process from the defined start and end frames
                     elif self.state[i] == 2:
+                        bpy.props.needsUpdating = False
                         # initializes self.frameRangesDict (returns False if frame range invalid)
                         if not setFrameRangesDict(self):
                             setRenderStatus("animation", "ERROR")
@@ -451,11 +455,7 @@ class sendAnimation(Operator):
                         return{"PASS_THROUGH"}
 
                     elif self.state[i] == 4:
-                        if scn.nameOutputFiles != "":
-                            self.fileName = scn.nameOutputFiles
-                        else:
-                            self.fileName = self.projectName
-                        numCompleted = getNumRenderedFiles("animation", None, self.fileName)
+                        numCompleted = getNumRenderedFiles("animation", None, getNameOutputFiles())
                         if numCompleted > 0:
                             viewString = " - View rendered frames in '//render-dump/'"
                         else:
@@ -480,18 +480,17 @@ class sendAnimation(Operator):
 
         return{"PASS_THROUGH"}
 
-    def execute(self, context):# ensure no other animation render processes are running
+    def execute(self, context): # ensure no other animation render processes are running
         self.projectName = bpy.path.display_name_from_filepath(bpy.data.filepath)
         scn = context.scene
 
-        #for testing purposes only (saves unsaved file as 'unsaved_file.blend')
+        # for testing purposes only (saves unsaved file as 'unsaved_file.blend')
         if self.projectName == "":
             self.projectName = "unsaved_file"
             bpy.ops.wm.save_mainfile(filepath="{tempLocalDir}{projectName}.blend".format(tempLocalDir=scn.tempLocalDir, projectName=self.projectName))
 
         # ensure no other render processes are running
-        runningStatus = ["Rendering...", "Preparing files..."]
-        if getRenderStatus("image") in runningStatus or getRenderStatus("animation") in runningStatus:
+        if getRenderStatus("image") in getRunningStatuses() or getRenderStatus("animation") in getRunningStatuses():
             self.report({"WARNING"}, "Render in progress...")
             return{"FINISHED"}
 
@@ -525,9 +524,8 @@ class sendAnimation(Operator):
         self.numFrames = str(int(scn.frame_end) - int(scn.frame_start))
         self.statusChecked = False
         self.processes = [copyProjectFile(self.projectName, scn.compress), False]
-        self.state = [1, 0]  # initializes state for modal
+        self.state = [1, 0] # initializes state for modal
         if bpy.props.needsUpdating or bpy.props.lastTempFilePath != scn.tempFilePath:
-            bpy.props.needsUpdating = False
             bpy.props.lastTempFilePath = scn.tempFilePath
         else:
             self.state[0] += 1
@@ -548,13 +546,9 @@ class openRenderedImageInUI(Operator):
     bl_options = {"REGISTER", "UNDO"}                                           # enable undo for the operator.
 
     def execute(self, context):
-        if context.scene.nameOutputFiles != "":
-            self.fileName = context.scene.nameOutputFiles
-        else:
-            self.fileName = bpy.path.display_name_from_filepath(bpy.data.filepath)
         # open rendered image
         changeContext(context, "IMAGE_EDITOR")
-        averaged_image_filepath = os.path.join(bpy.path.abspath("//"), "render-dump", "{fileName}_average{extension}".format(fileName=self.fileName, extension=bpy.props.imExtension))
+        averaged_image_filepath = os.path.join(bpy.path.abspath("//"), "render-dump", "{fileName}_average{extension}".format(fileName=getNameOutputFiles(), extension=bpy.props.imExtension))
         bpy.ops.image.open(filepath=averaged_image_filepath)
         bpy.ops.image.reload()
 
@@ -569,10 +563,6 @@ class openRenderedAnimationInUI(Operator):
 
     def execute(self, context):
         self.frameRangesDict = buildFrameRangesString(context.scene.frameRanges)
-        if context.scene.nameOutputFiles != "":
-            self.fileName = context.scene.nameOutputFiles
-        else:
-            self.fileName = bpy.path.display_name_from_filepath(bpy.data.filepath)
 
         # change contexts
         lastAreaType = changeContext(context, "CLIP_EDITOR")
@@ -583,16 +573,18 @@ class openRenderedAnimationInUI(Operator):
         for frame in bpy.props.animFrameRange:
             try:
                 print("entering try")
-                image_filename = "{fileName}_{frame}{extension}".format(fileName=self.fileName, frame=str(frame).zfill(4), extension=bpy.props.animExtension)
+                image_filename = "{fileName}_{frame}{extension}".format(fileName=getNameOutputFiles(), frame=str(frame).zfill(4), extension=bpy.props.animExtension)
                 bpy.ops.clip.open(directory=image_sequence_filepath, files=[{"name":image_filename}])
                 print("bpy.ops.clip.open(directory=" + image_sequence_filepath + ", files=[{'name':" + image_filename + "}]")
-                openedFile = True
+                openedFile = image_filename
+                openedFrame = frame
                 break
             except:
                 print("hit exception")
                 pass
         if openedFile:
             bpy.ops.clip.reload()
+            bpy.data.movieclips[openedFile].frame_start = frame
         else:
             changeContext(context, lastAreaType)
             self.report({"ERROR"}, "Could not open rendered animation. View files in file browser in the following folder: '<project_folder>/render-dump'.")
@@ -625,17 +617,13 @@ class listMissingFrames(Operator):
 
     def execute(self, context):
         scn = context.scene
-        if scn.nameOutputFiles != "":
-            self.fileName = scn.nameOutputFiles
-        else:
-            self.fileName = bpy.path.display_name_from_filepath(bpy.data.filepath)
 
         # initializes self.frameRangesDict (returns False if frame range invalid)
         if not setFrameRangesDict(self):
             return{"FINISHED"}
 
         # list all missing files from start frame to end frame in render-dump location
-        missingFrames = listMissingFiles(self.fileName, self.frameRangesDict["string"])
+        missingFrames = listMissingFiles(getNameOutputFiles(), self.frameRangesDict["string"])
         if len(missingFrames) > 0:
             self.report({"INFO"}, "Missing frames: {missingFrames}".format(missingFrames=missingFrames))
         else:
@@ -652,17 +640,11 @@ class setToMissingFrames(Operator):
     def execute(self, context):
         scn = context.scene
 
-        # set the name of the files to the project name or custom name defined in advanced settings
-        if scn.nameOutputFiles != "":
-            self.fileName = scn.nameOutputFiles
-        else:
-            self.fileName = bpy.path.display_name_from_filepath(bpy.data.filepath)
-
         # initializes self.frameRangesDict (returns False if frame range invalid)
         if not setFrameRangesDict(self):
             return{"FINISHED"}
 
         # list all missing files from start frame to end frame in render-dump location
-        scn.frameRanges = listMissingFiles(self.fileName, self.frameRangesDict["string"])
+        scn.frameRanges = listMissingFiles(getNameOutputFiles(), self.frameRangesDict["string"])
 
         return{"FINISHED"}
