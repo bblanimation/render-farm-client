@@ -118,10 +118,6 @@ class sendFrame(Operator):
     bl_label = "Render Current Frame"                                           # display name in the interface.
     bl_options = {"REGISTER", "UNDO"}                                           # enable undo for the operator.
 
-    def averageFrames(self, scn):
-        bpy.props.nameImOutputFiles = getNameOutputFiles()
-        averageFrames(self, bpy.props.nameImOutputFiles, 2)
-
     def modal(self, context, event):
         scn = context.scene
 
@@ -177,7 +173,7 @@ class sendFrame(Operator):
                         else:
                             pass
                     # handle python not found on host error
-                    if self.processes[i].returncode == 127 and self.state[i] == 3:
+                    elif self.processes[i].returncode == 127 and self.state[i] == 3:
                         self.report({"ERROR"}, "python and/or rsync not installed on host server")
                         setRenderStatus("image", "ERROR")
                         self.cancel(context)
@@ -188,7 +184,7 @@ class sendFrame(Operator):
 
                         # define self.errorSource string
                         if not self.state[i] == 3:
-                            self.errorSource = "Process " + str(self.state[i]-1)
+                            self.errorSource = "Processes[{i}] at state {state}".format(i=i, state=str(self.state[i]))
                         else:
                             self.errorSource = "blender_task"
 
@@ -237,14 +233,14 @@ class sendFrame(Operator):
                     # average the rendered frames if there are new frames to average
                     elif self.state[i] == 4:
                         # only average if there are new frames to average
-                        self.numRenderedFiles = self.avDict["numFrames"] + getNumRenderedFiles("image", bpy.props.imFrame, None)
-                        if self.avDict["numFrames"] != self.numRenderedFiles:
+                        numRenderedFiles = getNumRenderedFiles("image", bpy.props.imFrame, None)
+                        if numRenderedFiles > 0:
                             averaged = True
-                            self.averageFrames(scn)
+                            averageFrames(self, bpy.props.nameImOutputFiles)
                         else:
                             averaged = False
                         # calculate number of samples represented in averaged image
-                        self.numSamples = self.sampleSize * getNumRenderedFiles("image", bpy.props.imFrame, None)
+                        self.numSamples = self.sampleSize * self.avDict["numFrames"]
                         # open rendered image
                         if i == 0:
                             setRenderStatus("image", "Complete!")
@@ -328,8 +324,7 @@ class sendFrame(Operator):
         self.previewed = False
         self.numSamples = 0
         self.avDict = {"array":False, "numFrames":0}
-        self.numRenderedFiles = 0
-        self.numLastRenderedFiles = 0
+        bpy.props.nameImOutputFiles = getNameOutputFiles()
         bpy.props.imFrame = scn.frame_current
         self.state = [1, 0]  # initializes state for modal
         if bpy.props.needsUpdating:
@@ -417,7 +412,7 @@ class sendAnimation(Operator):
                         else:
                             pass
                     # handle python not found on host error
-                    if self.processes[i].returncode == 127 and self.state[i] == 3:
+                    elif self.processes[i].returncode == 127 and self.state[i] == 3:
                         self.report({"ERROR"}, "python and/or rsync not installed on host server")
                         setRenderStatus("animation", "ERROR")
                         self.cancel(context)
@@ -428,7 +423,7 @@ class sendAnimation(Operator):
 
                         # define self.errorSource string
                         if not self.state[i] == 3:
-                            self.errorSource = "Process {state}".format(state=str(self.state[i]-1))
+                            self.errorSource = "Processes[{i}] at state {state}".format(i=i, state=str(self.state[i]))
                         else:
                             self.errorSource = "blender_task"
 
@@ -570,7 +565,7 @@ class openRenderedImageInUI(Operator):
     def execute(self, context):
         # open rendered image
         changeContext(context, "IMAGE_EDITOR")
-        averaged_image_filepath = os.path.join(getRenderDumpFolder(), "{fileName}_{frame}_average{extension}".format(fileName=getNameOutputFiles(), frame=str(bpy.props.imFrame).zfill(4), extension=bpy.props.imExtension))
+        averaged_image_filepath = os.path.join(getRenderDumpFolder(), "{fileName}_{frame}_average{extension}".format(fileName=bpy.props.nameImOutputFiles, frame=str(bpy.props.imFrame).zfill(4), extension=bpy.props.imExtension))
         bpy.ops.image.open(filepath=averaged_image_filepath)
         bpy.ops.image.reload()
 

@@ -1,9 +1,7 @@
 #!/usr/bin/env python
 
-import bpy, sys, os, numpy, fnmatch
+import bpy, sys, os, numpy, fnmatch, time
 from . import getRenderDumpFolder
-
-
 
 def averageFrames(classObject, outputFileName, verbose=0):
     """ Averages final rendered images in blender to present one render result """
@@ -47,11 +45,11 @@ def averageFrames(classObject, outputFileName, verbose=0):
         if verbose >= 2:
             print(image)
         # load image
-        im = bpy.data.images.load(image)
-        data = list(im.pixels)
-        imarr = numpy.array(data, dtype=numpy.float)
-        arr = arr+imarr
-        bpy.data.images.remove(im, do_unlink=True)
+        im = bpy.data.images.load(image)                # ~.0002 sec
+        data = list(im.pixels)                          # ~.10 sec
+        imarr = numpy.array(data, dtype=numpy.float)    # ~.07 sec
+        arr = arr+imarr                                 # ~.008 sec
+        bpy.data.images.remove(im, do_unlink=True)      # ~.0002 sec
 
     classObject.avDict["numFrames"] = N
     classObject.avDict["array"] = arr

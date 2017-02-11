@@ -12,11 +12,11 @@ def getFrames(projectName, archiveFiles=False):
 
     scn = bpy.context.scene
     basePath = bpy.path.abspath("//")
-    dumpLocation = os.path.join(basePath, "render-dump")
+    dumpLocation = getRenderDumpFolder()
 
     if archiveFiles:
         # move old render files to backup directory
-        archiveRsyncCommand = "rsync -qx --rsync-path='mkdir -p {dumpLocation}/backups/ && rsync' --remove-source-files --exclude='{nameImOutputFiles}_average{imExtension}' {dumpLocation}/* {dumpLocation}/backups/;".format(dumpLocation=dumpLocation, nameImOutputFiles=bpy.props.nameImOutputFiles, imExtension=bpy.props.imExtension)
+        archiveRsyncCommand = "rsync -qx --rsync-path='mkdir -p {dumpLocation}/backups/ && rsync' --remove-source-files --exclude='{nameImOutputFiles}_*_average{imExtension}' {dumpLocation}/* {dumpLocation}/backups/;".format(dumpLocation=dumpLocation, nameImOutputFiles=bpy.props.nameImOutputFiles, imExtension=bpy.props.imExtension)
     else:
         archiveRsyncCommand = "mkdir -p {dumpLocation};".format(dumpLocation=dumpLocation)
 
@@ -134,7 +134,7 @@ def expandFrames(frame_range):
 def listMissingFiles(filename, frameRange):
     """ lists all missing files from local 'render-dump' directory """
 
-    dumpFolder=os.path.join(bpy.path.abspath("//"), "render-dump")
+    dumpFolder = getNameOutputFiles()
 
     try:
         allFiles = os.listdir(dumpFolder)
@@ -247,7 +247,7 @@ def changeContext(context, areaType):
 
 def updateServerPrefs():
     # verify rsync is installed on local machine
-    localVerify = subprocess.call("rsync --version", shell=True)
+    localVerify = subprocess.call("rsync --version", stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     if localVerify > 0:
         return {"valid":False, "errorMessage":"rsync not installed on local machine."}
 

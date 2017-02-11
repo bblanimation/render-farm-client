@@ -149,18 +149,17 @@ def buildJobStrings(frames, projectName, projectPath, nameOutputFiles, jobsPerFr
     """ Helper function to build Blender job strings to be sent to client servers """
 
     jobStrings = []
-    if not jobsPerFrame:
-        jobsPerFrame = servers/len(frames)
-    else:
-        jobsPerFrame = int(jobsPerFrame)
-    if jobsPerFrame > 1:
-        tmpInt = 0
+    # the following code may be used in the future, if I decide to distribute animation renders amongst multiple servers
+    # if not jobsPerFrame:
+    #     jobsPerFrame = servers/len(frames)
+    # else:
+    #     jobsPerFrame = int(jobsPerFrame)
+    if jobsPerFrame:
         for i in range(jobsPerFrame):
             for frame in frames:
                 seedString = "_seed-{seedNum}".format(seedNum=str(i).zfill(len(str(servers))))
                 builtString = buildJobString(projectPath, projectName, nameOutputFiles, frame, seedString)
                 jobStrings.append(builtString)
-                tmpInt += 1
     else:
         for frame in frames:
             builtString = buildJobString(projectPath, projectName, nameOutputFiles, frame)
