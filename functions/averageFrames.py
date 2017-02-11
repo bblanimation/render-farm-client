@@ -1,79 +1,73 @@
 #!/usr/bin/env python
 
-import argparse, sys, os, numpy
-from PIL import Image
-from VerboseAction import verbose_action
+import bpy, sys, os, numpy, fnmatch
+from . import getRenderDumpFolder
 
-parser = argparse.ArgumentParser()
-parser.add_argument("-p", "--path_to_images", action="store", help="Full path to Blender project file")
-parser.add_argument("-n", "--project_name", action="store", help="Name of Blender project file")
-parser.add_argument("-v", "--verbose", action=verbose_action, nargs="?", default=0)
-args = parser.parse_args()
 
-def averageFrames(renderedFramesPath, projectName, verbose=0):
-    """ Averages each pixel from all final rendered images to present one render result """
+
+def averageFrames(classObject, outputFileName, verbose=0):
+    """ Averages final rendered images in blender to present one render result """
 
     if verbose >= 1:
         print("Averaging images...")
 
-    # ensure 'renderedFramesPath' has trailing "/"
+    # ensure renderedFramesPath has trailing "/"
+    renderedFramesPath = getRenderDumpFolder()
     if not renderedFramesPath.endswith("/"):
         renderedFramesPath += "/"
 
     # get image files to average from 'renderedFramesPath'
     allFiles = os.listdir(renderedFramesPath)
-    supportedFileTypes = ["png", "tga", "tif", "jpg", "jp2", "bmp"]
-    imList = [filename for filename in allFiles if (filename[-3:] in supportedFileTypes and filename[-11:-3] != "average." and "_seed-" in filename)]
-    imList = [os.path.join(renderedFramesPath, im) for im in imList]
+    inFileName = "{outputFileName}_seed-*_{frame}{extension}".format(outputFileName=outputFileName, frame=str(bpy.props.imFrame).zfill(4), extension=bpy.props.imExtension)
+    imListNames = [filename for filename in allFiles if fnmatch.fnmatch(filename, inFileName)]
+    imList = [os.path.join(renderedFramesPath, im) for im in imListNames]
     if not imList:
-        sys.stderr.write("No valid image files to average.")
-        sys.exit(1)
-    extension = imList[0][-3:]
+        classObject.report({"ERROR"}, "No image files to average")
 
     # Assuming all images are the same size, get dimensions of first image
-    imRef = Image.open(imList[0])
-    w, h = imRef.size
-    mode = imRef.mode
-    N = len(imList)
-
-    # Create a numpy array of floats to store the average
-    if mode == "RGB":
-        arr = numpy.zeros((h, w, 3), numpy.float)
-    elif mode == "RGBA":
-        arr = numpy.zeros((h, w, 4), numpy.float)
-    elif mode == "L":
-        arr = numpy.zeros((h, w), numpy.float)
+    imRef = bpy.data.images.load(imList[0])
+    w = imRef.size[0]
+    h = imRef.size[1]
+    ch = imRef.channels
+    alpha = (ch == 4)
+    bpy.data.images.remove(imRef, do_unlink=True)
+    if type(classObject.avDict["array"]) == numpy.ndarray:
+        arr = classObject.avDict["array"]
+    elif ch in [3, 4]:
+        arr = numpy.zeros((w * h * ch), numpy.float)
     else:
-        sys.stderr.write("Unsupported image type. Supported types: ['RGB', 'RGBA', 'BW']")
-        sys.exit(1)
+        arr = numpy.zeros((w * h), numpy.float)
+    N = len(imList) + classObject.avDict["numFrames"]
 
     # Build up average pixel intensities, casting each image as an array of floats
     if verbose >= 2:
         print("Averaging the following images:")
-    for im in imList:
-        # load image
-        if verbose >= 2:
-            print(im)
-        imarr = numpy.array(Image.open(im), dtype=numpy.float)
-        arr = arr+imarr/N
 
-    # Round values in array and cast as 8-bit integer
-    arr = numpy.array(numpy.round(arr), dtype=numpy.uint8)
+    for image in imList:
+        if verbose >= 2:
+            print(image)
+        # load image
+        im = bpy.data.images.load(image)
+        data = list(im.pixels)
+        imarr = numpy.array(data, dtype=numpy.float)
+        arr = arr+imarr
+        bpy.data.images.remove(im, do_unlink=True)
+
+    classObject.avDict["numFrames"] = N
+    classObject.avDict["array"] = arr
+
+    arr = arr/N
 
     # Print details
     if verbose >= 1:
         print("Averaged successfully!")
 
-    # Generate, save and preview final image
-    out = Image.fromarray(arr, mode=mode)
-    if verbose >= 2:
-        print("saving averaged image...")
-    out.save(os.path.join(renderedFramesPath, "{projectName}_average.{extension}".format(extension=extension, projectName=projectName)))
-
-def main():
-    renderedFramesPath = args.path_to_images.replace(" ", "\\ ")
-    projectName = args.project_name
-    verbose = args.verbose
-    averageFrames(renderedFramesPath, projectName, verbose)
-
-main()
+    # Generate final averaged image, add it to the main database, and save it
+    imName = "{outputFileName}_{frame}_average{extension}".format(outputFileName=outputFileName, frame=str(bpy.props.imFrame).zfill(4), extension=bpy.props.imExtension)
+    if bpy.data.images.find(imName) < 0:
+        new = bpy.data.images.new(imName, w, h, alpha)
+    else:
+        new = bpy.data.images[imName]
+    new.pixels = arr.tolist()
+    new.filepath_raw = "{renderedFramesPath}{imName}".format(renderedFramesPath=renderedFramesPath, imName=imName)
+    new.save()

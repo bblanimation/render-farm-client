@@ -69,6 +69,12 @@ john
 
 
 
+### BEGIN HOST SERVER PATH ###
+/tmp/renderFarm/
+### END HOST SERVER PATH ###
+
+
+
 ### BEGIN REMOTE SERVERS DICTIONARY ###
 {"cse217": [
             "cse21701","cse21702","cse21703","cse21704","cse21705","cse21706",

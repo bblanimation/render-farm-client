@@ -3,7 +3,7 @@
 bl_info = {
     "name"        : "Server Farm Client",
     "author"      : "Christopher Gearhart <chris@bblanimation.com>",
-    "version"     : (0, 7, 3),
+    "version"     : (0, 7, 4),
     "blender"     : (2, 78, 0),
     "description" : "Render your scene on a custom server farm with this addon.",
     "location"    : "View3D > Tools > Render",
@@ -16,7 +16,7 @@ import bpy
 from bpy.types import Operator
 from bpy.props import *
 from . import (ui, buttons)
-from .functions.setupServerVars import *
+from .functions.setupServers import *
 
 def more_menu_options(self, context):
     layout = self.layout
@@ -40,7 +40,7 @@ def register():
         name="Kill Python",
         description="Run 'killall -9 python' on host server after render process cancelled",
         default=True)
-        
+
     bpy.types.Scene.compress = BoolProperty(
         name="Compress",
         description="Send compressed Blender file to host server (slower local save, faster file transfer)",
@@ -50,12 +50,6 @@ def register():
         name="Frames",
         description="Define frame ranges to render, separated by commas (e.g. '1,3,6-10')",
         default="")
-
-    bpy.types.Scene.tempFilePath = StringProperty(
-        name="Path",
-        description="Temporary remote filepath for output files on host server",
-        maxlen=128,
-        default="/tmp/renderFarm/")
 
     bpy.types.Scene.tempLocalDir = StringProperty(
         name="Temp Local Path",
@@ -91,41 +85,30 @@ def register():
     bpy.types.Scene.renderType = []
     bpy.types.Scene.renderStatus = {"animation":"None", "image":"None"}
 
-    # Initialize server and hostServerLogin variables
-    serverVars = setupServerVars()
-    bpy.props.servers = serverVars["servers"]
-    bpy.props.hostServerLogin = serverVars["hostServerLogin"]
-    writeServersFile(bpy.props.servers, "All Servers")
+    # Initialize server and login variables
+    bpy.types.Scene.serverGroups = EnumProperty(
+        attr="serverGroups",
+        name="Servers",
+        description="Choose which hosts to use for render processes",
+        items=[("All Servers", "All Servers", "Render on all servers")],
+        default="All Servers")
+    bpy.props.serverPrefs = {"servers":None, "login":None, "path":None, "hostConnection":None}
     bpy.types.Scene.availableServers = IntProperty(name="Available Servers", default=0)
     bpy.types.Scene.offlineServers = IntProperty(name="Offline Servers", default=0)
-    bpy.props.requiredFileRead = False
-    bpy.props.lastTempFilePath = bpy.types.Scene.tempFilePath
-
-    # TODO: Set default to False for public release (True for testing purposes)
+    bpy.props.lastRemotePath = None
     bpy.props.needsUpdating = True
 
     bpy.props.imExtension = False
     bpy.props.nameImOutputFiles = ""
     bpy.props.animExtension = False
+    bpy.props.imFrame = -1
     bpy.props.animFrameRange = []
-
-    # initialize server groups enum property
-    groupNames = [("All Servers", "All Servers", "Render on all servers")]
-    for groupName in serverVars["servers"]:
-        tmpList = [groupName, groupName, "Render only servers in this group"]
-        groupNames.append(tuple(tmpList))
-    bpy.types.Scene.serverGroups = EnumProperty(
-        attr="serverGroups",
-        name="Servers",
-        description="Choose which hosts to use for render processes",
-        items=groupNames,
-        default='All Servers')
 
     # handle the keymap
     wm = bpy.context.window_manager
     km = wm.keyconfigs.addon.keymaps.new(name='Object Mode', space_type='EMPTY')
-    kmi = km.keymap_items.new("scene.render_frame_on_servers", 'F12', 'PRESS', ctrl=True)
-    kmi = km.keymap_items.new("scene.render_animation_on_servers", 'F12', 'PRESS', ctrl=True, shift=True)
+    kmi = km.keymap_items.new("scene.render_frame_on_servers", 'F12', 'PRESS', alt=True)
+    kmi = km.keymap_items.new("scene.render_animation_on_servers", 'F12', 'PRESS', alt=True, shift=True)
     kmi = km.keymap_items.new("scene.open_rendered_image", 'O', 'PRESS', shift=True)
     kmi = km.keymap_items.new("scene.open_rendered_animation", 'O', 'PRESS', alt=True, shift=True)
     kmi = km.keymap_items.new("scene.list_frames", 'M', 'PRESS', shift=True)
@@ -139,7 +122,6 @@ def unregister():
     bpy.types.INFO_MT_render.remove(more_menu_options)
     del bpy.types.Scene.showAdvanced
     del bpy.types.Scene.frameRanges
-    del bpy.types.Scene.tempFilePath
     del bpy.types.Scene.tempLocalDir
     del bpy.types.Scene.nameOutputFiles
     del bpy.types.Scene.maxServerLoad
@@ -148,11 +130,9 @@ def unregister():
     del bpy.types.Scene.renderType
     del bpy.types.Scene.killPython
     del bpy.types.Scene.renderStatus
-    del bpy.props.servers
-    del bpy.props.hostServerLogin
-    del bpy.props.requiredFileRead
+    del bpy.props.serverPrefs
     del bpy.props.animFrameRange
-    del bpy.props.lastTempFilePath
+    del bpy.props.lastRemotePath
     del bpy.props.imExtension
     del bpy.props.animExtension
     del bpy.props.needsUpdating

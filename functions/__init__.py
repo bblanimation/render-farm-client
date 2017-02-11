@@ -1,68 +1,11 @@
 #!/usr/bin/env python
 
-import bpy, subprocess, os, sys
-from .setupServerVars import *
+import bpy
+import subprocess
+import os
+import sys
 import fnmatch
-
-def jobIsValid(jobType, classObject):
-    """ verifies that the job is valid before sending it to the host server """
-
-    jobValidityDict = False
-
-    # verify that project has been saved
-    if classObject.projectName == "":
-        jobValidityDict = {"valid":False, "errorType":"WARNING", "errorMessage":"RENDER FAILED: You have not saved your project file. Please save it before attempting to render."}
-
-    # verify that project name contains no spaces
-    elif " " in classObject.projectName:
-        jobValidityDict = {"valid":False, "errorType":"ERROR", "errorMessage":"RENDER ABORTED: Please remove ' ' (spaces) from the project file name."}
-
-    # verify that a camera exists in the scene
-    elif bpy.context.scene.camera is None:
-        jobValidityDict = {"valid":False, "errorType":"ERROR", "errorMessage":"RENDER FAILED: No camera in scene."}
-
-    # verify image file format
-    unsupportedFormats = ["AVI_JPEG", "AVI_RAW", "FRAMESERVER", "H264", "FFMPEG", "THEORA", "QUICKTIME", "XVID"]
-    if jobType == "image":
-        unsupportedFormats += ["CINEON", "HDR", "DPX", "IRIS", "OPEN_EXR", "OPEN_EXR_MULTILAYER"]
-    if not jobValidityDict and bpy.context.scene.render.image_settings.file_format in unsupportedFormats:
-        jobValidityDict = {"valid":False, "errorType":"ERROR", "errorMessage":"RENDER FAILED: Output file format not supported. Supported formats: BMP, PNG, TARGA, JPEG, JPEG 2000, TIFF. (Animation only: IRIS, CINEON, HDR, DPX, OPEN_EXR, OPEN_EXR_MULTILAYER)"}
-
-    # verify that sampling is high enough to provide expected results
-    if not jobValidityDict and jobType == "image":
-        if bpy.context.scene.cycles.progressive == "PATH":
-            samples = bpy.context.scene.cycles.samples
-            if bpy.context.scene.cycles.use_square_samples:
-                samples = samples**2
-            if samples < 10:
-                jobValidityDict = {"valid":True, "errorType":"WARNING", "errorMessage":"RENDER ALERT: Render result may be inaccurate at {samples} samples. Try 10 or more samples for a more accurate render.".format(samples=str(samples))}
-        elif bpy.context.scene.cycles.progressive == "BRANCHED_PATH":
-            samples = bpy.context.scene.cycles.aa_samples
-            if bpy.context.scene.cycles.use_square_samples:
-                samples = samples**2
-            if samples < 5:
-                jobValidityDict = {"valid":True, "errorType":"WARNING", "errorMessage":"RENDER ALERT: Render result may be inaccurate at {samples} AA samples. Try 5 or more AA samples for a more accurate render.".format(samples=str(samples))}
-
-    # else, the job is valid
-    if not jobValidityDict:
-        jobValidityDict = {"valid":True, "errorType":None, "errorMessage":None}
-
-    # if error detected, report error in Blender UI
-    if jobValidityDict["errorType"] != None:
-        classObject.report({jobValidityDict["errorType"]}, jobValidityDict["errorMessage"])
-    # else alert user that render job has started
-    else:
-        if jobType == "image":
-            classObject.report({"INFO"}, "Rendering current frame on {numAvailable} servers (Preview with 'SHIFT + P')".format(numAvailable=str(bpy.context.scene.availableServers)))
-        else:
-            classObject.report({"INFO"}, "Rendering animation on {numAvailable} servers (Check status with 'SHIFT + P')".format(numAvailable=str(bpy.context.scene.availableServers)))
-
-    # if job is invalid, return false
-    if not jobValidityDict["valid"]:
-        return False
-
-    # job is valid, return true
-    return True
+from .setupServers import *
 
 def getFrames(projectName, archiveFiles=False):
     """ rsync rendered frames from host server to local machine """
@@ -78,7 +21,7 @@ def getFrames(projectName, archiveFiles=False):
         archiveRsyncCommand = "mkdir -p {dumpLocation};".format(dumpLocation=dumpLocation)
 
     # rsync files from host server to local directory
-    fetchRsyncCommand = "rsync -x --progress --remove-source-files --exclude='*.blend' --exclude='*_average.???' -e 'ssh -T -o Compression=no -x' '{hostServerLogin}:{tempFilePath}{projectName}/results/*' '{dumpLocation}/';".format(hostServerLogin=bpy.props.hostServerLogin, tempFilePath=scn.tempFilePath, projectName=projectName, dumpLocation=dumpLocation)
+    fetchRsyncCommand = "rsync -x --progress --remove-source-files --exclude='*.blend' --exclude='*_average.???' -e 'ssh -T -oCompression=no -oStrictHostKeyChecking=no -x' '{login}:{remotePath}{projectName}/results/*' '{dumpLocation}/';".format(login=bpy.props.serverPrefs["login"], remotePath=bpy.props.serverPrefs["path"], projectName=projectName, dumpLocation=dumpLocation)
 
     # run the above processes
     process = subprocess.Popen(archiveRsyncCommand + fetchRsyncCommand, stdout=subprocess.PIPE, shell=True)
@@ -124,7 +67,7 @@ def copyProjectFile(projectName, compress):
         bpy.ops.wm.save_as_mainfile(filepath=saveToPath, copy=True)
 
     # copies blender project file to host server
-    rsyncCommand = "rsync --copy-links --progress --rsync-path='mkdir -p {tempFilePath}{projectName}/toRemote/ && rsync' -qazx --include={projectName}.blend --exclude='*' -e 'ssh -T -o Compression=no -x' '{tempLocalDir}' '{hostServerLogin}:{tempFilePath}{projectName}/toRemote/'".format(tempFilePath=scn.tempFilePath, projectName=projectName, tempLocalDir=scn.tempLocalDir, hostServerLogin=bpy.props.hostServerLogin)
+    rsyncCommand = "rsync --copy-links --progress --rsync-path='mkdir -p {remotePath}{projectName}/toRemote/ && rsync' -qazx --include={projectName}.blend --exclude='*' -e 'ssh -T -oCompression=no -oStrictHostKeyChecking=no -x' '{tempLocalDir}' '{login}:{remotePath}{projectName}/toRemote/'".format(remotePath=bpy.props.serverPrefs["path"], projectName=projectName, tempLocalDir=scn.tempLocalDir, login=bpy.props.serverPrefs["login"])
     process = subprocess.Popen(rsyncCommand, shell=True)
     return process
 
@@ -133,10 +76,10 @@ def copyFiles():
     scn = bpy.context.scene
 
     # write out the servers file for remote servers
-    writeServersFile(bpy.props.servers, scn.serverGroups)
+    writeServersFile(bpy.props.serverPrefs["servers"], scn.serverGroups)
 
     # rsync setup files to host server ('servers.txt', 'blender_p.py', 'blender_task' module)
-    rsyncCommand = "rsync -qax -e 'ssh -T -o Compression=no -x' --rsync-path='mkdir -p {tempFilePath} && rsync' '{to_host_server}/' '{username}:{tempFilePath}'".format(tempFilePath=scn.tempFilePath, to_host_server=os.path.join(getLibraryPath(), "to_host_server"), username=bpy.props.hostServerLogin)
+    rsyncCommand = "rsync -qax -e 'ssh -T -oCompression=no -oStrictHostKeyChecking=no -x' --rsync-path='mkdir -p {remotePath} && rsync' '{to_host_server}/' '{login}:{remotePath}'".format(remotePath=bpy.props.serverPrefs["path"], to_host_server=os.path.join(getLibraryPath(), "to_host_server"), login=bpy.props.serverPrefs["login"])
     process = subprocess.Popen(rsyncCommand, stdout=subprocess.PIPE, shell=True)
     return process
 
@@ -144,21 +87,14 @@ def renderFrames(frameRange, projectName, jobsPerFrame=False):
     """ calls 'blender_task' on host server """
 
     scn = bpy.context.scene
-    extraFlags = ""
-
     # defines the name of the output files generated by 'blender_task'
-    if scn.nameOutputFiles != "":
-        extraFlags += " -O {nameOutputFiles}".format(nameOutputFiles=scn.nameOutputFiles)
-
-    # defines the project path on the host server if specified
-    if scn.tempFilePath == "":
-        scn.tempFilePath = "/tmp/"
+    extraFlags = " -O {nameOutputFiles}".format(nameOutputFiles=getNameOutputFiles())
 
     if jobsPerFrame:
         extraFlags += " -j {jobsPerFrame}".format(jobsPerFrame=jobsPerFrame)
 
     # runs blender command to render given range from the remote server
-    renderCommand = "ssh -T -x {hostServerLogin} 'python {tempFilePath}blender_task -v -p -n {projectName} -l {frameRange} --hosts_file {tempFilePath}servers.txt -R {tempFilePath} --connection_timeout {t} --max_server_load {maxServerLoad}{extraFlags}'".format(hostServerLogin=bpy.props.hostServerLogin, tempFilePath=scn.tempFilePath, projectName=projectName, frameRange=frameRange.replace(" ", ""), t=scn.timeout, maxServerLoad=str(scn.maxServerLoad), extraFlags=extraFlags)
+    renderCommand = "ssh -T -oStrictHostKeyChecking=no -x {login} 'python {remotePath}blender_task -v -p -n {projectName} -l {frameRange} --hosts_file {remotePath}servers.txt -R {remotePath} --connection_timeout {t} --max_server_load {maxServerLoad}{extraFlags}'".format(login=bpy.props.serverPrefs["login"], remotePath=bpy.props.serverPrefs["path"], projectName=projectName, frameRange=frameRange.replace(" ", ""), t=scn.timeout, maxServerLoad=str(scn.maxServerLoad), extraFlags=extraFlags)
     process = subprocess.Popen(renderCommand, stderr=subprocess.PIPE, shell=True)
     print("Process sent to remote servers!")
     return process
@@ -273,6 +209,10 @@ def getRunningStatuses():
 
 def getNameOutputFiles():
     scn = bpy.context.scene
+    # remove illegal characters
+    for char in "/<>:\"\ |?*":
+        scn.nameOutputFiles = scn.nameOutputFiles.replace(char, "")
+    # return nameOutputFiles, or projectName if nameOutputFiles not specified
     if scn.nameOutputFiles != "":
         return scn.nameOutputFiles
     else:
@@ -292,12 +232,44 @@ def cleanupCancelledRender(classObject, context):
     wm.event_timer_remove(classObject._timer)
     for j in range(len(classObject.processes)):
         if classObject.processes[j]:
-            classObject.processes[j].kill()
+            try:
+                classObject.processes[j].kill()
+            except:
+                pass
     if bpy.context.scene.killPython:
-        subprocess.call("ssh -oStrictHostKeyChecking=no {hostServerLogin} 'killall -9 python'".format(hostServerLogin=bpy.props.hostServerLogin), shell=True)
+        subprocess.call("ssh -T -oStrictHostKeyChecking=no -x {login} 'killall -9 python'".format(login=bpy.props.serverPrefs["login"]), shell=True)
 
 def changeContext(context, areaType):
     """ Changes current context and returns previous area type """
     lastAreaType = context.area.type
     context.area.type = areaType
     return lastAreaType
+
+def updateServerPrefs():
+    # verify rsync is installed on local machine
+    localVerify = subprocess.call("rsync --version", shell=True)
+    if localVerify > 0:
+        return {"valid":False, "errorMessage":"rsync not installed on local machine."}
+
+    oldServerPrefs = bpy.props.serverPrefs
+    bpy.props.serverPrefs = setupServerPrefs()
+
+    if bpy.props.serverPrefs != oldServerPrefs:
+        # verify user entries correspond to responsive servers
+        # try:
+        #     subprocess.call("ssh -oStrictHostKeyChecking=no {login} 'echo hi'".format(login=bpy.props.serverPrefs["login"]), shell=True)
+        # except:
+        #     return {"valid":False, "errorMessage":"ssh to '{login}' failed. Check your settings and ensure ssh keys are setup".format(login=bpy.props.serverPrefs["login"])}
+
+        # initialize server groups enum property
+        groupNames = [("All Servers", "All Servers", "Render on all servers")]
+        for groupName in bpy.props.serverPrefs["servers"]:
+            tmpList = [groupName, groupName, "Render only servers in this group"]
+            groupNames.append(tuple(tmpList))
+        bpy.types.Scene.serverGroups = bpy.props.EnumProperty(
+            attr="serverGroups",
+            name="Servers",
+            description="Choose which hosts to use for render processes",
+            items=groupNames,
+            default="All Servers")
+    return {"valid":True, "errorMessage":None}

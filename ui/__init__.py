@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 
-import bpy, math
+import bpy
+import math
 from bpy.types import Panel
 from bpy.props import *
 from ..functions import getRenderStatus
-from ..functions.setupServerVars import *
+from ..functions.setupServers import *
 
 class renderOnServersPanel(Panel):
     bl_space_type  = "VIEW_3D"
@@ -41,13 +42,6 @@ class renderOnServersPanel(Panel):
             row.operator("scene.render_animation_on_servers", text="Animation", icon="RENDER_ANIMATION")
             col = layout.column(align=True)
             row = col.row(align=True)
-
-            # if 'remoteServers.txt' file has been edited, read in new input
-            if bpy.props.requiredFileRead:
-                serverVars = setupServerVars()
-                bpy.props.servers = serverVars["servers"]
-                bpy.props.hostServerLogin = serverVars["hostServerLogin"]
-                bpy.props.requiredFileRead = False
             row.prop(scn, "serverGroups")
 
             # Render Status Info
@@ -135,9 +129,7 @@ class serversPanel(Panel):
             box.prop(scn, "showAdvanced")
             if scn.showAdvanced:
                 col = box.column()
-                col.label(text="Output:")
                 col.prop(scn, "nameOutputFiles")
-                col.prop(scn, "tempFilePath")
 
                 layout.separator()
 
@@ -146,6 +138,9 @@ class serversPanel(Panel):
                 col.prop(scn, "maxServerLoad")
                 col.prop(scn, "timeout")
                 col.prop(scn, "maxSamples")
+
+                layout.separator()
+
                 row = col.row(align=True)
                 row.prop(scn, "killPython")
                 row.prop(scn, "compress")

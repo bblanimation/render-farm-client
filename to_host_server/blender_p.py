@@ -1,7 +1,6 @@
 #!/usr/bin/python
 
 import bpy
-import sys
 import random
 
 randomSeed = random.randint(1, 10000)

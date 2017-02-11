@@ -2,7 +2,6 @@
 
 import threading
 import telnetlib
-import subprocess
 import time
 from supporting_methods import *
 

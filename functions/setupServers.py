@@ -39,7 +39,7 @@ def readFileFor(f, flagName):
 
     return readLines
 
-def setupServerVars():
+def setupServerPrefs():
     # Variable definitions
     libraryServersPath = os.path.join(getLibraryPath(), "servers")
     serverFile = open(os.path.join(libraryServersPath, "remoteServers.txt"),"r")
@@ -48,11 +48,18 @@ def setupServerVars():
     username = readFileFor(serverFile, "SSH USERNAME").replace("\"", "")
     hostServer = readFileFor(serverFile, "HOST SERVER").replace("\"", "")
     extension = readFileFor(serverFile, "EXTENSION").replace("\"", "")
-    hostServerLogin = "{username}@{hostServer}{extension}".format(username=username, hostServer=hostServer, extension=extension)
+    path = readFileFor(serverFile, "HOST SERVER PATH").replace("\"", "")
+    login = "{username}@{hostServer}{extension}".format(username=username, hostServer=hostServer, extension=extension)
+    hostConnection = "{hostServer}{extension}".format(hostServer=hostServer, extension=extension)
+
+    # Format host server path
+    path = path.replace(" ", "_")
+    if not path.endswith("/"):
+        path += "/"
 
     # Set server dictionary
     servers = json.loads(readFileFor(serverFile, "REMOTE SERVERS DICTIONARY"))
-    return {"servers":servers, "hostServerLogin":hostServerLogin}
+    return {"servers":servers, "login":login, "path":path, "hostConnection":hostConnection}
 
 def writeServersFile(serverDict, serverGroups):
     f = open(os.path.join(getLibraryPath(), "to_host_server", "servers.txt"), "w")

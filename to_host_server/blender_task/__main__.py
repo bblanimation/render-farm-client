@@ -6,13 +6,10 @@ import os
 import getpass
 import sys
 import subprocess
-import threading
 import telnetlib
 import json
 import re
 import fnmatch
-import shlex
-import math
 import json
 import signal
 from JobHost import *

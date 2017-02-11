@@ -10,6 +10,8 @@ import time
 from bpy.types import Operator
 from bpy.props import *
 from ..functions import *
+from ..functions.averageFrames import *
+from ..functions.jobIsValid import *
 
 class refreshNumAvailableServers(Operator):
     """Attempt to connect to all servers through host server"""                 # blender will use this as a tooltip for menu items and buttons.
@@ -19,7 +21,7 @@ class refreshNumAvailableServers(Operator):
 
     def checkNumAvailServers(self):
         scn = bpy.context.scene
-        command = "ssh -T -x {hostServerLogin} 'python {tempFilePath}blender_task -H --connection_timeout {timeout} --hosts_file {tempFilePath}servers.txt'".format(hostServerLogin=bpy.props.hostServerLogin, tempFilePath=scn.tempFilePath, timeout=scn.timeout)
+        command = "ssh -T -oStrictHostKeyChecking=no -x {login} 'python {remotePath}blender_task -H --connection_timeout {timeout} --hosts_file {remotePath}servers.txt'".format(login=bpy.props.serverPrefs["login"], remotePath=bpy.props.serverPrefs["path"], timeout=scn.timeout)
         process = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
         return process
 
@@ -38,17 +40,24 @@ class refreshNumAvailableServers(Operator):
 
     def modal(self, context, event):
         if event.type in {"ESC"}:
-            self.report({"INFO"}, "Render process cancelled")
+            self.report({"INFO"}, "Refresh process cancelled")
             self.cancel(context)
             return{"CANCELLED"}
 
         if event.type == "TIMER":
             self.process.poll()
 
-            # if process finished and error thrown
+            # if python not found on host server
+            if self.process.returncode == 127 and self.state == 2:
+                self.report({"ERROR"}, "python not installed on host server")
+                self.cancel(context)
+                return{"CANCELLED"}
+
+            # if process finished and unknown error thrown
             if self.process.returncode != 0 and self.process.returncode != None:
                 handleError(self, "Process {curState}".format(curState=str(self.state-1)))
-                return{"FINISHED"}
+                self.cancel(context)
+                return{"CANCELLED"}
 
             # if process finished and no errors
             if self.process.returncode != None:
@@ -57,8 +66,8 @@ class refreshNumAvailableServers(Operator):
                 # check number of available servers via host server
                 if self.state == 1:
                     bpy.props.needsUpdating = False
-                    self.process = self.checkNumAvailServers()
                     self.state += 1
+                    self.process = self.checkNumAvailServers()
                     return{"PASS_THROUGH"}
 
                 elif self.state == 2:
@@ -76,24 +85,23 @@ class refreshNumAvailableServers(Operator):
         print("\nRunning 'checkNumAvailServers' function...")
         scn = context.scene
 
-        # format user input for tempFilePath string
-        scn.tempFilePath.replace(" ", "_")
-        if not scn.tempFilePath.endswith("/"):
-            scn.tempFilePath += "/"
+        # start initial process
+        self.state = 1 # initializes state for modal
+        if bpy.props.needsUpdating:
+            updateStatus = updateServerPrefs()
+            if not updateStatus["valid"]:
+                self.report({"ERROR"}, updateStatus["errorMessage"])
+                return{"CANCELLED"}
+            self.process = copyFiles()
+            bpy.props.lastRemotePath = bpy.props.serverPrefs["path"]
+        else:
+            self.process = self.checkNumAvailServers()
+            self.state += 1
 
         # create timer for modal
         wm = context.window_manager
         self._timer = wm.event_timer_add(0.1, context.window)
         wm.modal_handler_add(self)
-
-        # start initial process
-        self.state = 1 # initializes state for modal
-        if bpy.props.needsUpdating or bpy.props.lastTempFilePath != scn.tempFilePath:
-            self.process = copyFiles()
-            bpy.props.lastTempFilePath = scn.tempFilePath
-        else:
-            self.process = self.checkNumAvailServers()
-            self.state += 1
 
         self.report({"INFO"}, "Refreshing available servers...")
 
@@ -111,11 +119,8 @@ class sendFrame(Operator):
     bl_options = {"REGISTER", "UNDO"}                                           # enable undo for the operator.
 
     def averageFrames(self, scn):
-        averageScriptPath = os.path.join(getLibraryPath(), "functions", "averageFrames.py")
         bpy.props.nameImOutputFiles = getNameOutputFiles()
-        runScriptCommand = "python {averageScriptPath} -p {renderDumpFolder} -n {nameOutputFiles}".format(averageScriptPath=averageScriptPath.replace(" ", "\\ "), renderDumpFolder=getRenderDumpFolder(), nameOutputFiles=bpy.props.nameImOutputFiles)
-        process = subprocess.Popen(runScriptCommand, shell=True)
-        return process
+        averageFrames(self, bpy.props.nameImOutputFiles, 2)
 
     def modal(self, context, event):
         scn = context.scene
@@ -140,7 +145,7 @@ class sendFrame(Operator):
         elif event.type in {"P"} and self.shift and not self.processes[1]:
             if self.state[0] == 3:
                 self.report({"INFO"}, "Preparing render preview...")
-                self.processes[1] = getFrames(self.projectName, not self.previewed)
+                self.processes[1] = getFrames(self.projectName, True)
                 self.state[1] = 4
             elif self.state[0] < 3:
                 self.report({"WARNING"}, "Files are still transferring - try again in a moment")
@@ -171,6 +176,12 @@ class sendFrame(Operator):
                             return{"FINISHED"}
                         else:
                             pass
+                    # handle python not found on host error
+                    if self.processes[i].returncode == 127 and self.state[i] == 3:
+                        self.report({"ERROR"}, "python and/or rsync not installed on host server")
+                        setRenderStatus("image", "ERROR")
+                        self.cancel(context)
+                        return{"CANCELLED"}
                     # handle unidentified errors
                     elif self.processes[i].returncode > 1:
                         setRenderStatus("image", "ERROR")
@@ -182,6 +193,7 @@ class sendFrame(Operator):
                             self.errorSource = "blender_task"
 
                         handleError(self, self.errorSource, i)
+                        setRenderStatus("image", "ERROR")
                         self.cancel(context)
                         return{"CANCELLED"}
 
@@ -207,7 +219,7 @@ class sendFrame(Operator):
                             setRenderStatus("image", "ERROR")
                             self.cancel(context)
                             return{"CANCELLED"}
-                        self.processes[i] = renderFrames(str([self.curFrame]), self.projectName, jobsPerFrame)
+                        self.processes[i] = renderFrames(str([bpy.props.imFrame]), self.projectName, jobsPerFrame)
                         self.state[i] += 1
                         setRenderStatus("image", "Rendering...")
                         return{"PASS_THROUGH"}
@@ -217,7 +229,7 @@ class sendFrame(Operator):
                         if self.processes[1] and self.processes[1].returncode == None:
                             self.processes[1].kill()
                         self.state[i] += 1
-                        self.processes[0] = getFrames(self.projectName, not self.previewed)
+                        self.processes[0] = getFrames(self.projectName, True)
                         if not self.renderCancelled:
                             setRenderStatus("image", "Finishing...")
                         return{"PASS_THROUGH"}
@@ -225,39 +237,39 @@ class sendFrame(Operator):
                     # average the rendered frames if there are new frames to average
                     elif self.state[i] == 4:
                         # only average if there are new frames to average
-                        self.numLastRenderedFiles = self.numRenderedFiles
-                        self.numRenderedFiles = getNumRenderedFiles("image", self.curFrame, None)
-                        if self.numLastRenderedFiles != self.numRenderedFiles:
-                            self.processes[i] = self.averageFrames(scn)
-                        self.state[i] += 1
-                        return{'PASS_THROUGH'}
-
-                    elif self.state[i] == 5:
-                        self.numSamples = self.sampleSize * getNumRenderedFiles("image", self.curFrame, None)
+                        self.numRenderedFiles = self.avDict["numFrames"] + getNumRenderedFiles("image", bpy.props.imFrame, None)
+                        if self.avDict["numFrames"] != self.numRenderedFiles:
+                            averaged = True
+                            self.averageFrames(scn)
+                        else:
+                            averaged = False
+                        # calculate number of samples represented in averaged image
+                        self.numSamples = self.sampleSize * getNumRenderedFiles("image", bpy.props.imFrame, None)
+                        # open rendered image
                         if i == 0:
                             setRenderStatus("image", "Complete!")
                             if context.area.type == "IMAGE_EDITOR":
-                                if not self.previewed:
-                                    averaged_image_filepath = os.path.join(bpy.path.abspath("//"), "render-dump", "{fileName}_average{extension}".format(fileName=bpy.props.nameImOutputFiles, extension=bpy.props.imExtension))
+                                if averaged and not self.previewed:
+                                    averaged_image_filepath = os.path.join(getRenderDumpFolder(), "{fileName}_{frame}_average{extension}".format(fileName=bpy.props.nameImOutputFiles, frame=str(bpy.props.imFrame).zfill(4), extension=bpy.props.imExtension))
                                     bpy.ops.image.open(filepath=averaged_image_filepath)
                                 bpy.ops.image.reload()
                             self.report({"INFO"}, "Render completed at {numSamples} samples! View the rendered image in your UV/Image_Editor".format(numSamples=str(self.numSamples)))
                         else:
                             # open preview image in UV/Image_Editor
                             changeContext(context, "IMAGE_EDITOR")
-                            if not self.previewed:
-                                averaged_image_filepath = os.path.join(bpy.path.abspath("//"), "render-dump", "{fileName}_average{extension}".format(fileName=bpy.props.nameImOutputFiles, extension=bpy.props.imExtension))
+                            if averaged and not self.previewed:
+                                averaged_image_filepath = os.path.join(getRenderDumpFolder(), "{fileName}_{frame}_average{extension}".format(fileName=bpy.props.nameImOutputFiles, frame=str(bpy.props.imFrame).zfill(4), extension=bpy.props.imExtension))
                                 bpy.ops.image.open(filepath=averaged_image_filepath)
-                            bpy.ops.image.reload()
                             self.processes[1] = False
                             self.previewed = True
                             previewString = "Render preview loaded ({numSamples} samples)".format(numSamples=str(self.numSamples))
                             self.report({"INFO"}, previewString)
-                            print(previewString)
+                            bpy.ops.image.reload()
                         appendViewable("image")
                         removeViewable("animation")
                         if i == 0:
                             if self.renderCancelled:
+                                setRenderStatus("image", "Cancelled")
                                 self.cancel(context)
                                 return{"CANCELLED"}
                             else:
@@ -265,6 +277,7 @@ class sendFrame(Operator):
                     else:
                         self.report({"ERROR"}, "ERROR: Current state not recognized.")
                         setRenderStatus("image", "ERROR")
+                        self.cancel(context)
                         return{"CANCELLED"}
 
         return{"PASS_THROUGH"}
@@ -281,18 +294,16 @@ class sendFrame(Operator):
         # ensure no other render processes are running
         if getRenderStatus("image") in getRunningStatuses() or getRenderStatus("animation") in getRunningStatuses():
             self.report({"WARNING"}, "Render in progress...")
-            return{"FINISHED"}
-
-        print("\nRunning sendFrame function...")
+            return{"CANCELLED"}
+        elif scn.availableServers == 0:
+            self.report({"WARNING"}, "No servers available. Try refreshing.")
+            return{"CANCELLED"}
 
         # ensure the job won't break the script
         if not jobIsValid("image", self):
-            return{"FINISHED"}
+            return{"CANCELLED"}
 
-        # format user input for tempFilePath string
-        scn.tempFilePath.replace(" ", "_")
-        if not scn.tempFilePath.endswith("/"):
-            scn.tempFilePath += "/"
+        print("\nRunning sendFrame function...")
 
         # set the file extension for use with 'open image' button
         bpy.props.imExtension = scn.render.file_extension
@@ -307,11 +318,6 @@ class sendFrame(Operator):
             if scn.cycles.use_square_samples:
                 self.sampleSize = self.sampleSize**2
 
-        # create timer for modal
-        wm = context.window_manager
-        self._timer = wm.event_timer_add(0.1, context.window)
-        wm.modal_handler_add(self)
-
         # start initial render process
         self.stdout = None
         self.stderr = None
@@ -321,15 +327,25 @@ class sendFrame(Operator):
         self.finishedFrames = 0
         self.previewed = False
         self.numSamples = 0
+        self.avDict = {"array":False, "numFrames":0}
         self.numRenderedFiles = 0
         self.numLastRenderedFiles = 0
-        self.curFrame = scn.frame_current
-        self.processes = [copyProjectFile(self.projectName, scn.compress), False]
+        bpy.props.imFrame = scn.frame_current
         self.state = [1, 0]  # initializes state for modal
-        if bpy.props.needsUpdating or bpy.props.lastTempFilePath != scn.tempFilePath:
-            bpy.props.lastTempFilePath = scn.tempFilePath
+        if bpy.props.needsUpdating:
+            updateStatus = updateServerPrefs()
+            if not updateStatus["valid"]:
+                self.report({"ERROR"}, updateStatus["errorMessage"])
+                return{"CANCELLED"}
+            bpy.props.lastRemotePath = bpy.props.serverPrefs["path"]
         else:
             self.state[0] += 1
+        self.processes = [copyProjectFile(self.projectName, scn.compress), False]
+
+        # create timer for modal
+        wm = context.window_manager
+        self._timer = wm.event_timer_add(0.1, context.window)
+        wm.modal_handler_add(self)
 
         setRenderStatus("image", "Preparing files...")
         setRenderStatus("animation", "None")
@@ -400,6 +416,12 @@ class sendAnimation(Operator):
                             return{"FINISHED"}
                         else:
                             pass
+                    # handle python not found on host error
+                    if self.processes[i].returncode == 127 and self.state[i] == 3:
+                        self.report({"ERROR"}, "python and/or rsync not installed on host server")
+                        setRenderStatus("animation", "ERROR")
+                        self.cancel(context)
+                        return{"CANCELLED"}
                     # handle unidentified errors
                     elif self.processes[i].returncode > 1:
                         setRenderStatus("animation", "ERROR")
@@ -411,6 +433,7 @@ class sendAnimation(Operator):
                             self.errorSource = "blender_task"
 
                         handleError(self, self.errorSource, i)
+                        setRenderStatus("animation", "ERROR")
                         self.cancel(context)
                         return{"CANCELLED"}
 
@@ -489,7 +512,11 @@ class sendAnimation(Operator):
         # ensure no other render processes are running
         if getRenderStatus("image") in getRunningStatuses() or getRenderStatus("animation") in getRunningStatuses():
             self.report({"WARNING"}, "Render in progress...")
-            return{"FINISHED"}
+            return{"CANCELLED"}
+        elif scn.availableServers == 0:
+
+            self.report({"WARNING"}, "No servers available. Try refreshing.")
+            return{"CANCELLED"}
 
         print("\nRunning sendAnimation function...")
 
@@ -497,18 +524,8 @@ class sendAnimation(Operator):
         if not jobIsValid("animation", self):
             return{"FINISHED"}
 
-        # format user input for tempFilePath string
-        scn.tempFilePath.replace(" ", "_")
-        if not scn.tempFilePath.endswith("/"):
-            scn.tempFilePath += "/"
-
         # set the file extension for use with 'open animation' button
         bpy.props.animExtension = bpy.context.scene.render.file_extension
-
-        # create timer for modal
-        wm = context.window_manager
-        self._timer = wm.event_timer_add(0.1, context.window)
-        wm.modal_handler_add(self)
 
         # start initial render process
         self.stdout = None
@@ -520,12 +537,20 @@ class sendAnimation(Operator):
         self.endFrame = context.scene.frame_end
         self.numFrames = str(int(scn.frame_end) - int(scn.frame_start))
         self.statusChecked = False
-        self.processes = [copyProjectFile(self.projectName, scn.compress), False]
         self.state = [1, 0] # initializes state for modal
-        if bpy.props.needsUpdating or bpy.props.lastTempFilePath != scn.tempFilePath:
-            bpy.props.lastTempFilePath = scn.tempFilePath
+        if bpy.props.needsUpdating:
+            updateStatus = updateServerPrefs()
+            if not updateStatus["valid"]:
+                self.report({"ERROR"}, updateStatus["errorMessage"])
+                return{"CANCELLED"}
         else:
             self.state[0] += 1
+        self.processes = [copyProjectFile(self.projectName, scn.compress), False]
+
+        # create timer for modal
+        wm = context.window_manager
+        self._timer = wm.event_timer_add(0.1, context.window)
+        wm.modal_handler_add(self)
 
         setRenderStatus("animation", "Preparing files...")
         setRenderStatus("image", "None")
@@ -545,7 +570,7 @@ class openRenderedImageInUI(Operator):
     def execute(self, context):
         # open rendered image
         changeContext(context, "IMAGE_EDITOR")
-        averaged_image_filepath = os.path.join(bpy.path.abspath("//"), "render-dump", "{fileName}_average{extension}".format(fileName=getNameOutputFiles(), extension=bpy.props.imExtension))
+        averaged_image_filepath = os.path.join(getRenderDumpFolder(), "{fileName}_{frame}_average{extension}".format(fileName=getNameOutputFiles(), frame=str(bpy.props.imFrame).zfill(4), extension=bpy.props.imExtension))
         bpy.ops.image.open(filepath=averaged_image_filepath)
         bpy.ops.image.reload()
 
@@ -600,7 +625,6 @@ class editRemoteServersDict(Operator):
             libraryServersPath = os.path.join(getLibraryPath(), "servers")
             bpy.ops.text.open(filepath=os.path.join(libraryServersPath, "remoteServers.txt"))
             self.report({"INFO"}, "Opened 'remoteServers.txt'")
-            bpy.props.requiredFileRead = True
             bpy.props.needsUpdating = True
         except:
             self.report({"ERROR"}, "ERROR: Could not open 'remoteServers.txt'. If the problem persists, try reinstalling the add-on.")
