@@ -134,18 +134,29 @@ def expandFrames(frame_range):
 def listMissingFiles(filename, frameRange):
     """ lists all missing files from local 'render-dump' directory """
 
-    dumpFolder = getNameOutputFiles()
+    dumpFolder = getRenderDumpFolder()
+    compList = expandFrames(json.loads(frameRange))
+
+    if not os.path.exists(dumpFolder):
+        errorMsg = "The folder does not exist: {dumpFolder}/".format(dumpFolder=dumpFolder)
+        sys.stderr.write(errorMsg)
+        print(errorMsg)
+        return str(compList)[1:-1]
 
     try:
         allFiles = os.listdir(dumpFolder)
     except:
-        sys.stderr.write("Error listing directory {dumpFolder}/. The folder may not exist.".format(dumpFolder=dumpFolder))
-        return ""
+        errorMsg = "Error listing directory {dumpFolder}/".format(dumpFolder=dumpFolder)
+        sys.stderr.write(errorMsg)
+        print(errorMsg)
+        return str(compList)[1:-1]
     imList = []
     for f in allFiles:
-        if f[-11:-4] != "average" and "seed" not in f and f[:len(filename)] == filename:
+        if "_average." not in f and not fnmatch.fnmatch(f, "*_seed-*_????.???") and f[:len(filename)] == filename:
             imList.append(int(f[len(filename)+1:len(filename)+5]))
-    compList = expandFrames(json.loads(frameRange))
+    print(frameRange)
+    print(compList)
+    print(imList)
 
     # compare lists to determine which frames are missing from imlist
     missingF = [i for i in compList if i not in imList]
