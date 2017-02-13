@@ -25,7 +25,6 @@ def getFrames(projectName, archiveFiles=False, frameRange=False):
             f.write(fileStrings)
             includeDict = "--include-from='{outFilePath}'".format(outFilePath=outFilePath)
             f.close()
-            os.remove(outFilePath)
         archiveRsyncCommand = "rsync -qx --rsync-path='mkdir -p {dumpLocation}/backups/ && rsync' --remove-source-files {includeDict} --exclude='{nameOutputFiles}_????.???' --exclude='*_average.???' {dumpLocation}/* {dumpLocation}/backups/;".format(includeDict=includeDict, dumpLocation=dumpLocation, nameOutputFiles=getNameOutputFiles(), imExtension=bpy.props.imExtension)
     else:
         archiveRsyncCommand = "mkdir -p {dumpLocation};".format(dumpLocation=dumpLocation)
