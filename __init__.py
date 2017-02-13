@@ -58,6 +58,13 @@ def register():
         default="/tmp/",
         subtype="DIR_PATH")
 
+    bpy.types.Scene.renderDumpLoc = StringProperty(
+        name="Output",
+        description="Folder to store output files from Blender (empty folder recommended)",
+        maxlen=128,
+        default="//render-dump/",
+        subtype="DIR_PATH")
+
     bpy.types.Scene.nameOutputFiles = StringProperty(
         name="Name",
         description="Name output files in 'render_dump' folder (prepended to: '_####')",
@@ -73,8 +80,8 @@ def register():
     bpy.types.Scene.maxSamples = IntProperty(
         name="Max Samples",
         description="Maximum number of samples to render when rendering current frame",
-        min=100, max=2000,
-        default=1000)
+        min=100, max=9999,
+        default=750)
 
     bpy.types.Scene.timeout = FloatProperty(
         name="Timeout",
@@ -123,6 +130,7 @@ def unregister():
     del bpy.types.Scene.showAdvanced
     del bpy.types.Scene.frameRanges
     del bpy.types.Scene.tempLocalDir
+    del bpy.types.Scene.renderDumpLoc
     del bpy.types.Scene.nameOutputFiles
     del bpy.types.Scene.maxServerLoad
     del bpy.types.Scene.timeout

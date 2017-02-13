@@ -233,7 +233,7 @@ class sendFrame(Operator):
                     # average the rendered frames if there are new frames to average
                     elif self.state[i] == 4:
                         # only average if there are new frames to average
-                        numRenderedFiles = getNumRenderedFiles("image", bpy.props.imFrame, None)
+                        numRenderedFiles = getNumRenderedFiles("image", list(bpy.props.imFrame), None)
                         if numRenderedFiles > 0:
                             averaged = True
                             averageFrames(self, bpy.props.nameImOutputFiles)
@@ -380,7 +380,7 @@ class sendAnimation(Operator):
         elif event.type in {"P"} and self.shift and not self.processes[1]:
             if self.state[0] == 3:
                 self.report({"INFO"}, "Checking render status...")
-                self.processes[1] = getFrames(self.projectName, not self.statusChecked)
+                self.processes[1] = getFrames(self.projectName, not self.statusChecked, self.expandedFrameRange)
                 self.state[1] = 4
             elif self.state[0] < 3:
                 self.report({"WARNING"}, "Files are still transferring - try again in a moment")
@@ -452,9 +452,9 @@ class sendAnimation(Operator):
                         if not setFrameRangesDict(self):
                             setRenderStatus("animation", "ERROR")
                             return{"FINISHED"}
-                        expandedFrameRange = expandFrames(json.loads(self.frameRangesDict["string"]))
-                        self.processes[i] = renderFrames(str(expandedFrameRange), self.projectName)
-                        bpy.props.animFrameRange = expandedFrameRange
+                        self.expandedFrameRange = expandFrames(json.loads(self.frameRangesDict["string"]))
+                        self.processes[i] = renderFrames(str(self.expandedFrameRange), self.projectName)
+                        bpy.props.animFrameRange = self.expandedFrameRange
                         setRenderStatus("animation", "Rendering...")
                         self.state[i] += 1
                         return{"PASS_THROUGH"}
@@ -464,15 +464,15 @@ class sendAnimation(Operator):
                         if self.processes[1] and self.processes[1].returncode == None:
                             self.processes[1].kill()
                         self.state[0] += 1
-                        self.processes[0] = getFrames(self.projectName, not self.statusChecked)
+                        self.processes[0] = getFrames(self.projectName, not self.statusChecked, self.expandedFrameRange)
                         if not self.renderCancelled:
                             setRenderStatus("animation", "Finishing...")
                         return{"PASS_THROUGH"}
 
                     elif self.state[i] == 4:
-                        numCompleted = getNumRenderedFiles("animation", None, getNameOutputFiles())
+                        numCompleted = getNumRenderedFiles("animation", self.expandedFrameRange, getNameOutputFiles())
                         if numCompleted > 0:
-                            viewString = " - View rendered frames in '//render-dump/'"
+                            viewString = " - View rendered frames in render dump folder"
                         else:
                             viewString = ""
                         self.report({"INFO"}, "Render completed for {numCompleted}/{numSent} frames{viewString}".format(numCompleted=numCompleted, numSent=len(bpy.props.animFrameRange), viewString=viewString))
@@ -532,6 +532,7 @@ class sendAnimation(Operator):
         self.endFrame = context.scene.frame_end
         self.numFrames = str(int(scn.frame_end) - int(scn.frame_start))
         self.statusChecked = False
+        self.expandedFrameRange = []
         self.state = [1, 0] # initializes state for modal
         if bpy.props.needsUpdating:
             updateStatus = updateServerPrefs()
@@ -604,7 +605,7 @@ class openRenderedAnimationInUI(Operator):
             bpy.data.movieclips[openedFile].frame_start = frame
         else:
             changeContext(context, lastAreaType)
-            self.report({"ERROR"}, "Could not open rendered animation. View files in file browser in the following folder: '<project_folder>/render-dump'.")
+            self.report({"ERROR"}, "Could not open rendered animation. View files in file browser in the following folder: '{renderDumpFolder}'.".format(renderDumpFolder=getRenderDumpFolder()))
 
         return{"FINISHED"}
 
@@ -626,7 +627,7 @@ class editRemoteServersDict(Operator):
         return{"FINISHED"}
 
 class listMissingFrames(Operator):
-    """List the output files missing from the render-dump folder"""             # blender will use this as a tooltip for menu items and buttons.
+    """List the output files missing from the render dump folder"""             # blender will use this as a tooltip for menu items and buttons.
     bl_idname = "scene.list_frames"                                              # unique identifier for buttons and menu items to reference.
     bl_label = "List Missing Frames"                                            # display name in the interface.
     bl_options = {"REGISTER", "UNDO"}                                           # enable undo for the operator.
@@ -638,7 +639,7 @@ class listMissingFrames(Operator):
         if not setFrameRangesDict(self):
             return{"FINISHED"}
 
-        # list all missing files from start frame to end frame in render-dump location
+        # list all missing files from start frame to end frame in render dump folder
         missingFrames = listMissingFiles(getNameOutputFiles(), self.frameRangesDict["string"])
         if len(missingFrames) > 0:
             self.report({"INFO"}, "Missing frames: {missingFrames}".format(missingFrames=missingFrames))
@@ -648,7 +649,7 @@ class listMissingFrames(Operator):
         return{"FINISHED"}
 
 class setToMissingFrames(Operator):
-    """Set frame range to frames missing from the render-dump folder"""         # blender will use this as a tooltip for menu items and buttons.
+    """Set frame range to frames missing from the render dump folder"""         # blender will use this as a tooltip for menu items and buttons.
     bl_idname = "scene.set_to_missing_frames"                                   # unique identifier for buttons and menu items to reference.
     bl_label = "Set to Missing Frames"                                          # display name in the interface.
     bl_options = {"REGISTER", "UNDO"}                                           # enable undo for the operator.
@@ -660,7 +661,7 @@ class setToMissingFrames(Operator):
         if not setFrameRangesDict(self):
             return{"FINISHED"}
 
-        # list all missing files from start frame to end frame in render-dump location
+        # list all missing files from start frame to end frame in render dump location
         scn.frameRanges = listMissingFiles(getNameOutputFiles(), self.frameRangesDict["string"])
 
         return{"FINISHED"}

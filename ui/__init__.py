@@ -130,6 +130,7 @@ class serversPanel(Panel):
             if scn.showAdvanced:
                 col = box.column()
                 col.prop(scn, "nameOutputFiles")
+                col.prop(scn, "renderDumpLoc")
 
                 layout.separator()
 

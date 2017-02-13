@@ -7,7 +7,7 @@ import sys
 import fnmatch
 from .setupServers import *
 
-def getFrames(projectName, archiveFiles=False):
+def getFrames(projectName, archiveFiles=False, frameRange=False):
     """ rsync rendered frames from host server to local machine """
 
     scn = bpy.context.scene
@@ -16,7 +16,17 @@ def getFrames(projectName, archiveFiles=False):
 
     if archiveFiles:
         # move old render files to backup directory
-        archiveRsyncCommand = "rsync -qx --rsync-path='mkdir -p {dumpLocation}/backups/ && rsync' --remove-source-files --exclude='{nameImOutputFiles}_*_average{imExtension}' {dumpLocation}/* {dumpLocation}/backups/;".format(dumpLocation=dumpLocation, nameImOutputFiles=bpy.props.nameImOutputFiles, imExtension=bpy.props.imExtension)
+        if frameRange:
+            fileStrings = ""
+            for frame in frameRange:
+                fileStrings += "{nameOutputFiles}_{frameNum}{animExtension}\n".format(nameOutputFiles=getNameOutputFiles(), frameNum=str(frame).zfill(4), animExtension=bpy.props.animExtension)
+            outFilePath = os.path.join(dumpLocation, "includeList.txt")
+            f = open(outFilePath, "w")
+            f.write(fileStrings)
+            includeDict = "--include-from='{outFilePath}'".format(outFilePath=outFilePath)
+            f.close()
+            os.remove(outFilePath)
+        archiveRsyncCommand = "rsync -qx --rsync-path='mkdir -p {dumpLocation}/backups/ && rsync' --remove-source-files {includeDict} --exclude='{nameOutputFiles}_????.???' --exclude='*_average.???' {dumpLocation}/* {dumpLocation}/backups/;".format(includeDict=includeDict, dumpLocation=dumpLocation, nameOutputFiles=getNameOutputFiles(), imExtension=bpy.props.imExtension)
     else:
         archiveRsyncCommand = "mkdir -p {dumpLocation};".format(dumpLocation=dumpLocation)
 
@@ -132,7 +142,7 @@ def expandFrames(frame_range):
     return list(set(frames))
 
 def listMissingFiles(filename, frameRange):
-    """ lists all missing files from local 'render-dump' directory """
+    """ lists all missing files from local render dump directory """
 
     dumpFolder = getRenderDumpFolder()
     compList = expandFrames(json.loads(frameRange))
@@ -154,9 +164,6 @@ def listMissingFiles(filename, frameRange):
     for f in allFiles:
         if "_average." not in f and not fnmatch.fnmatch(f, "*_seed-*_????.???") and f[:len(filename)] == filename:
             imList.append(int(f[len(filename)+1:len(filename)+5]))
-    print(frameRange)
-    print(compList)
-    print(imList)
 
     # compare lists to determine which frames are missing from imlist
     missingF = [i for i in compList if i not in imList]
@@ -213,7 +220,22 @@ def setFrameRangesDict(classObject):
     return True
 
 def getRenderDumpFolder():
-    return os.path.join(bpy.path.abspath("//"), "render-dump")
+    dumpLoc = bpy.context.scene.renderDumpLoc
+
+    # setup the render dump folder based on user input
+    if dumpLoc.startswith("//"):
+        dumpLoc = os.path.join(bpy.path.abspath("//"), dumpLoc[2:])
+    elif dumpLoc != "":
+        dumpLoc = dumpLoc[2:]
+    # if no user input, use default render location
+    else:
+        dumpLoc = os.path.join(bpy.path.abspath("//"), "render-dump")
+
+    # check to make sure dumpLoc exists on local machine
+    if not os.path.exists(dumpLoc):
+        os.path.mkdir(dumpLoc)
+
+    return dumpLoc
 
 def getRunningStatuses():
     return ["Rendering...", "Preparing files...", "Finishing..."]
@@ -229,11 +251,19 @@ def getNameOutputFiles():
     else:
         return bpy.path.display_name_from_filepath(bpy.data.filepath)
 
-def getNumRenderedFiles(jobType, frameNumber=None, fileName=None):
+def getNumRenderedFiles(jobType, frameRange=None, fileName=None):
     if jobType == "image":
-        numRenderedFiles = len([f for f in os.listdir(getRenderDumpFolder()) if "_seed-" in f and f.endswith(str(frameNumber) + bpy.props.imExtension)])
+        numRenderedFiles = len([f for f in os.listdir(getRenderDumpFolder()) if "_seed-" in f and f.endswith(str(frameRange[0]) + bpy.props.imExtension)])
     else:
-        numRenderedFiles = len([f for f in os.listdir(getRenderDumpFolder()) if fnmatch.fnmatch(f, "{fileName}_????{extension}".format(fileName=fileName, extension=bpy.props.animExtension))])
+        renderedFiles = []
+        for f in os.listdir(getRenderDumpFolder()):
+            try:
+                frameNum = int(f[-8:-4])
+            except:
+                continue
+            if frameNum in frameRange and fnmatch.fnmatch(f, "{fileName}_????{extension}".format(fileName=fileName, extension=bpy.props.animExtension)):
+                renderedFiles.append(f)
+        numRenderedFiles = len(renderedFiles)
     return numRenderedFiles
 
 def cleanupCancelledRender(classObject, context):
