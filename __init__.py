@@ -99,6 +99,7 @@ def register():
         description="Choose which hosts to use for render processes",
         items=[("All Servers", "All Servers", "Render on all servers")],
         default="All Servers")
+    bpy.props.lastServerGroup = "All Servers"
     bpy.props.serverPrefs = {"servers":None, "login":None, "path":None, "hostConnection":None}
     bpy.types.Scene.availableServers = IntProperty(name="Available Servers", default=0)
     bpy.types.Scene.offlineServers = IntProperty(name="Offline Servers", default=0)

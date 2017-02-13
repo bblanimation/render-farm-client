@@ -49,6 +49,8 @@ the author, Chris Gearhart, at chris@bblanimation.com.
 changes to this file (Text > Save), and switch back to the 3D viewport. Now
 you're ready to render on your remote servers!
 
+***DO NOT MODIFY LINES CONTAINING "###"***
+
 
 
 ### BEGIN SSH USERNAME ###

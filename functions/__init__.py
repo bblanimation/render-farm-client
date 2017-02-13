@@ -25,6 +25,8 @@ def getFrames(projectName, archiveFiles=False, frameRange=False):
             f.write(fileStrings)
             includeDict = "--include-from='{outFilePath}'".format(outFilePath=outFilePath)
             f.close()
+        else:
+            includeDict = ""
         archiveRsyncCommand = "rsync -qx --rsync-path='mkdir -p {dumpLocation}/backups/ && rsync' --remove-source-files {includeDict} --exclude='{nameOutputFiles}_????.???' --exclude='*_average.???' {dumpLocation}/* {dumpLocation}/backups/;".format(includeDict=includeDict, dumpLocation=dumpLocation, nameOutputFiles=getNameOutputFiles(), imExtension=bpy.props.imExtension)
     else:
         archiveRsyncCommand = "mkdir -p {dumpLocation};".format(dumpLocation=dumpLocation)
@@ -232,7 +234,7 @@ def getRenderDumpFolder():
 
     # check to make sure dumpLoc exists on local machine
     if not os.path.exists(dumpLoc):
-        os.path.mkdir(dumpLoc)
+        os.mkdir(dumpLoc)
 
     return dumpLoc
 
@@ -291,15 +293,20 @@ def updateServerPrefs():
     if localVerify > 0:
         return {"valid":False, "errorMessage":"rsync not installed on local machine."}
 
+    # run setupServerPrefs() and store last results to oldServerPrefs
     oldServerPrefs = bpy.props.serverPrefs
-    bpy.props.serverPrefs = setupServerPrefs()
+    newServerPrefs = setupServerPrefs()
+    if newServerPrefs["valid"]:
+        bpy.props.serverPrefs = newServerPrefs
+    else:
+        return newServerPrefs
 
     if bpy.props.serverPrefs != oldServerPrefs:
-        # verify user entries correspond to responsive servers
-        # try:
-        #     subprocess.call("ssh -oStrictHostKeyChecking=no {login} 'echo hi'".format(login=bpy.props.serverPrefs["login"]), shell=True)
-        # except:
-        #     return {"valid":False, "errorMessage":"ssh to '{login}' failed. Check your settings and ensure ssh keys are setup".format(login=bpy.props.serverPrefs["login"])}
+        # verify host server login, built from user entries, correspond to a responsive server
+        try:
+            subprocess.call("ssh -T -oStrictHostKeyChecking=no -x {login} 'echo hi'".format(login=bpy.props.serverPrefs["login"]), shell=True)
+        except:
+            return {"valid":False, "errorMessage":"ssh to '{login}' failed. Check your settings and ensure ssh keys are setup".format(login=bpy.props.serverPrefs["login"])}
 
         # initialize server groups enum property
         groupNames = [("All Servers", "All Servers", "Render on all servers")]

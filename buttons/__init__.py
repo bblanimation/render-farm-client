@@ -87,7 +87,8 @@ class refreshNumAvailableServers(Operator):
 
         # start initial process
         self.state = 1 # initializes state for modal
-        if bpy.props.needsUpdating:
+        if bpy.props.needsUpdating or bpy.props.lastServerGroup != scn.serverGroups:
+            bpy.props.lastServerGroup = scn.serverGroups
             updateStatus = updateServerPrefs()
             if not updateStatus["valid"]:
                 self.report({"ERROR"}, updateStatus["errorMessage"])
@@ -233,7 +234,7 @@ class sendFrame(Operator):
                     # average the rendered frames if there are new frames to average
                     elif self.state[i] == 4:
                         # only average if there are new frames to average
-                        numRenderedFiles = getNumRenderedFiles("image", list(bpy.props.imFrame), None)
+                        numRenderedFiles = getNumRenderedFiles("image", [bpy.props.imFrame], None)
                         if numRenderedFiles > 0:
                             averaged = True
                             averageFrames(self, bpy.props.nameImOutputFiles)
@@ -327,7 +328,8 @@ class sendFrame(Operator):
         bpy.props.nameImOutputFiles = getNameOutputFiles()
         bpy.props.imFrame = scn.frame_current
         self.state = [1, 0]  # initializes state for modal
-        if bpy.props.needsUpdating:
+        if bpy.props.needsUpdating or bpy.props.lastServerGroup != scn.serverGroups:
+            bpy.props.lastServerGroup = scn.serverGroups
             updateStatus = updateServerPrefs()
             if not updateStatus["valid"]:
                 self.report({"ERROR"}, updateStatus["errorMessage"])
@@ -534,7 +536,8 @@ class sendAnimation(Operator):
         self.statusChecked = False
         self.expandedFrameRange = []
         self.state = [1, 0] # initializes state for modal
-        if bpy.props.needsUpdating:
+        if bpy.props.needsUpdating or bpy.props.lastServerGroup != scn.serverGroups:
+            bpy.props.lastServerGroup = scn.serverGroups
             updateStatus = updateServerPrefs()
             if not updateStatus["valid"]:
                 self.report({"ERROR"}, updateStatus["errorMessage"])

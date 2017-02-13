@@ -23,8 +23,7 @@ def readFileFor(f, flagName):
         nextLine = f.readline()
         numIters += 1
         if numIters >= 300:
-            print("Unable to read with over 300 preceeding lines.")
-            break
+            raise ValueError("Unable to find '### BEGIN {flagName} ###' in the first 300 lines of Remote Servers file".format(flagName=flagName))
 
     # read the following lines leading up to '### END flagName ###'
     nextLine = f.readline()
@@ -35,31 +34,60 @@ def readFileFor(f, flagName):
         numIters += 1
         if numIters >= 250:
             print("Unable to read over 250 lines.")
-            break
+            raise ValueError("'### END {flagName} ###' not found within 250 lines of '### BEGIN {flagName} ###' in the Remote Servers file".format(flagName=flagName))
 
     return readLines
 
+def invalidEntry(field):
+    return "Could not load '{field}'. Please read the instructions carefully to make sure you've set up your file correctly".format(field=field)
+
 def setupServerPrefs():
-    # Variable definitions
+    # variable definitions
     libraryServersPath = os.path.join(getLibraryPath(), "servers")
     serverFile = open(os.path.join(libraryServersPath, "remoteServers.txt"),"r")
 
-    # Set SSH login information for host server
-    username = readFileFor(serverFile, "SSH USERNAME").replace("\"", "")
-    hostServer = readFileFor(serverFile, "HOST SERVER").replace("\"", "")
-    extension = readFileFor(serverFile, "EXTENSION").replace("\"", "")
-    path = readFileFor(serverFile, "HOST SERVER PATH").replace("\"", "")
+    # set SSH login information for host server
+    try:
+        username = readFileFor(serverFile, "SSH USERNAME").replace("\"", "")
+    except:
+        return {"valid":False, "errorMessage":invalidEntry("SSH USERNAME")}
+    try:
+        hostServer = readFileFor(serverFile, "HOST SERVER").replace("\"", "")
+    except:
+        return {"valid":False, "errorMessage":invalidEntry("HOST SERVER")}
+    try:
+        extension = readFileFor(serverFile, "EXTENSION").replace("\"", "")
+    except:
+        return {"valid":False, "errorMessage":invalidEntry("EXTENSION")}
+
+    # build SSH login information
     login = "{username}@{hostServer}{extension}".format(username=username, hostServer=hostServer, extension=extension)
     hostConnection = "{hostServer}{extension}".format(hostServer=hostServer, extension=extension)
 
-    # Format host server path
+    # set base path for host server
+    try:
+        path = readFileFor(serverFile, "HOST SERVER PATH").replace("\"", "")
+    except:
+        return {"valid":False, "errorMessage":invalidEntry("HOST SERVER PATH")}
+
+    # format host server path
     path = path.replace(" ", "_")
-    if not path.endswith("/"):
+    if not path.endswith("/") and path != "":
         path += "/"
 
-    # Set server dictionary
-    servers = json.loads(readFileFor(serverFile, "REMOTE SERVERS DICTIONARY"))
-    return {"servers":servers, "login":login, "path":path, "hostConnection":hostConnection}
+    # read file for servers dictionary
+    try:
+        tmpServers = readFileFor(serverFile, "REMOTE SERVERS DICTIONARY")
+    except:
+        return {"valid":False, "errorMessage":"Could not load 'REMOTE SERVERS DICTIONARY'. Please read the instructions carefully to make sure you've set up your file correctly"}
+
+    # convert servers dictionary string to object
+    try:
+        servers = json.loads(tmpServers)
+    except:
+        return {"valid":False, "errorMessage":"Could not load dictionary. Please make sure you've entered a valid dictionary and check for syntax errors"}
+
+    return {"valid":True, "servers":servers, "login":login, "path":path, "hostConnection":hostConnection}
 
 def writeServersFile(serverDict, serverGroups):
     f = open(os.path.join(getLibraryPath(), "to_host_server", "servers.txt"), "w")
