@@ -11,10 +11,6 @@ def jobIsValid(jobType, classObject):
     if classObject.projectName == "":
         jobValidityDict = {"valid":False, "errorType":"WARNING", "errorMessage":"RENDER FAILED: You have not saved your project file. Please save it before attempting to render."}
 
-    # verify that project name contains no spaces
-    elif " " in classObject.projectName:
-        jobValidityDict = {"valid":False, "errorType":"ERROR", "errorMessage":"RENDER ABORTED: Please remove ' ' (spaces) from the project file name."}
-
     # verify that a camera exists in the scene
     elif bpy.context.scene.camera is None:
         jobValidityDict = {"valid":False, "errorType":"ERROR", "errorMessage":"RENDER FAILED: No camera in scene."}

@@ -237,31 +237,32 @@ class sendFrame(Operator):
                         numRenderedFiles = getNumRenderedFiles("image", [bpy.props.imFrame], None)
                         if numRenderedFiles > 0:
                             averaged = True
-                            averageFrames(self, bpy.props.nameImOutputFiles)
+                            bpy.props.nameAveragedImage = averageFrames(self, bpy.props.nameImOutputFiles)
                         else:
                             averaged = False
                         # calculate number of samples represented in averaged image
                         self.numSamples = self.sampleSize * self.avDict["numFrames"]
-                        # open rendered image
                         if i == 0:
                             setRenderStatus("image", "Complete!")
-                            if context.area.type == "IMAGE_EDITOR":
-                                if averaged and not self.previewed:
-                                    averaged_image_filepath = os.path.join(getRenderDumpFolder(), "{fileName}_{frame}_average{extension}".format(fileName=bpy.props.nameImOutputFiles, frame=str(bpy.props.imFrame).zfill(4), extension=bpy.props.imExtension))
-                                    bpy.ops.image.open(filepath=averaged_image_filepath)
-                                bpy.ops.image.reload()
+                            if bpy.data.images.find(bpy.props.nameAveragedImage) >= 0:
+                                # open rendered image in any open 'IMAGE_EDITOR' windows
+                                for area in context.screen.areas:
+                                    if area.type == "IMAGE_EDITOR":
+                                        area.spaces.active.image = bpy.data.images[bpy.props.nameAveragedImage]
+                                        break
                             self.report({"INFO"}, "Render completed at {numSamples} samples! View the rendered image in your UV/Image_Editor".format(numSamples=str(self.numSamples)))
                         else:
-                            # open preview image in UV/Image_Editor
-                            changeContext(context, "IMAGE_EDITOR")
-                            if averaged and not self.previewed:
-                                averaged_image_filepath = os.path.join(getRenderDumpFolder(), "{fileName}_{frame}_average{extension}".format(fileName=bpy.props.nameImOutputFiles, frame=str(bpy.props.imFrame).zfill(4), extension=bpy.props.imExtension))
-                                bpy.ops.image.open(filepath=averaged_image_filepath)
+                            if bpy.data.images.find(bpy.props.nameAveragedImage) >= 0:
+                                # open preview image in UV/Image_Editor
+                                changeContext(context, "IMAGE_EDITOR")
+                                for area in context.screen.areas:
+                                    if area.type == "IMAGE_EDITOR":
+                                        area.spaces.active.image = bpy.data.images[bpy.props.nameAveragedImage]
+                                        self.previewed = True
+                                        break
                             self.processes[1] = False
-                            self.previewed = True
                             previewString = "Render preview loaded ({numSamples} samples)".format(numSamples=str(self.numSamples))
                             self.report({"INFO"}, previewString)
-                            bpy.ops.image.reload()
                         appendViewable("image")
                         removeViewable("animation")
                         if i == 0:
@@ -280,10 +281,10 @@ class sendFrame(Operator):
         return{"PASS_THROUGH"}
 
     def execute(self, context):
-        self.projectName = bpy.path.display_name_from_filepath(bpy.data.filepath)
+        self.projectName = bpy.path.display_name_from_filepath(bpy.data.filepath).replace(" ", "_")
         scn = context.scene
 
-        #for testing purposes only (saves unsaved file as 'unsaved_file.blend')
+        # for testing purposes only (saves unsaved file as 'unsaved_file.blend')
         if self.projectName == "":
             self.projectName = "unsaved_file"
             bpy.ops.wm.save_mainfile(filepath="{tempLocalDir}{projectName}.blend".format(tempLocalDir=scn.tempLocalDir, projectName=self.projectName))
@@ -325,6 +326,7 @@ class sendFrame(Operator):
         self.previewed = False
         self.numSamples = 0
         self.avDict = {"array":False, "numFrames":0}
+        self.averageIm = None
         bpy.props.nameImOutputFiles = getNameOutputFiles()
         bpy.props.imFrame = scn.frame_current
         self.state = [1, 0]  # initializes state for modal
@@ -351,7 +353,7 @@ class sendFrame(Operator):
 
     def cancel(self, context):
         print("process cancelled")
-        cleanupCancelledRender(self, context)
+        cleanupCancelledRender(self, context, bpy.types.Scene.killPython)
 
 class sendAnimation(Operator):
     """Render animation on remote servers"""                                    # blender will use this as a tooltip for menu items and buttons.
@@ -497,8 +499,8 @@ class sendAnimation(Operator):
 
         return{"PASS_THROUGH"}
 
-    def execute(self, context): # ensure no other animation render processes are running
-        self.projectName = bpy.path.display_name_from_filepath(bpy.data.filepath)
+    def execute(self, context):
+        self.projectName = bpy.path.display_name_from_filepath(bpy.data.filepath).replace(" ", "_")
         scn = context.scene
 
         # for testing purposes only (saves unsaved file as 'unsaved_file.blend')
@@ -558,7 +560,7 @@ class sendAnimation(Operator):
 
     def cancel(self, context):
         print("process cancelled")
-        cleanupCancelledRender(self, context)
+        cleanupCancelledRender(self, context, bpy.types.Scene.killPython)
 
 class openRenderedImageInUI(Operator):
     """Open rendered image"""                                                   # blender will use this as a tooltip for menu items and buttons.
@@ -567,11 +569,18 @@ class openRenderedImageInUI(Operator):
     bl_options = {"REGISTER", "UNDO"}                                           # enable undo for the operator.
 
     def execute(self, context):
-        # open rendered image
-        changeContext(context, "IMAGE_EDITOR")
-        averaged_image_filepath = os.path.join(getRenderDumpFolder(), "{fileName}_{frame}_average{extension}".format(fileName=bpy.props.nameImOutputFiles, frame=str(bpy.props.imFrame).zfill(4), extension=bpy.props.imExtension))
-        bpy.ops.image.open(filepath=averaged_image_filepath)
-        bpy.ops.image.reload()
+        if bpy.data.images.find(bpy.props.nameAveragedImage) >= 0:
+            # open rendered image in UV/Image_Editor
+            changeContext(context, "IMAGE_EDITOR")
+            for area in context.screen.areas:
+                if area.type == "IMAGE_EDITOR":
+                    area.spaces.active.image = bpy.data.images[bpy.props.nameAveragedImage]
+        elif bpy.props.nameAveragedImage and bpy.props.nameAveragedImage != "":
+            self.report({"ERROR"}, "Image could not be found: '{nameAveragedImage}'".format(nameAveragedImage=bpy.props.nameAveragedImage))
+            return{"CANCELLED"}
+        else:
+            self.report({"WARNING"}, "No rendered images could be found")
+            return{"CANCELLED"}
 
         return{"FINISHED"}
 

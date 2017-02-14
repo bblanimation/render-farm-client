@@ -27,7 +27,7 @@ def getFrames(projectName, archiveFiles=False, frameRange=False):
             f.close()
         else:
             includeDict = ""
-        archiveRsyncCommand = "rsync -qx --rsync-path='mkdir -p {dumpLocation}/backups/ && rsync' --remove-source-files {includeDict} --exclude='{nameOutputFiles}_????.???' --exclude='*_average.???' {dumpLocation}/* {dumpLocation}/backups/;".format(includeDict=includeDict, dumpLocation=dumpLocation, nameOutputFiles=getNameOutputFiles(), imExtension=bpy.props.imExtension)
+        archiveRsyncCommand = "rsync -qx --rsync-path='mkdir -p {dumpLocation}/backups/ && rsync' --remove-source-files {includeDict} --exclude='{nameOutputFiles}_????.???' {dumpLocation}/* {dumpLocation}/backups/;".format(includeDict=includeDict, dumpLocation=dumpLocation, nameOutputFiles=getNameOutputFiles(), imExtension=bpy.props.imExtension)
     else:
         archiveRsyncCommand = "mkdir -p {dumpLocation};".format(dumpLocation=dumpLocation)
 
@@ -250,7 +250,7 @@ def getNameOutputFiles():
     if scn.nameOutputFiles != "":
         return scn.nameOutputFiles
     else:
-        return bpy.path.display_name_from_filepath(bpy.data.filepath)
+        return bpy.path.display_name_from_filepath(bpy.data.filepath).replace(" ", "_")
 
 def getNumRenderedFiles(jobType, frameRange=None, fileName=None):
     if jobType == "image":
@@ -267,7 +267,7 @@ def getNumRenderedFiles(jobType, frameRange=None, fileName=None):
         numRenderedFiles = len(renderedFiles)
     return numRenderedFiles
 
-def cleanupCancelledRender(classObject, context):
+def cleanupCancelledRender(classObject, context, killPython=True):
     """ Kills running processes when render job cancelled """
 
     wm = context.window_manager
@@ -278,7 +278,7 @@ def cleanupCancelledRender(classObject, context):
                 classObject.processes[j].kill()
             except:
                 pass
-    if bpy.context.scene.killPython:
+    if killPython:
         subprocess.call("ssh -T -oStrictHostKeyChecking=no -x {login} 'killall -9 python'".format(login=bpy.props.serverPrefs["login"]), shell=True)
 
 def changeContext(context, areaType):

@@ -192,8 +192,6 @@ def main():
     if verbose >= 3:
         pflush("\nJob exit statuses:")
         jhm.print_jobs_status()
-    # if args.average_results:
-    #     averageFrames(localResultsPath, projectName, verbose)
 
     # report on the success/failure of the tasks
     endTime = time.time()

@@ -106,6 +106,7 @@ def register():
     bpy.props.lastRemotePath = None
     bpy.props.needsUpdating = True
 
+    bpy.props.nameAveragedImage = None
     bpy.props.imExtension = False
     bpy.props.nameImOutputFiles = ""
     bpy.props.animExtension = False
@@ -142,6 +143,7 @@ def unregister():
     del bpy.props.serverPrefs
     del bpy.props.animFrameRange
     del bpy.props.lastRemotePath
+    del bpy.props.nameAveragedImage
     del bpy.props.imExtension
     del bpy.props.animExtension
     del bpy.props.needsUpdating
