@@ -59,11 +59,6 @@ def setupServerPrefs():
         extension = readFileFor(serverFile, "EXTENSION").replace("\"", "")
     except:
         return {"valid":False, "errorMessage":invalidEntry("EXTENSION")}
-    try:
-        email = readFileFor(serverFile, "EMAIL ADDRESS").replace("\"", "")
-    except:
-        return {"valid":False, "errorMessage":invalidEntry("EMAIL ADDRESS")}
-
 
     # build SSH login information
     login = "{username}@{hostServer}{extension}".format(username=username, hostServer=hostServer, extension=extension)
@@ -92,7 +87,7 @@ def setupServerPrefs():
     except:
         return {"valid":False, "errorMessage":"Could not load dictionary. Please make sure you've entered a valid dictionary and check for syntax errors"}
 
-    return {"valid":True, "servers":servers, "login":login, "path":path, "hostConnection":hostConnection, "email":email}
+    return {"valid":True, "servers":servers, "login":login, "path":path, "hostConnection":hostConnection}
 
 def writeServersFile(serverDict, serverGroups):
     f = open(os.path.join(getLibraryPath(), "to_host_server", "servers.txt"), "w")
