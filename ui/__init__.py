@@ -1,5 +1,25 @@
-#!/usr/bin/env python
+"""
+Copyright (C) 2017 Bricks Brought to Life
+http://bblanimation.com/
+chris@bblanimation.com
 
+Created by Christopher Gearhart
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+"""
+
+# system imports
 import bpy
 import math
 from bpy.types import Panel
@@ -60,24 +80,6 @@ class renderOnServersPanel(Panel):
                 row.operator("scene.open_rendered_image", text="View Image", icon="FILE_IMAGE")
             if "animation" in scn.renderType:
                 row.operator("scene.open_rendered_animation", text="View Animation", icon="FILE_MOVIE")
-
-def menu_draw(self, context):
-    layout = self.layout
-    scn = context.scene
-
-    if scn.render.engine == "CYCLES" and not scn.cycles.progressive == "BRANCHED_PATH":
-        # Basic Render Samples Info
-        col = layout.column(align=True)
-        row = col.row(align=True)
-        sampleSize = scn.cycles.samples
-        if scn.cycles.use_square_samples:
-            sampleSize = sampleSize**2
-        if sampleSize < 10:
-            row.label("Too few samples")
-        else:
-            row.label("Samples on Servers: {numSamples}".format(numSamples=str(math.floor(sampleSize*scn.availableServers))))
-
-bpy.types.CyclesRender_PT_sampling.append(menu_draw)
 
 class frameRangePanel(Panel):
     bl_space_type  = "VIEW_3D"

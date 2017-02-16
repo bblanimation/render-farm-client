@@ -1,6 +1,28 @@
-#!/usr/bin/env python
+"""
+Copyright (C) 2017 Bricks Brought to Life
+http://bblanimation.com/
+chris@bblanimation.com
 
-import bpy, os, json
+Created by Christopher Gearhart
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+"""
+
+# system imports
+import bpy
+import json
+import os
 
 def getLibraryPath():
     # Full path to module directory
@@ -49,10 +71,12 @@ def setupServerPrefs():
     # set SSH login information for host server
     try:
         username = readFileFor(serverFile, "SSH USERNAME").replace("\"", "")
+        test = username[0] # fails if username is empty string
     except:
         return {"valid":False, "errorMessage":invalidEntry("SSH USERNAME")}
     try:
         hostServer = readFileFor(serverFile, "HOST SERVER").replace("\"", "")
+        test = hostServer[0] # fails if hostServer is empty string
     except:
         return {"valid":False, "errorMessage":invalidEntry("HOST SERVER")}
     try:
@@ -71,7 +95,7 @@ def setupServerPrefs():
         return {"valid":False, "errorMessage":invalidEntry("HOST SERVER PATH")}
 
     # format host server path
-    path = path.replace(" ", "_")
+    path = path.replace(" ", "_").replace("$username$", username)
     if not path.endswith("/") and path != "":
         path += "/"
 

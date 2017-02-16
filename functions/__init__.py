@@ -1,12 +1,32 @@
-#!/usr/bin/env python
+"""
+Copyright (C) 2017 Bricks Brought to Life
+http://bblanimation.com/
+chris@bblanimation.com
 
+Created by Christopher Gearhart
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+"""
+
+# system imports
 import bpy
-import subprocess
-import os
-import sys
 import fnmatch
 import itertools
 import operator
+import os
+import subprocess
+import sys
 from .setupServers import *
 
 def getFrames(projectName, archiveFiles=False, frameRange=False):
@@ -47,16 +67,19 @@ def buildFrameRangesString(frameRanges):
     for string in frameRangeList:
         try:
             newInt = int(string)
-            newFrameRangeList.append(newInt)
+            if newInt >= 0 and newInt <= 500000:
+                newFrameRangeList.append(newInt)
+            else:
+                return invalidDict
         except:
             if "-" in string:
                 newString = string.split("-")
-                if len(newString) > 2:
+                if len(newString) != 2:
                     return invalidDict
                 try:
                     newInt1 = int(newString[0])
                     newInt2 = int(newString[1])
-                    if newInt1 <= newInt2:
+                    if newInt1 <= newInt2 and newInt2 <= 500000:
                         newFrameRangeList.append([newInt1, newInt2])
                     else:
                         return invalidDict
@@ -303,13 +326,12 @@ def updateServerPrefs():
     else:
         return newServerPrefs
 
-    if bpy.props.serverPrefs != oldServerPrefs:
-        # verify host server login, built from user entries, correspond to a responsive server
-        try:
-            subprocess.call("ssh -T -oBatchMode=yes -oStrictHostKeyChecking=no -x {login} 'echo hi'".format(login=bpy.props.serverPrefs["login"]), shell=True)
-        except:
-            return {"valid":False, "errorMessage":"ssh to '{login}' failed. Check your settings and ensure ssh keys are setup".format(login=bpy.props.serverPrefs["login"])}
+    # verify host server login, built from user entries, correspond to a responsive server, and that defined renderFarm path is writable
+    rc = subprocess.call("ssh -T -oBatchMode=yes -oStrictHostKeyChecking=no -oConnectTimeout=10 -x {login} 'mkdir -p {remotePath}; touch {remotePath}test'".format(login=bpy.props.serverPrefs["login"], remotePath=bpy.props.serverPrefs["path"]), shell=True)
+    if rc != 0:
+        return {"valid":False, "errorMessage":"ssh to '{login}' failed (return code: {rc}). Check your settings, ensure ssh keys are setup, and verify your write permissions for '{remotePath}' (see error in terminal)".format(login=bpy.props.serverPrefs["login"], rc=rc, remotePath=bpy.props.serverPrefs["path"])}
 
+    if bpy.props.serverPrefs != oldServerPrefs:
         # initialize server groups enum property
         groupNames = [("All Servers", "All Servers", "Render on all servers")]
         for groupName in bpy.props.serverPrefs["servers"]:
