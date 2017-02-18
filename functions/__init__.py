@@ -259,6 +259,8 @@ def getRenderDumpFolder():
     # if no user input, use default render location
     else:
         dumpLoc = os.path.join(bpy.path.abspath("//"), "render-dump")
+    # cleanse input
+    # TODO: throw error if dumpLoc contains backslash
     # check to make sure dumpLoc exists on local machine
     if not os.path.exists(dumpLoc):
         os.mkdir(dumpLoc)
@@ -268,12 +270,12 @@ def getRunningStatuses():
     return ["Rendering...", "Preparing files...", "Finishing..."]
 
 def getNameOutputFiles():
+    """return nameOutputFiles, or current project name if nameOutputFiles not specified"""
     scn = bpy.context.scene
-    # remove illegal characters
-    for char in "/<>:\"\ |?*":
-        scn.nameOutputFiles = scn.nameOutputFiles.replace(char, "")
-    # return nameOutputFiles, or projectName if nameOutputFiles not specified
     if scn.nameOutputFiles != "":
+        # remove illegal characters
+        for char in "/<>:\"\ |?*":
+            scn.nameOutputFiles = scn.nameOutputFiles.replace(char, "_")
         return scn.nameOutputFiles
     else:
         return bpy.path.display_name_from_filepath(bpy.data.filepath).replace(" ", "_")

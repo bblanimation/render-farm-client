@@ -619,7 +619,8 @@ class openRenderedAnimationInUI(Operator):
 
         # opens first frame of image sequence (blender imports full sequence)
         openedFile = False
-        image_sequence_filepath = "{dumpFolder}/".format(dumpFolder=getRenderDumpFolder())
+        self.renderDumpFolder = getRenderDumpFolder()
+        image_sequence_filepath = "{dumpFolder}/".format(dumpFolder=self.renderDumpFolder)
         for frame in bpy.props.animFrameRange:
             try:
                 print("entering try")
@@ -637,7 +638,7 @@ class openRenderedAnimationInUI(Operator):
             bpy.data.movieclips[openedFile].frame_start = frame
         else:
             changeContext(context, lastAreaType)
-            self.report({"ERROR"}, "Could not open rendered animation. View files in file browser in the following folder: '{renderDumpFolder}'.".format(renderDumpFolder=getRenderDumpFolder()))
+            self.report({"ERROR"}, "Could not open rendered animation. View files in file browser in the following folder: '{renderDumpFolder}'.".format(renderDumpFolder=self.renderDumpFolder))
 
         return{"FINISHED"}
 
