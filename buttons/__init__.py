@@ -472,10 +472,6 @@ class sendAnimation(Operator):
                     # start render process from the defined start and end frames
                     elif self.state[i] == 2:
                         bpy.props.needsUpdating = False
-                        # initializes self.frameRangesDict (returns False if frame range invalid)
-                        if not setFrameRangesDict(self):
-                            setRenderStatus("animation", "ERROR")
-                            return{"FINISHED"}
                         self.expandedFrameRange = expandFrames(json.loads(self.frameRangesDict["string"]))
                         self.processes[i] = renderFrames(str(self.expandedFrameRange), self.projectName)
                         bpy.props.animFrameRange = self.expandedFrameRange
@@ -541,6 +537,10 @@ class sendAnimation(Operator):
 
         # ensure the job won't break the script
         if not jobIsValid("animation", self):
+            return{"FINISHED"}
+        # initializes self.frameRangesDict (returns reports error if frame range is invalid)
+        if not setFrameRangesDict(self):
+            setRenderStatus("animation", "ERROR")
             return{"FINISHED"}
 
         # set the file extension for use with 'open animation' button
