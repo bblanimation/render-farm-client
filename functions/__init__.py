@@ -247,10 +247,6 @@ def setFrameRangesDict(classObject):
         if not classObject.frameRangesDict["valid"]:
             classObject.report({"ERROR"}, "ERROR: Invalid frame ranges given.")
             return False
-    # restrict length of frame range string to 50000 characters
-    if len(classObject.frameRangesDict["string"]) > 50000:
-        classObject.report({"ERROR"}, "ERROR: Frame range is too large.")
-        return False
     return True
 
 def getRenderDumpFolder():
