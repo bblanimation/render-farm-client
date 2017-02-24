@@ -231,11 +231,6 @@ class sendFrame(Operator):
                     elif self.state[i] == 2:
                         bpy.props.needsUpdating = False
                         jobsPerFrame = scn.maxSamples // self.sampleSize
-                        if jobsPerFrame > 100:
-                            self.report({"ERROR"}, "Max Samples / Samples > 100. Try increasing samples or lowering max samples.")
-                            setRenderStatus("image", "ERROR")
-                            self.cancel(context)
-                            return{"CANCELLED"}
                         self.processes[i] = renderFrames(str([bpy.props.imFrame]), self.projectName, jobsPerFrame)
                         self.state[i] += 1
                         setRenderStatus("image", "Rendering...")
@@ -327,14 +322,7 @@ class sendFrame(Operator):
         bpy.props.imExtension = scn.render.file_extension
 
         # Store current sample size for use in computing render results
-        if scn.cycles.progressive == "PATH":
-            self.sampleSize = scn.cycles.samples
-            if scn.cycles.use_square_samples:
-                self.sampleSize = self.sampleSize**2
-        else:
-            self.sampleSize = scn.cycles.aa_samples
-            if scn.cycles.use_square_samples:
-                self.sampleSize = self.sampleSize**2
+        self.sampleSize = scn.samplesPerFrame
 
         # start initial render process
         self.stdout = None

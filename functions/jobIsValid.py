@@ -43,19 +43,10 @@ def jobIsValid(jobType, classObject):
         jobValidityDict = {"valid":False, "errorType":"ERROR", "errorMessage":"RENDER FAILED: Output file format not supported. Supported formats: BMP, PNG, TARGA, JPEG, JPEG 2000, TIFF. (Animation only: IRIS, CINEON, HDR, DPX, OPEN_EXR, OPEN_EXR_MULTILAYER)"}
 
     # verify that sampling is high enough to provide expected results
-    if not jobValidityDict and jobType == "image":
-        if scn.cycles.progressive == "PATH":
-            samples = scn.cycles.samples
-            if scn.cycles.use_square_samples:
-                samples = samples**2
-            if samples < 10:
-                jobValidityDict = {"valid":True, "errorType":"WARNING", "errorMessage":"RENDER ALERT: Render result may be inaccurate at {samples} samples. Try 10 or more samples for a more accurate render.".format(samples=str(samples))}
-        elif scn.cycles.progressive == "BRANCHED_PATH":
-            samples = scn.cycles.aa_samples
-            if scn.cycles.use_square_samples:
-                samples = samples**2
-            if samples < 5:
-                jobValidityDict = {"valid":True, "errorType":"WARNING", "errorMessage":"RENDER ALERT: Render result may be inaccurate at {samples} AA samples. Try 5 or more AA samples for a more accurate render.".format(samples=str(samples))}
+    if jobType == "image":
+        jobsPerFrame = scn.maxSamples // scn.samplesPerFrame
+        if jobsPerFrame > 100:
+            jobValidityDict = {"valid":False, "errorType":"ERROR", "errorMessage": "Max Samples / SamplesPerJob > 100. Try increasing samples per frame or lowering max samples."}
 
     # verify that the user input for renderDumpLoc is valid and can be created
     try:

@@ -140,6 +140,7 @@ class serversPanel(Panel):
                 col.label(text="Performance:")
                 col.prop(scn, "maxServerLoad")
                 col.prop(scn, "timeout")
+                col.prop(scn, "samplesPerFrame")
                 col.prop(scn, "maxSamples")
 
                 layout.separator()

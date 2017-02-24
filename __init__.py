@@ -97,17 +97,23 @@ def register():
         min=1, max=8,
         default=1)
 
-    bpy.types.Scene.maxSamples = IntProperty(
-        name="Max Samples",
-        description="Maximum number of samples to render when rendering current frame",
-        min=100, max=9999,
-        default=750)
-
     bpy.types.Scene.timeout = FloatProperty(
         name="Timeout",
         description="Time (in seconds) to wait for client servers to respond",
         min=.001, max=1,
         default=.01)
+
+    bpy.types.Scene.samplesPerFrame = IntProperty(
+        name="Samples Per Job",
+        description="Number of samples to render per job when rendering current frame",
+        min=10, max=999,
+        default=10)
+
+    bpy.types.Scene.maxSamples = IntProperty(
+        name="Max Samples",
+        description="Maximum number of samples to render when rendering current frame",
+        min=100, max=9999,
+        default=1000)
 
     bpy.types.Scene.renderType = []
     bpy.types.Scene.renderStatus = {"animation":"None", "image":"None"}

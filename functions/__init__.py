@@ -124,6 +124,7 @@ def renderFrames(frameRange, projectName, jobsPerFrame=False):
 
     if jobsPerFrame:
         extraFlags += " -j {jobsPerFrame}".format(jobsPerFrame=jobsPerFrame)
+        extraFlags += " -s {numImSamples}".format(numImSamples=scn.samplesPerFrame)
 
     # runs blender command to render given range from the remote server
     renderCommand = "ssh -T -oStrictHostKeyChecking=no -x {login} 'python {remotePath}blender_task -v -p -n {projectName} -l {frameRange} --hosts_file {remotePath}servers.txt -R {remotePath} --connection_timeout {t} --max_server_load {maxServerLoad}{extraFlags}'".format(login=bpy.props.serverPrefs["login"], remotePath=bpy.props.serverPrefs["path"], projectName=projectName, frameRange=frameRange.replace(" ", ""), t=scn.timeout, maxServerLoad=str(scn.maxServerLoad), extraFlags=extraFlags)

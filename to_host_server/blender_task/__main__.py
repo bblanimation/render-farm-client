@@ -46,11 +46,12 @@ parser.add_argument("-i", "--hosts_file", action="store", default="remoteServers
 parser.add_argument("-m", "--max_server_load", action="store", default=1, help="Max render processes to run on each server at a time.")
 parser.add_argument("-a", "--average_results", action="store_true", default=None, help="Average frames when finished.")
 parser.add_argument("-j", "--jobs_per_frame", action="store", default=False, help="Number of jobs to queue for each frame")
+parser.add_argument("-s", "--samples", action="store", default=False, help="Number of samples to render per job")
 parser.add_argument("-t", "--connection_timeout", action="store", default=.01, help="Pass a float for the timeout in seconds for telnet connections to client servers.")
 # NOTE: this parameter is currently required
 parser.add_argument("-n", "--project_name", action="store", default=False) # just project name. default path will be in /tmp/blenderProjects
 # TODO: test this for directories other than toRemote
-parser.add_argument("-s", "--local_sync", action="store", default="./toRemote", help="Pass a full or relative path to sync to the project directory on remote.")
+parser.add_argument("-S", "--local_sync", action="store", default="./toRemote", help="Pass a full or relative path to sync to the project directory on remote.")
 # NOTE: remote_results_path will sync the directory at results
 parser.add_argument("-r", "--remote_results_path", action="store", default="results", help="Pass a path to the directory that should be synced back.")
 # NOTE: passing the contents flag will sync back the contents from the directory given in remote_results_path
@@ -179,8 +180,14 @@ def main():
             os.mkdir(localResultsPath)
         localResultsPath = os.path.join(localResultsPath, '.')
 
-    # Copy blender_p.py to project folder
-    subprocess.call("rsync -e 'ssh -oStrictHostKeyChecking=no' -a '{pyFilePathSource}' '{pyFilePathDest}'".format(pyFilePathSource=os.path.join(projectRoot, "blender_p.py"), pyFilePathDest=os.path.join(projectPath, "toRemote", "blender_p.py")), shell=True)
+    # Copy blender_p.py to project folder and append seed value if given
+    pyFilePathDest = os.path.join(projectPath, "toRemote", "blender_p.py")
+    subprocess.call("rsync -e 'ssh -oStrictHostKeyChecking=no' -a '{pyFilePathSource}' '{pyFilePathDest}'".format(pyFilePathSource=os.path.join(projectRoot, "blender_p.py"), pyFilePathDest=pyFilePathDest), shell=True)
+    if args.samples:
+        with open(pyFilePathDest, "a") as f:
+            f.write("    scene.cycles.progressive == 'PATH'\n")
+            f.write("    scn.cycles.use_square_samples == False\n")
+            f.write("    scene.cycles.samples = {samples}".format(samples=args.samples))
 
     # Print frame range to be rendered
     frames = json.loads(args.frame_range)
