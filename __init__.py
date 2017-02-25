@@ -64,7 +64,7 @@ def register():
     bpy.types.Scene.compress = BoolProperty(
         name="Compress",
         description="Send compressed Blender file to host server (slower local save, faster file transfer)",
-        default=False)
+        default=True)
 
     bpy.types.Scene.frameRanges = StringProperty(
         name="Frames",
@@ -132,7 +132,7 @@ def register():
     bpy.props.lastRemotePath = None
     bpy.props.needsUpdating = True
 
-    bpy.props.nameAveragedImage = None
+    bpy.props.nameAveragedImage = ""
     bpy.props.imExtension = False
     bpy.props.nameImOutputFiles = ""
     bpy.props.animExtension = False

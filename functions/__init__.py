@@ -48,7 +48,7 @@ def getFrames(projectName, archiveFiles=False, frameRange=False):
             f.close()
         else:
             includeDict = ""
-        archiveRsyncCommand = "rsync -qx --rsync-path='mkdir -p {dumpLocation}/backups/ && rsync' --remove-source-files {includeDict} --exclude='{nameOutputFiles}_????.???' {dumpLocation}/* {dumpLocation}/backups/;".format(includeDict=includeDict, dumpLocation=dumpLocation, nameOutputFiles=getNameOutputFiles(), imExtension=bpy.props.imExtension)
+        archiveRsyncCommand = "rsync -qx --rsync-path='mkdir -p {dumpLocation}/backups/ && rsync' --remove-source-files {includeDict} --exclude='{nameOutputFiles}_????.???' '{dumpLocation}/*' '{dumpLocation}/backups/';".format(includeDict=includeDict, dumpLocation=dumpLocation, nameOutputFiles=getNameOutputFiles(), imExtension=bpy.props.imExtension)
     else:
         archiveRsyncCommand = "mkdir -p {dumpLocation};".format(dumpLocation=dumpLocation)
 
@@ -56,6 +56,7 @@ def getFrames(projectName, archiveFiles=False, frameRange=False):
     fetchRsyncCommand = "rsync -x --progress --remove-source-files --exclude='*.blend' --exclude='*_average.???' -e 'ssh -T -oCompression=no -oStrictHostKeyChecking=no -x' '{login}:{remotePath}{projectName}/results/*' '{dumpLocation}/';".format(login=bpy.props.serverPrefs["login"], remotePath=bpy.props.serverPrefs["path"], projectName=projectName, dumpLocation=dumpLocation)
 
     # run the above processes
+    print(archiveRsyncCommand + fetchRsyncCommand)
     process = subprocess.Popen(archiveRsyncCommand + fetchRsyncCommand, stdout=subprocess.PIPE, shell=True)
     return process
 
@@ -260,8 +261,10 @@ def getRenderDumpFolder():
     # if no user input, use default render location
     else:
         dumpLoc = os.path.join(bpy.path.abspath("//"), "render-dump")
-    # cleanse input
-    # TODO: throw error if dumpLoc contains backslash
+    # ensure it doesn't end in forwardslash
+    if dumpLoc.endswith("/"):
+        dumpLoc = dumpLoc[:-1]
+    # TODO: Throw error if backslash found in path
     # check to make sure dumpLoc exists on local machine
     if not os.path.exists(dumpLoc):
         os.mkdir(dumpLoc)

@@ -299,6 +299,13 @@ class sendFrame(Operator):
         self.projectName = bpy.path.display_name_from_filepath(bpy.data.filepath).replace(" ", "_")
         scn = context.scene
 
+        if scn.render.engine != "CYCLES":
+            self.report({"INFO"}, "Rendering on local machine (switch to cycles to render current frame on remote servers).")
+            context.area.type = "IMAGE_EDITOR"
+            bpy.ops.render.render(use_viewport=True)
+            context.area.spaces.active.image = bpy.data.images["Render Result"]
+            return{"FINISHED"}
+
         # for testing purposes only (saves unsaved file as 'unsaved_file.blend')
         if self.projectName == "":
             self.projectName = "unsaved_file"
@@ -587,7 +594,7 @@ class openRenderedImageInUI(Operator):
             for area in context.screen.areas:
                 if area.type == "IMAGE_EDITOR":
                     area.spaces.active.image = bpy.data.images[bpy.props.nameAveragedImage]
-        elif bpy.props.nameAveragedImage and bpy.props.nameAveragedImage != "":
+        elif bpy.props.nameAveragedImage != "":
             self.report({"ERROR"}, "Image could not be found: '{nameAveragedImage}'".format(nameAveragedImage=bpy.props.nameAveragedImage))
             return{"CANCELLED"}
         else:

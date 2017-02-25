@@ -5,6 +5,7 @@ Scripts and associated files for rendering from Blender files on CSE remote serv
 ## Server Farm Client Add-On:
   * Features:
       * Clean UI for sending frames to servers and viewing them within Blender
+      * Full support for Cycles Render Engine (support for Blender Internal/Game 'animation' renders only - current frame render jobs processed locally)
       * Mid-render previews/status updates available with 'SHIFT + P'
       * Abort render with 'ESC'
       * NOTE: Files are auto-packed into the .blend file with each render process

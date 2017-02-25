@@ -40,46 +40,41 @@ class renderOnServersPanel(Panel):
         layout = self.layout
         scn = context.scene
 
-        if scn.render.engine != "CYCLES":
+        imRenderStatus = getRenderStatus("image")
+        animRenderStatus = getRenderStatus("animation")
+
+        # Available Servers Info
+        col = layout.column(align=True)
+        row = col.row(align=True)
+        availableServerString = "Available Servers: {available} / {total}".format(available=str(scn.availableServers),total=str(scn.availableServers + scn.offlineServers))
+        row.operator("scene.refresh_num_available_servers", text=availableServerString, icon="FILE_REFRESH")
+
+        # Render Buttons
+        row = col.row(align=True)
+        row.alignment = "EXPAND"
+        row.active = scn.availableServers > 0 or not scn.render.engine == "CYCLES"
+        row.operator("scene.render_frame_on_servers", text="Render", icon="RENDER_STILL")
+        row.operator("scene.render_animation_on_servers", text="Animation", icon="RENDER_ANIMATION")
+        col = layout.column(align=True)
+        row = col.row(align=True)
+        row.prop(scn, "serverGroups")
+
+        # Render Status Info
+        if imRenderStatus != "None":
             col = layout.column(align=True)
             row = col.row(align=True)
-            row.label("Please switch to Cycles")
-        else:
-            imRenderStatus = getRenderStatus("image")
-            animRenderStatus = getRenderStatus("animation")
-
-            # Available Servers Info
+            row.label("Render Status: {imRenderStatus}".format(imRenderStatus=imRenderStatus))
+        elif animRenderStatus != "None":
             col = layout.column(align=True)
             row = col.row(align=True)
-            availableServerString = "Available Servers: {available} / {total}".format(available=str(scn.availableServers),total=str(scn.availableServers + scn.offlineServers))
-            row.operator("scene.refresh_num_available_servers", text=availableServerString, icon="FILE_REFRESH")
+            row.label("Render Status: {animRenderStatus}".format(animRenderStatus=animRenderStatus))
 
-            # Render Buttons
-            row = col.row(align=True)
-            row.alignment = "EXPAND"
-            row.active = scn.availableServers > 0
-            row.operator("scene.render_frame_on_servers", text="Render", icon="RENDER_STILL")
-            row.operator("scene.render_animation_on_servers", text="Animation", icon="RENDER_ANIMATION")
-            col = layout.column(align=True)
-            row = col.row(align=True)
-            row.prop(scn, "serverGroups")
-
-            # Render Status Info
-            if imRenderStatus != "None":
-                col = layout.column(align=True)
-                row = col.row(align=True)
-                row.label("Render Status: {imRenderStatus}".format(imRenderStatus=imRenderStatus))
-            elif animRenderStatus != "None":
-                col = layout.column(align=True)
-                row = col.row(align=True)
-                row.label("Render Status: {animRenderStatus}".format(animRenderStatus=animRenderStatus))
-
-            # display buttons to view render(s)
-            row = layout.row(align=True)
-            if   "image"   in scn.renderType:
-                row.operator("scene.open_rendered_image", text="View Image", icon="FILE_IMAGE")
-            if "animation" in scn.renderType:
-                row.operator("scene.open_rendered_animation", text="View Animation", icon="FILE_MOVIE")
+        # display buttons to view render(s)
+        row = layout.row(align=True)
+        if   "image"   in scn.renderType:
+            row.operator("scene.open_rendered_image", text="View Image", icon="FILE_IMAGE")
+        if "animation" in scn.renderType:
+            row.operator("scene.open_rendered_animation", text="View Animation", icon="FILE_MOVIE")
 
 class frameRangePanel(Panel):
     bl_space_type  = "VIEW_3D"
@@ -94,16 +89,15 @@ class frameRangePanel(Panel):
         layout = self.layout
         scn = context.scene
 
-        if scn.render.engine == "CYCLES":
-            col = layout.column(align=True)
-            row = col.row(align=True)
-            row.prop(scn, "frameRanges")
-            col = layout.column(align=True)
-            col.active = bpy.path.display_name_from_filepath(bpy.data.filepath) != ""
-            row = col.row(align=True)
-            row.operator("scene.list_frames", text="List Missing Frames", icon="LONGDISPLAY")
-            row = col.row(align=True)
-            row.operator("scene.set_to_missing_frames", text="Set to Missing Frames", icon="FILE_PARENT")
+        col = layout.column(align=True)
+        row = col.row(align=True)
+        row.prop(scn, "frameRanges")
+        col = layout.column(align=True)
+        col.active = bpy.path.display_name_from_filepath(bpy.data.filepath) != ""
+        row = col.row(align=True)
+        row.operator("scene.list_frames", text="List Missing Frames", icon="LONGDISPLAY")
+        row = col.row(align=True)
+        row.operator("scene.set_to_missing_frames", text="Set to Missing Frames", icon="FILE_PARENT")
 
 class serversPanel(Panel):
     bl_space_type  = "VIEW_3D"
@@ -119,35 +113,35 @@ class serversPanel(Panel):
         layout = self.layout
         scn = context.scene
 
-        if scn.render.engine == "CYCLES":
-            col = layout.column(align=True)
-            row = col.row(align=True)
-            row.operator("scene.edit_servers_dict", text="Edit Remote Servers", icon="TEXT")
+        col = layout.column(align=True)
+        row = col.row(align=True)
+        row.operator("scene.edit_servers_dict", text="Edit Remote Servers", icon="TEXT")
 
-            col = layout.column(align=True)
-            row = col.row(align=True)
+        col = layout.column(align=True)
+        row = col.row(align=True)
 
-            box = row.box()
-            box.prop(scn, "showAdvanced")
-            if scn.showAdvanced:
-                col = box.column()
-                col.prop(scn, "nameOutputFiles")
-                col.prop(scn, "renderDumpLoc")
+        box = row.box()
+        box.prop(scn, "showAdvanced")
+        if scn.showAdvanced:
+            col = box.column()
+            col.prop(scn, "nameOutputFiles")
+            col.prop(scn, "renderDumpLoc")
 
-                layout.separator()
+            layout.separator()
 
-                col = box.column(align=True)
-                col.label(text="Performance:")
-                col.prop(scn, "maxServerLoad")
-                col.prop(scn, "timeout")
+            col = box.column(align=True)
+            col.label(text="Performance:")
+            col.prop(scn, "maxServerLoad")
+            col.prop(scn, "timeout")
+            if scn.render.engine == "CYCLES":
                 col.prop(scn, "samplesPerFrame")
                 col.prop(scn, "maxSamples")
 
-                layout.separator()
+            layout.separator()
 
-                row = col.row(align=True)
-                row.prop(scn, "killPython")
-                row.prop(scn, "compress")
-                # The following is probably unnecessary
-                # col = box.row(align=True)
-                # col.prop(scn, "tempLocalDir")
+            row = col.row(align=True)
+            row.prop(scn, "killPython")
+            row.prop(scn, "compress")
+            # The following is probably unnecessary
+            # col = box.row(align=True)
+            # col.prop(scn, "tempLocalDir")

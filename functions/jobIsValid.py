@@ -33,6 +33,11 @@ def jobIsValid(jobType, classObject):
     if classObject.projectName == "":
         jobValidityDict = {"valid":False, "errorType":"WARNING", "errorMessage":"RENDER FAILED: You have not saved your project file. Please save it before attempting to render."}
 
+    # verify there are no single or double quotes in project path
+    projectPath = bpy.path.abspath("//")
+    if "'" in projectPath or "\"" in projectPath:
+        jobValidityDict = {"valid":False, "errorType":"ERROR", "errorMessage":"RENDER FAILED: Found illegal quotation in project path ({projectPath}). Please change the file/directory name before attempting to render.".format(projectPath=projectPath)}
+
     # verify that a camera exists in the scene
     elif scn.camera is None:
         jobValidityDict = {"valid":False, "errorType":"ERROR", "errorMessage":"RENDER FAILED: No camera in scene."}
@@ -43,7 +48,7 @@ def jobIsValid(jobType, classObject):
         jobValidityDict = {"valid":False, "errorType":"ERROR", "errorMessage":"RENDER FAILED: Output file format not supported. Supported formats: BMP, PNG, TARGA, JPEG, JPEG 2000, TIFF. (Animation only: IRIS, CINEON, HDR, DPX, OPEN_EXR, OPEN_EXR_MULTILAYER)"}
 
     # verify that sampling is high enough to provide expected results
-    if jobType == "image":
+    if jobType == "image" and scn.render.engine == "CYCLES":
         jobsPerFrame = scn.maxSamples // scn.samplesPerFrame
         if jobsPerFrame > 100:
             jobValidityDict = {"valid":False, "errorType":"ERROR", "errorMessage": "Max Samples / SamplesPerJob > 100. Try increasing samples per frame or lowering max samples."}
