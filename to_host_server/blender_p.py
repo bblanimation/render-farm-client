@@ -34,4 +34,4 @@ for scene in bpy.data.scenes:
     scene.cycles.blur_glossy = 0
     scene.render.use_overwrite = True
     if scene.cycles.film_transparent:
-        scene.color_mode = 'RGBA'
+        scene.render.image_settings.color_mode = 'RGBA'

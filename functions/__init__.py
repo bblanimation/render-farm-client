@@ -56,7 +56,6 @@ def getFrames(projectName, archiveFiles=False, frameRange=False):
     fetchRsyncCommand = "rsync -x --progress --remove-source-files --exclude='*.blend' --exclude='*_average.???' -e 'ssh -T -oCompression=no -oStrictHostKeyChecking=no -x' '{login}:{remotePath}{projectName}/results/*' '{dumpLocation}/';".format(login=bpy.props.serverPrefs["login"], remotePath=bpy.props.serverPrefs["path"], projectName=projectName, dumpLocation=dumpLocation)
 
     # run the above processes
-    print(archiveRsyncCommand + fetchRsyncCommand)
     process = subprocess.Popen(archiveRsyncCommand + fetchRsyncCommand, stdout=subprocess.PIPE, shell=True)
     return process
 
@@ -278,7 +277,7 @@ def getNameOutputFiles():
     scn = bpy.context.scene
     if scn.nameOutputFiles != "":
         # remove illegal characters
-        for char in "/<>:\"\ |?*":
+        for char in " <>:\"'/|\?*.^":
             scn.nameOutputFiles = scn.nameOutputFiles.replace(char, "_")
         return scn.nameOutputFiles
     else:

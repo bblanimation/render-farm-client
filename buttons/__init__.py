@@ -622,15 +622,12 @@ class openRenderedAnimationInUI(Operator):
         image_sequence_filepath = "{dumpFolder}/".format(dumpFolder=self.renderDumpFolder)
         for frame in bpy.props.animFrameRange:
             try:
-                print("entering try")
                 image_filename = "{fileName}_{frame}{extension}".format(fileName=getNameOutputFiles(), frame=str(frame).zfill(4), extension=bpy.props.animExtension)
                 bpy.ops.clip.open(directory=image_sequence_filepath, files=[{"name":image_filename}])
-                print("bpy.ops.clip.open(directory=" + image_sequence_filepath + ", files=[{'name':" + image_filename + "}]")
                 openedFile = image_filename
                 openedFrame = frame
                 break
             except:
-                print("hit exception")
                 pass
         if openedFile:
             bpy.ops.clip.reload()

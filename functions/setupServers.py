@@ -95,21 +95,23 @@ def setupServerPrefs():
         return {"valid":False, "errorMessage":invalidEntry("HOST SERVER PATH")}
 
     # format host server path
-    path = path.replace(" ", "_").replace("$username$", username)
+    for char in " <>:\"\|?*.^":
+        path = path.replace(char, "_")
+    path.replace("$username$", username)
     if not path.endswith("/") and path != "":
         path += "/"
 
     # read file for servers dictionary
     try:
-        tmpServers = readFileFor(serverFile, "REMOTE SERVERS DICTIONARY")
+        tmpServers = readFileFor(serverFile, "REMOTE SERVERS DICTIONARY").replace("'", "\"")
     except:
-        return {"valid":False, "errorMessage":"Could not load 'REMOTE SERVERS DICTIONARY'. Please read the instructions carefully to make sure you've set up your file correctly"}
+        return {"valid":False, "errorMessage":invalidEntry("REMOTE SERVERS DICTIONARY")}
 
     # convert servers dictionary string to object
     try:
         servers = json.loads(tmpServers)
     except:
-        return {"valid":False, "errorMessage":"Could not load dictionary. Please make sure you've entered a valid dictionary and check for syntax errors"}
+        return {"valid":False, "errorMessage":invalidEntry("dictionary")}
 
     return {"valid":True, "servers":servers, "login":login, "path":path, "hostConnection":hostConnection}
 

@@ -185,9 +185,9 @@ def main():
     subprocess.call("rsync -e 'ssh -oStrictHostKeyChecking=no' -a '{pyFilePathSource}' '{pyFilePathDest}'".format(pyFilePathSource=os.path.join(projectRoot, "blender_p.py"), pyFilePathDest=pyFilePathDest), shell=True)
     if args.samples:
         with open(pyFilePathDest, "a") as f:
-            f.write("    scene.cycles.progressive == 'PATH'\n")
-            f.write("    scn.cycles.use_square_samples == False\n")
-            f.write("    scene.cycles.samples = {samples}".format(samples=args.samples))
+            f.write("    scene.cycles.progressive = 'PATH'\n")
+            f.write("    scene.cycles.samples = {samples}\n".format(samples=args.samples))
+            f.write("    scene.cycles.use_square_samples = False\n")
 
     # Print frame range to be rendered
     frames = json.loads(args.frame_range)
