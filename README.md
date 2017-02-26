@@ -1,18 +1,22 @@
 # README
 
-Scripts and associated files for rendering from Blender files on CSE remote servers (Blender version: 2.78a)
+Blender add-on for distributing render jobs to remote servers (Blender version: 2.78b)
 
 ## Server Farm Client Add-On:
   * Features:
       * Clean UI for sending frames to servers and viewing them within Blender
-      * Full support for Cycles Render Engine (support for Blender Internal/Game 'animation' renders only - current frame render jobs processed locally)
       * Mid-render previews/status updates available with 'SHIFT + P'
       * Abort render with 'ESC'
+      * Full support for Cycles Render Engine (support for Blender Internal/Game 'animation' renders only - current frame render jobs processed locally)
       * NOTE: Files are auto-packed into the .blend file with each render process
-  * Required packages:
-      * Local: rsync
-      * Host Server: rsync, python
-      * Client Servers: blender
+  * System Requirements:
+      * Operating System (local and remote):
+          * Linux
+          * Mac OS X
+      * Required packages:
+          * Local: rsync
+          * Host Server: rsync, python
+          * Client Servers: blender
   * Future improvements:
       * Handle known errors
           * Detect when required packages have not been installed on servers (see 'which' command)
