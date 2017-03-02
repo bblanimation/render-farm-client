@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """
 Copyright (C) 2017 Bricks Brought to Life
 http://bblanimation.com/
@@ -52,25 +54,25 @@ class JobHostManager():
         jobAccepted = False
         try:
             while not self.jobs_complete() and not self.stop_now:
-                time.sleep(1)
+                # time.sleep(.25)
                 for aHost in self.hosts.keys():
+                    if self.jobs_complete() or self.stop_now:
+                        break
                     host = self.hosts[aHost]
                     while self.host_can_take_job(host=host) and len(self.jobs) > 0:
-                        time.sleep(.5)
+                        # time.sleep(.1)
                         hostname = host.get_hostname()
                         job = self.jobs.pop()
                         host.add_job(job)
                         if host not in self.hosts_with_jobs:
-                            self.hosts_with_jobs[hostname] = host.get_task_count()
-                        if not host.is_started() and not host.thread_stopped():
+                            self.hosts_with_jobs[hostname] = host.get_job_count()
+                        if not host.is_started():
                             host.start()
                         numQueued = str(len(self.jobs))
                         if self.verbose >= 3:
                             pflush("Running job {job} on host {host}. ({numQueued} jobs remain in queue)".format(job=job, host=hostname, numQueued=numQueued))
                         elif self.verbose >= 2:
                             pflush("Job sent to host '{hostname}' ({numQueued} jobs remain in queue)".format(hostname=hostname, numQueued=numQueued))
-                    if self.jobs_complete() or self.stop_now:
-                        break
             self.stop_all_threads()
         except (KeyboardInterrupt, SystemExit):
             self.stop_all_threads()
@@ -118,10 +120,8 @@ class JobHostManager():
     def host_failed_job(self, hostname, job):
         error_string = "Failed Job on {hostname}: {job}".format(hostname=hostname, job=job)
         # eflush(error_string)
-
         if self.verbose >= 3:
             print(error_string)
-
         # self.add_job(job)
         self.job_status[job] = 1
 
@@ -132,7 +132,7 @@ class JobHostManager():
             host = self.hosts[hostname]
         else:
             return False
-        if host.get_task_count() < self.max_on_hosts and host.is_telnetable():
+        if host.can_take_job() and host.is_telnetable():
             return True
         return False
 
@@ -141,7 +141,6 @@ class JobHostManager():
 
     def print_jobs_status(self):
         if self.jobs_complete():
-            print("Jobs completed successfully!")
             if self.verbose >= 2:
                 print(self.get_cumulative_status())
         else:
@@ -150,7 +149,7 @@ class JobHostManager():
     def stop_all_threads(self):
         for hostname in self.hosts_with_jobs.keys():
             tHost = self.hosts[hostname]
-            tHost.thread_stop()
+            tHost.kill()
             self.stop()
 
     def stop(self):
@@ -168,13 +167,31 @@ if __name__ == '__main__':
     verbose = 2
     # jhm = JobHostManager(jobs=jobStrings,hosts=host_objects,function_args=job_args)
     # jobs = ['blender -b /tmp/nwhite/test/test.blend -x 1 -o //results/test_####.png -s 7 -e 7 -P  /tmp/nwhite/test/blender_p.py -a' ,'blender -b /tmp/nwhite/test/test.blend -x 1 -o //results/test_####.png -s 6 -e 6 -P  /tmp/nwhite/test/blender_p.py -a' ,'blender -b /tmp/nwhite/test/test.blend -x 1 -o //results/test_####.png -s 5 -e 5 -P  /tmp/nwhite/test/blender_p.py -a' ,'blender -b /tmp/nwhite/test/test.blend -x 1 -o //results/test_####.png -s 4 -e 4 -P  /tmp/nwhite/test/blender_p.py -a' , 'blender -b /tmp/nwhite/test/test.blend -x 1 -o //results/test_####.png -s 2 -e 2 -P  /tmp/nwhite/test/blender_p.py -a' , 'blender -b /tmp/nwhite/test/test.blend -x 1 -o //results/test_####.png -s 1 -e 1 -P  /tmp/nwhite/test/blender_p.py -a','blender -b /tmp/nwhite/test/test.blend -x 1 -o //results/test_####.png -s 3 -e 3 -P  /tmp/nwhite/test/blender_p.py -a' ]
-    jobs = ['blender -b /tmp/nwhite/test/test.blend -x 1 -o //results/test_####.png -s 7 -e 7 -P  /tmp/nwhite/test/blender_p.py -a']
-    kwargs = {'username':'nwhite', 'remoteProjectPath':'/tmp/nwhite/test', 'verbose':None, 'projectPath':'/tmp/nwhite/test', 'remoteSyncBack':'/tmp/nwhite/test/results', 'projectName':'test', 'projectSyncPath':'/tmp/nwhite/test/toRemote/', 'projectOutuptFile':'/tmp/nwhite/test/'}
+    jobs = [
+        'blender -b /tmp/nwhite/test/test.blend -x 1 -o //results/test_####.png -s 1 -e 1 -P  /tmp/nwhite/test/blender_p.py -a',
+        'blender -b /tmp/nwhite/test/test.blend -x 1 -o //results/test_####.png -s 2 -e 2 -P  /tmp/nwhite/test/blender_p.py -a',
+        'blender -b /tmp/nwhite/test/test.blend -x 1 -o //results/test_####.png -s 3 -e 3 -P  /tmp/nwhite/test/blender_p.py -a',
+        'blender -b /tmp/nwhite/test/test.blend -x 1 -o //results/test_####.png -s 4 -e 4 -P  /tmp/nwhite/test/blender_p.py -a',
+        'blender -b /tmp/nwhite/test/test.blend -x 1 -o //results/test_####.png -s 5 -e 5 -P  /tmp/nwhite/test/blender_p.py -a',
+        'blender -b /tmp/nwhite/test/test.blend -x 1 -o //results/test_####.png -s 6 -e 6 -P  /tmp/nwhite/test/blender_p.py -a',
+        'blender -b /tmp/nwhite/test/test.blend -x 1 -o //results/test_####.png -s 7 -e 7 -P  /tmp/nwhite/test/blender_p.py -a',
+        'blender -b /tmp/nwhite/test/test.blend -x 1 -o //results/test_####.png -s 8 -e 8 -P  /tmp/nwhite/test/blender_p.py -a'
+        ]
 
-    cse217Host  = JobHost(hostname='cse21701', thread_func=start_tasks, kwargs=kwargs, verbose=2)
-    cse10319 = JobHost(hostname='cse10319', thread_func=start_tasks, kwargs=kwargs, verbose=2)
-    cse10318 = JobHost(hostname='cse10318', thread_func=start_tasks, kwargs=kwargs, verbose=2)
+    kwargs = {
+        'projectName':'test',
+        'projectSyncPath':'/tmp/nwhite/test/toRemote/',
+        'username':'nwhite',
+        'verbose':None,
+        'projectPath':'/tmp/nwhite/test',
+        'remoteResultsPath':'/tmp/nwhite/test/results',
+        'localResultsPath':'/tmp/nwhite/test/results'
+        }
 
-    hostObjects = [cse217Host, cse10319, cse10318]
-    jhm = JobHostManager(jobs=jobs, hosts=hostObjects, max_on_hosts=1)
+    cse217Host  = JobHost(hostname='cse21701', thread_func=start_tasks, kwargs=kwargs, verbose=3 ,max_on_host=3)
+
+    hostObjects = [cse217Host]
+    jhm = JobHostManager(jobs=jobs, hosts=hostObjects)
+
+
     jhm.print_jobs_status()

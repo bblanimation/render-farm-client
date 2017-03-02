@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
 Copyright (C) 2017 Bricks Brought to Life
 http://bblanimation.com/
@@ -23,17 +24,19 @@ Created by Christopher Gearhart and Nathan White
 import telnetlib
 import threading
 import time
-from supporting_methods import *
+from supporting_methods import *  #start_tasks
+# from multiprocessing import Pool
+from multiprocessing import Process
 
 class JobHost(threading.Thread):
     """ Write tooltip here """
 
-    def __init__(self, hostname, persist_thread=True, jobs_list=None, thread_func=None, kwargs=None, callback=None, timeout=.01, verbose=0, error_callback=None):
+    def __init__(self, hostname, jobs_list=None, thread_func=None, kwargs=None, callback=None, timeout=.01, verbose=0, error_callback=None, max_on_host=4, cleanup_when_done=False):
         super(JobHost, self).__init__()
-
         self.verbose = verbose
         self.timeout = timeout
         self.firstTime = True
+        self.cleanup_when_done=cleanup_when_done
 
         # The name of the host this object represents
         self.hostname = hostname
@@ -44,18 +47,16 @@ class JobHost(threading.Thread):
         self.reachable = False
         # In case the status of the host changes after we have checked it once
         self.reachable_change = False
-        self.is_telnetable() # Will set up the self.reachable var
+        self.is_telnetable() # Will set up self.reachable
 
-        # Starts out not running a job
-        self.running_job = False
-
-        # Thread will persist by default
-        self.persist_thread = persist_thread
-
-        # List of job strings. This is how jobs are initially handed over to the thread
+        self.max_on_host = max_on_host
+        # List of job strings. This is how jobs are initially handed over to the host
         self.jobs_list = jobs_list
-        self.task_count = 0
-        if jobs_list: self.task_count = len(jobs_list) # Keeps track of number of threads currently running
+        if jobs_list:
+            self.job_count = len(jobs_list)
+        else:
+            self.job_count = 0
+
         self.jobs = dict() # Stores info about a job. Indexed by job string
 
         if not kwargs: kwargs = dict()
@@ -64,11 +65,13 @@ class JobHost(threading.Thread):
         if not thread_func: thread_func = lambda x: x # Defaults to identity function
         self.thread_func = thread_func # The main function that should be run by JobHost
 
-        if not callback: callback = lambda x: x
-        self.callback = callback # Set up callback
-        self.error_callback = error_callback # If an error comes up while running
+        if not callback: callback = lambda *x: x
+        self.callback = callback # Set up callback so host can notify outside world when it finishes jobs
+        self.error_callback = error_callback # If an error comes up while working on jobs
+
+        self.killed  = False
         self.started = False
-        self._stop = threading.Event()
+        # self.pool = Pool(processes=self.max_on_host,maxtasksperchild=1)
 
     def __str__(self):
         aString = threading.Thread.__str__(self)
@@ -83,9 +86,6 @@ class JobHost(threading.Thread):
     def set_error_callback(self, error_callback):
         self.error_callback = error_callback
 
-    def is_running_job(self):
-        return self.running_job
-
     def is_complete_without_error(self):
         for job in self.jobs:
             if not job["exit_status"] == 0:
@@ -95,8 +95,8 @@ class JobHost(threading.Thread):
     def get_jobs_status(self):
         return self.jobs
 
-    def get_task_count(self):
-        return self.task_count
+    def get_job_count(self):
+        return self.job_count
 
     def get_hostname(self):
         return self.hostname
@@ -104,45 +104,79 @@ class JobHost(threading.Thread):
     def is_reachable(self):
         return self.reachable
 
-    def start(self):
-        self.started = True
-        super(JobHost, self).start()
-
     def is_started(self):
         return self.started
 
-    def print_job_status(self, state, job=None):
-        if self.verbose >= 2:
+    def print_job_status(self, state, job=None,verbose=1):
+        if self.verbose >= 2 or verbose >= 1:
             pflush("Job {state} on host {hostname}".format(state=state, hostname=self.get_hostname()))
             if self.verbose >= 2:
                 pflush(job + "\n")
 
     def run(self):
-        # Should thread terminate once jobs are finished, or stay alive?
-        while not self.thread_stopped() and (self.task_count > 0  or self.persist_thread):
-            if len(self.jobs_list) > 0:
-                self.running_job = True
-                job = self.jobs_list.pop()
-                self.jobs[job] = {"exit_status":-1, "get_callback":self.get_callback, "error_callback":self.get_error_callback}
-                self.kwargs["jobString"] = job
-                self.kwargs["hostname"] = self.get_hostname()
-                self.kwargs["firstTime"] = self.firstTime
-                self.print_job_status("started", job)
-                r_value = self.thread_func(**self.kwargs)
-                # Cleanup after job is finished and call callback
-                self.jobs[job]["exit_status"] = r_value
-                self.job_complete(job=job)
-            else:
-                self.running_job = False
-        self.thread_stop()
+        # checks job queue for jobs that were created on the host before the start command was issued.
+        # runs host main loop
+        acc = 0
+        while True:
+            if acc < self.max_on_host:
+                job = self.get_next_job()
+                if job:
+                    # Start jobs in the pool if we are not already past the max running jobs
+                    if job not in self.jobs:
+                        self.started = True
+                        self.jobs[job] = dict()
+                        self.kwargs["jobString"] = job
+                        self.kwargs["hostname"] = self.get_hostname()
+                        self.kwargs["firstTime"] = self.firstTime
+                        job_process=Process(target=self.thread_func,kwargs=self.kwargs)
+                        job_process.start()
+                        self.jobs[job]['process'] = job_process
+                        acc += 1
+            # Check on child processes
+            for job_key in self.jobs.keys():
+                job_process=self.jobs[job_key]['process']
+                if( job_process.exitcode != None and 'printed' not in self.jobs[job_key] ):
+                    acc -= 1
+                    exitstatus = job_process.exitcode
+                    self.jobs[job_key]['exit_status'] = exitstatus
+                    self.jobs[job_key]['printed'] = True
+                    if exitstatus == 0:
+                        (self.get_callback())(self.hostname,job_key)
+                    else:
+                        (self.get_error_callback())(self.hostname,job_key)
 
-    def thread_stop(self):
-        # This terminates the thread. There is no restarting a thread once it has been terminated.
-        self.running_job = False
-        self._stop.set()
+                    self.job_complete(job=job_key)
+            if self.terminate():
+                break
+        for job_string in self.jobs.keys():
+            self.jobs[job_string]['process'].terminate()
 
-    def thread_stopped(self):
-        return self._stop.isSet()
+    def terminate(self):
+        return ( self.cleanup_when_done and self.started and self.all_jobs_complete() or self.jobHostKilled() )
+
+    def jobHostKilled(self):
+        return self.killed
+
+    def kill(self):
+        self.killed = True
+
+    def all_jobs_complete(self):
+        remaining_jobs = 0
+        for job_string in self.jobs.keys():
+            if not "exit_status" in self.jobs[job_string]:
+                remaining_jobs += 1
+        return remaining_jobs == 0
+
+    def get_next_job(self):
+        if self.can_start_job():
+            return self.jobs_list.pop()
+        return False
+
+    def can_start_job(self):
+        return (self.job_count <= self.max_on_host) and (len(self.jobs_list) > 0)
+
+    def can_take_job(self):
+        return self.job_count <= self.max_on_host
 
     def get_callback(self):
         return self.callback
@@ -151,25 +185,20 @@ class JobHost(threading.Thread):
         return self.error_callback
 
     def job_complete(self, job=None, exit_status=0):
-        self.task_count -= 1
         self.firstTime = False
+        self.job_count -= 1
 
-        if self.task_count == 0:
-            self.running_job = False
         # Call the callback
         if self.jobs[job]["exit_status"] == 0:
-
             self.print_job_status("finished", job)
-
-            # Skip callback if there is not one set.
-            if self.jobs[job]["get_callback"] != None:
+            if "get_callback" in self.jobs[job] and self.jobs[job]["get_callback"] != None:
                 callback = self.jobs[job]["get_callback"]()
                 if not callback == None:
                     callback(self.hostname, job)
                 elif self.verbose >= 2:
                     print("No callback specified.")
         else:
-            if self.jobs[job]["error_callback"] != None:
+            if "error_callback" in self.jobs[job] and self.jobs[job]["error_callback"] != None:
                 callback = self.jobs[job]["error_callback"]()
                 if not callback == None:
                     callback(self.hostname, job)
@@ -190,12 +219,12 @@ class JobHost(threading.Thread):
     def add_jobs(self, jobs):
         for job in jobs:
             self.add_job(job)
+            self.job_count += 1
 
     def add_job(self, job):
-        self.task_count += 1
-        self.running_job = True
         if not self.jobs_list: self.jobs_list = list()
         self.jobs_list.append(job)
+        self.job_count += 1
 
     def print_job_list(self):
         print(self.jobs_list)
@@ -209,37 +238,57 @@ def callback_func(host, job):
 def error_callback_func(host, job):
     pass
 
+
+import json
+
 if __name__ == "__main__":
-    print("TESTING JobHost Class")
     verbose = 0
-    # self, hostname, thread_func=None, kwargs=None, callback=None, persist_thread=True, verbose=False, error_callback=None
+    # self, hostname, thread_func=None, kwargs=None, callback=None, verbose=False, error_callback=None
 
-    testDict1 = {"username":"nwhite", "remoteProjectPath":"/tmp/nwhite/test", "verbose":verbose, "projectPath":"/tmp/nwhite/test", "remoteSyncBack":"/tmp/nwhite/test/results", "projectName":"test", "projectSyncPath":"/tmp/nwhite/test/toRemote/", "projectOutuptFile":"/tmp/nwhite/test/"}
-    jobsList = ["blender -b /tmp/nwhite/test/test.blend -x 1 -o //results/test_####.png -s 2 -e 2 -P  /tmp/nwhite/test/blender_p.py -a"]
-    h1 = JobHost(hostname="cse10318", thread_func=start_tasks, kwargs=testDict1, verbose=verbose, callback=callback_func, jobs_list=jobsList)
-    print("Reachable:", h1.is_reachable())
-    print("Running:", h1.is_running_job())
+    # testDict1 = {"username":"nwhite",
+    #     "verbose":verbose, "projectPath":"/tmp/nwhite/test", "remoteSyncBack":"/tmp/nwhite/test/results", "projectName":"test", "projectSyncPath":"/tmp/nwhite/test/toRemote/", "projectOutuptFile":"/tmp/nwhite/test/"}
+    # def start_tasks( hostname, jobString, remoteResultsPath, localResultsPath, JobHostObject=None, firstTime=True, frame=False, progress=False, verbose=0):
+    testDict1 = {
+        'projectName':'test',
+        'projectSyncPath':'/tmp/nwhite/test/toRemote/',
+        'username':'nwhite',
+        'verbose':0,
+        'projectPath':'/tmp/nwhite/test',
+        'remoteResultsPath':'/tmp/nwhite/test/results',
+        'localResultsPath':'/tmp/nwhite/test/results'
+    }
+    jobsList = [ "blender -b /tmp/nwhite/test/test.blend -x 1 -o //results/test_####.png -s 1 -e 1 -P  /tmp/nwhite/test/blender_p.py -a > /tmp/nwhite/test/1.out.log",
+                    "blender -b /tmp/nwhite/test/test.blend -x 1 -o //results/test_####.png -s 2 -e 2 -P  /tmp/nwhite/test/blender_p.py -a > /tmp/nwhite/test/2.out.log"]
+    h1 = JobHost(hostname="cse21701", thread_func=start_tasks, kwargs=testDict1, verbose=verbose, callback=callback_func, jobs_list=jobsList,max_on_host=4)
+    h1.add_job("blender -b /tmp/nwhite/test/test.blend -x 1 -o //results/test_####.tga -s 3 -e 3 -P  /tmp/nwhite/test/blender_p.py -a > /tmp/nwhite/test/3.out.log")
+    h1.add_job("blender -b /tmp/nwhite/test/test.blend -x 1 -o //results/test_####.tga -s 4 -e 4 -P  /tmp/nwhite/test/blender_p.py -a > /tmp/nwhite/test/4.out.log")
+    h1.add_job("blender -b /tmp/nwhite/test/test.blend -x 1 -o //results/test_####.png -s 5 -e 5 -P  /tmp/nwhite/test/blender_p.py -a > /tmp/nwhite/test/5.out.log")
+    h1.add_job("blender -b /tmp/nwhite/test/test.blend -x 1 -o //results/test_####.png -s 6 -e 6 -P  /tmp/nwhite/test/blender_p.py -a > /tmp/nwhite/test/6.out.log")
+    h1.add_job("blender -b /tmp/nwhite/test/test.blend -x 1 -o //results/test_####.png -s 7 -e 7 -P  /tmp/nwhite/test/blender_p.py -a > /tmp/nwhite/test/7.out.log")
+    h1.add_job("blender -b /tmp/nwhite/test/test.blend -x 1 -o //results/test_####.png -s 8 -e 8 -P  /tmp/nwhite/test/blender_p.py -a > /tmp/nwhite/test/8.out.log")
+    h1.print_job_list()
     h1.start()
-    h1.add_job("blender -b /tmp/nwhite/test/test.blend -x 1 -o //results/test_####.png -s 4 -e 4 -P  /tmp/nwhite/test/blender_p.py -a")
+    try:
+        while not( h1.terminate() ):
+            print "some jobs remaining"
+            time.sleep(2)
+    except KeyboardInterrupt:
+        print "terminating jobs"
+        h1.kill()
+
+    tDict = h1.get_jobs_status()
+    print(tDict)
+    for item in tDict.keys():
+        print("{} : \n \t{}\n\t{}\n\t{} ".format(item,tDict[item]['exit_status'],tDict[item]["process"],tDict[item]['printed']))
+
+    # h1.add_job("blender -b /tmp/nwhite/test/test.blend -x 1 -o //results/test_####.png -s 5 -e 5 -P  /tmp/nwhite/test/blender_p.py -a")
+    # try:
+    #     while h1.running_job():
+    #         print "Remaining jobs2: ", h1.get_job_count(), "remaining"
+    #         time.sleep(2)
+    # except KeyboardInterrupt:
+    #     print "terminating other jobs"
+    #     h1.terminate(terminate_pool=True)
+    #
+    # h1.terminate()
     # print(h1.get_jobs_status())
-    while h1.is_running_job():
-        print("Remaining jobs1: ", h1.get_task_count(), "remaining")
-        time.sleep(2)
-
-    h1.add_job("blender -b /tmp/nwhite/test/test.blend -x 1 -o //results/test_####.png -s 5 -e 5 -P  /tmp/nwhite/test/blender_p.py -a")
-    while h1.is_running_job():
-        print("Remaining jobs2: ", h1.get_task_count(), "remaining")
-        time.sleep(2)
-
-    h1.thread_stop()
-    print(h1.get_jobs_status())
-
-    # testDict2 = {"username":"nwhite", "remoteProjectPath":"/tmp/nwhite/test", "verbose":2, "projectPath":"/tmp/nwhite/test", "remoteSyncBack":"/tmp/nwhite/test/results", "projectName":"test", "projectSyncPath":"/tmp/nwhite/test/toRemote/", "projectOutuptFile":"/tmp/nwhite/test/"}
-    # h2 = JobHost(hostname="cse10319", thread_func=start_tasks, kwargs=testDict2)
-    # h2.add_job("blender -b /tmp/nwhite/test/test.blend -x 1 -o //results/test_####.png -s 3 -e 3 -P  /tmp/nwhite/test/blender_p.py -a")
-    # h2.print_job_list()
-    # print("Reachable:", h2.is_reachable())
-    # print("Running:", h2.is_running_job())
-    # h2.start()
-    # while h2.is_running_job():
-    #     pass

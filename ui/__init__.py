@@ -63,11 +63,11 @@ class renderOnServersPanel(Panel):
         if imRenderStatus != "None":
             col = layout.column(align=True)
             row = col.row(align=True)
-            row.label("Render Status: {imRenderStatus}".format(imRenderStatus=imRenderStatus))
+            row.label("Render Status: {status}".format(status=imRenderStatus))
         elif animRenderStatus != "None":
             col = layout.column(align=True)
             row = col.row(align=True)
-            row.label("Render Status: {animRenderStatus}".format(animRenderStatus=animRenderStatus))
+            row.label("Render Status: {status}".format(status=animRenderStatus))
 
         # display buttons to view render(s)
         row = layout.row(align=True)

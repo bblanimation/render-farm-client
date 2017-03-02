@@ -93,7 +93,7 @@ class refreshNumAvailableServers(Operator):
                 elif self.state == 2:
                     self.updateAvailServerInfo()
                     scn = context.scene
-                    self.report({"INFO"}, "Refresh process completed ({numAvailable} servers available)".format(numAvailable=str(scn.availableServers)))
+                    self.report({"INFO"}, "Refresh process completed ({num} servers available)".format(num=str(scn.availableServers)))
                     return{"FINISHED"}
                 else:
                     self.report({"ERROR"}, "ERROR: Current state not recognized.")
@@ -252,7 +252,11 @@ class sendFrame(Operator):
                         numRenderedFiles = getNumRenderedFiles("image", [bpy.props.imFrame], None)
                         if numRenderedFiles > 0:
                             averaged = True
-                            bpy.props.nameAveragedImage = averageFrames(self, bpy.props.nameImOutputFiles)
+                            aveName = averageFrames(self, bpy.props.nameImOutputFiles)
+                            if aveName != None:
+                                bpy.props.nameAveragedImage = aveName
+                            else:
+                                averaged = False
                         else:
                             averaged = False
                         # calculate number of samples represented in averaged image
@@ -265,7 +269,7 @@ class sendFrame(Operator):
                                     if area.type == "IMAGE_EDITOR":
                                         area.spaces.active.image = bpy.data.images[bpy.props.nameAveragedImage]
                                         break
-                            self.report({"INFO"}, "Render completed at {numSamples} samples! View the rendered image in your UV/Image_Editor".format(numSamples=str(self.numSamples)))
+                            self.report({"INFO"}, "Render completed at {num} samples! View the rendered image in your UV/Image_Editor".format(num=str(self.numSamples)))
                         else:
                             if bpy.data.images.find(bpy.props.nameAveragedImage) >= 0:
                                 # open preview image in UV/Image_Editor
@@ -276,7 +280,7 @@ class sendFrame(Operator):
                                         self.previewed = True
                                         break
                             self.processes[1] = False
-                            previewString = "Render preview loaded ({numSamples} samples)".format(numSamples=str(self.numSamples))
+                            previewString = "Render preview loaded ({num} samples)".format(num=str(self.numSamples))
                             self.report({"INFO"}, previewString)
                         appendViewable("image")
                         removeViewable("animation")

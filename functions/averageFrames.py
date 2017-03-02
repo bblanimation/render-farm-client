@@ -43,7 +43,8 @@ def averageFrames(classObject, outputFileName, verbose=0):
     imListNames = [filename for filename in allFiles if fnmatch.fnmatch(filename, inFileName)]
     imList = [os.path.join(renderedFramesPath, im) for im in imListNames]
     if not imList:
-        classObject.report({"ERROR"}, "No image files to average")
+        print("No image files to average")
+        return None
 
     # Assuming all images are the same size, get dimensions of first image
     imRef = bpy.data.images.load(imList[0])

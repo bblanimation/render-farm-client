@@ -32,7 +32,7 @@ def getLibraryPath():
     libraryPath = functionsPath[:-10]
 
     if not os.path.exists(libraryPath):
-        raise NameError("Did not find addon from path {libraryPath}".format(libraryPath=libraryPath))
+        raise NameError("Did not find addon from path {}".format(libraryPath))
     return libraryPath
 
 def readFileFor(f, flagName):

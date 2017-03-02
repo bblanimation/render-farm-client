@@ -89,8 +89,9 @@ def main():
     hosts_online = list()
     hosts_offline = list()
 
+    max_server_load = int(args.max_server_load)
     for host in hosts:
-        jh = JobHost(hostname=host, timeout=float(args.connection_timeout), thread_func=start_tasks, verbose=verbose)
+        jh = JobHost(hostname=host, timeout=float(args.connection_timeout), thread_func=start_tasks, verbose=verbose,  max_on_host=max_server_load)
         if jh.is_reachable():
             hosts_online.append(str(host))
         else:
@@ -210,7 +211,6 @@ def main():
         job_args["frame"] = frames[0]
 
     # Sets up kwargs, and callbacks on the hosts
-    max_server_load = int(args.max_server_load)
     jhm = JobHostManager(jobs=jobStrings, hosts=host_objects, function_args=job_args, verbose=verbose, max_on_hosts=max_server_load)
     jhm.start()
     status = jhm.get_cumulative_status()
