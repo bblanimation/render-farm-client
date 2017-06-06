@@ -97,7 +97,7 @@ def setupServerPrefs():
     # format host server path
     for char in " <>:\"\|?*.^":
         path = path.replace(char, "_")
-    path.replace("$username$", username)
+    path = path.replace("$username$", username)
     if not path.endswith("/") and path != "":
         path += "/"
 
