@@ -35,7 +35,8 @@ Created by Christopher Gearhart
 import bpy
 from bpy.types import Operator
 from bpy.props import *
-from . import (ui, buttons)
+from .ui import *
+from .buttons import *
 from .functions.setupServers import *
 
 def more_menu_options(self, context):
