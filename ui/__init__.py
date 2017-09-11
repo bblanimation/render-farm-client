@@ -43,6 +43,7 @@ class renderOnServersPanel(Panel):
         if not have_internet():
             col = layout.column(align=True)
             col.label("No internet connection")
+            return
 
         imRenderStatus = getRenderStatus("image")
         animRenderStatus = getRenderStatus("animation")
