@@ -49,7 +49,7 @@ class refreshNumAvailableServers(Operator):
     def checkNumAvailServers(self):
         scn = bpy.context.scene
         command = "ssh -T -oStrictHostKeyChecking=no -x {login} 'python {remotePath}blender_task -Hv --connection_timeout {timeout} --hosts_file {remotePath}servers.txt'".format(login=bpy.props.serverPrefs["login"], remotePath=bpy.props.serverPrefs["path"], timeout=scn.timeout)
-        process = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
         return process
 
     def updateAvailServerInfo(self):

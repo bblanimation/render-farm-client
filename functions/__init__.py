@@ -70,7 +70,7 @@ def getFrames(projectName, archiveFiles=False, frameRange=False):
     fetchRsyncCommand = "rsync -ax --progress --remove-source-files --exclude='*.blend' --exclude='*_average.???' -e 'ssh -T -oCompression=no -oStrictHostKeyChecking=no -x' '{login}:{remotePath}{projectName}/results/' '{dumpLocation}/';".format(login=bpy.props.serverPrefs["login"], remotePath=bpy.props.serverPrefs["path"], projectName=projectName, dumpLocation=dumpLocation)
 
     # run the above processes
-    process = subprocess.Popen(archiveRsyncCommand + fetchRsyncCommand, stdout=subprocess.PIPE, shell=True)
+    process = subprocess.Popen(archiveRsyncCommand + fetchRsyncCommand, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     return process
 
 def buildFrameRangesString(frameRanges):
@@ -127,7 +127,7 @@ def copyFiles():
 
     # rsync setup files to host server ('servers.txt', 'blender_p.py', 'blender_task' module)
     rsyncCommand = "rsync -qax -e 'ssh -T -oCompression=no -oStrictHostKeyChecking=no -x' --rsync-path='mkdir -p {remotePath} && rsync' '{to_host_server}/' '{login}:{remotePath}'".format(remotePath=bpy.props.serverPrefs["path"], to_host_server=os.path.join(getLibraryPath(), "to_host_server"), login=bpy.props.serverPrefs["login"])
-    process = subprocess.Popen(rsyncCommand, stdout=subprocess.PIPE, shell=True)
+    process = subprocess.Popen(rsyncCommand, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     return process
 
 def renderFrames(frameRange, projectName, jobsPerFrame=False):
@@ -236,7 +236,7 @@ def handleError(classObject, errorSource, i="Not Provided"):
     if not errorMessage:
         errorMessage = "No error message to print."
 
-    classObject.report({"ERROR"}, "{errorSource} gave return code {returnCode}. {errorMessage}".format(errorSource=errorSource,returnCode=rCode-1, errorMessage=errorMessage))
+    classObject.report({"ERROR"}, "{errorSource} gave return code {returnCode}. {errorMessage}".format(errorSource=errorSource,returnCode=rCode, errorMessage=errorMessage))
 
 def handleBTError(classObject, i="Not Provided"):
     if i == "Not Provided":
