@@ -28,6 +28,20 @@ import os
 import subprocess
 import sys
 from .setupServers import *
+try:
+    import httplib
+except:
+    import http.client as httplib
+
+def have_internet():
+    conn = httplib.HTTPConnection("www.google.com", timeout=5)
+    try:
+        conn.request("HEAD", "/")
+        conn.close()
+        return True
+    except:
+        conn.close()
+        return False
 
 def getFrames(projectName, archiveFiles=False, frameRange=False):
     """ rsync rendered frames from host server to local machine """

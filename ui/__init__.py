@@ -24,7 +24,7 @@ import bpy
 import math
 from bpy.types import Panel
 from bpy.props import *
-from ..functions import getRenderStatus
+from ..functions import getRenderStatus, have_internet
 from ..functions.setupServers import *
 
 class renderOnServersPanel(Panel):
@@ -39,6 +39,10 @@ class renderOnServersPanel(Panel):
     def draw(self, context):
         layout = self.layout
         scn = context.scene
+
+        if not have_internet():
+            col = layout.column(align=True)
+            col.label("No internet connection")
 
         imRenderStatus = getRenderStatus("image")
         animRenderStatus = getRenderStatus("animation")

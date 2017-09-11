@@ -39,6 +39,13 @@ class sendAnimation(Operator):
     bl_label = "Render Animation"                                               # display name in the interface.
     bl_options = {"REGISTER", "UNDO"}                                           # enable undo for the operator.
 
+    @classmethod
+    def poll(cls, context):
+        """ ensures operator can execute (if not, returns false) """
+        if not have_internet():
+            return False
+        return True
+
     def modal(self, context, event):
         scn = context.scene
 
