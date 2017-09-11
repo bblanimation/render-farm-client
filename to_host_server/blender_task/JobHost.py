@@ -107,7 +107,7 @@ class JobHost(threading.Thread):
     def is_started(self):
         return self.started
 
-    def print_job_status(self, state, job=None,verbose=1):
+    def print_job_status(self, state, job=None, verbose=1):
         if self.verbose >= 2 or verbose >= 1:
             pflush("Job {state} on host {hostname}".format(state=state, hostname=self.get_hostname()))
             if self.verbose >= 2:
@@ -210,7 +210,9 @@ class JobHost(threading.Thread):
             tn = telnetlib.Telnet(self.hostname, 22, self.timeout)
             self.reachable = True
             return True
-        except:
+        except Exception as e:
+            if self.verbose >= 1:
+                print("Encountered following error connecting to '" + str(self.hostname) + "': " + str(e))
             if self.reachable:
                 self.reachable_change = True
             self.reachable = False

@@ -41,17 +41,32 @@ class refreshNumAvailableServers(Operator):
 
     def checkNumAvailServers(self):
         scn = bpy.context.scene
-        command = "ssh -T -oStrictHostKeyChecking=no -x {login} 'python {remotePath}blender_task -H --connection_timeout {timeout} --hosts_file {remotePath}servers.txt'".format(login=bpy.props.serverPrefs["login"], remotePath=bpy.props.serverPrefs["path"], timeout=scn.timeout)
+        command = "ssh -T -oStrictHostKeyChecking=no -x {login} 'python {remotePath}blender_task -Hv --connection_timeout {timeout} --hosts_file {remotePath}servers.txt'".format(login=bpy.props.serverPrefs["login"], remotePath=bpy.props.serverPrefs["path"], timeout=scn.timeout)
         process = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
         return process
 
     def updateAvailServerInfo(self):
         scn = bpy.context.scene
 
-        line1 = self.process.stdout.readline().decode("ASCII").replace("\\n", "")
-        line2 = self.process.stdout.readline().decode("ASCII").replace("\\n", "")
-        available = json.loads(line1.replace("'", "\""))
-        offline = json.loads(line2.replace("'", "\""))
+        available = None
+        offline = None
+
+        while available is None:
+            try:
+                rl = self.process.stdout.readline()
+                line1 = rl.decode("ASCII").replace("\\n", "")
+                available = json.loads(line1.replace("'", "\""))
+            except:
+                print(line1, end="")
+                available = None
+        while offline is None:
+            try:
+                rl = self.process.stdout.readline()
+                line2 = rl.decode("ASCII").replace("\\n", "")
+                offline = json.loads(line2.replace("'", "\""))
+            except:
+                print(line2, end="")
+                offline = None
 
         scn.availableServers = len(available)
         scn.offlineServers = len(offline)
