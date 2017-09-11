@@ -1,5 +1,5 @@
 bl_info = {
-    "name"        : "Server Farm Client",
+    "name"        : "Render Farm Client",
     "author"      : "Christopher Gearhart <chris@bblanimation.com>",
     "version"     : (0, 7, 5),
     "blender"     : (2, 78, 0),

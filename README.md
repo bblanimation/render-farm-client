@@ -2,7 +2,7 @@
 
 Blender add-on for distributing render jobs to remote servers (Blender version: 2.78b)
 
-## Server Farm Client Add-On:
+## Render Farm Client Add-On:
   * Features:
       * Clean UI for sending frames to servers and viewing them within Blender
       * Mid-render previews/status updates available with 'SHIFT + P'

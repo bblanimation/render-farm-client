@@ -1,3 +1,4 @@
-__pycache__
+__pycache__/
+.DS_Store
 servers.txt
 to_host_server/blender_task.zip
