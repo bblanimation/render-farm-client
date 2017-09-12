@@ -31,12 +31,13 @@ from multiprocessing import Process
 class JobHost(threading.Thread):
     """ Write tooltip here """
 
-    def __init__(self, hostname, jobs_list=None, thread_func=None, kwargs=None, callback=None, timeout=.01, verbose=0, error_callback=None, max_on_host=4, cleanup_when_done=False):
+    def __init__(self, hostname, jobs_list=None, thread_func=None, kwargs=None, callback=None, timeout=.01, print_connection_issue=False, verbose=0, error_callback=None, max_on_host=4, cleanup_when_done=False):
         super(JobHost, self).__init__()
         self.verbose = verbose
         self.timeout = timeout
         self.firstTime = True
         self.cleanup_when_done=cleanup_when_done
+        self.print_connection_issue = print_connection_issue
 
         # The name of the host this object represents
         self.hostname = hostname
@@ -211,7 +212,7 @@ class JobHost(threading.Thread):
             self.reachable = True
             return True
         except Exception as e:
-            if self.verbose >= 1:
+            if self.verbose >= 1 and self.print_connection_issue:
                 print("Encountered following error connecting to '" + str(self.hostname) + "': " + str(e))
             if self.reachable:
                 self.reachable_change = True

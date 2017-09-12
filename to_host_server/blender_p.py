@@ -22,6 +22,7 @@ Created by Christopher Gearhart
 # system imports
 import bpy
 import random
+from bpy.app.handlers import persistent
 
 randomSeed = random.randint(1, 10000)
 
@@ -35,3 +36,22 @@ for scene in bpy.data.scenes:
     scene.render.use_overwrite = True
     if scene.cycles.film_transparent:
         scene.render.image_settings.color_mode = 'RGBA'
+
+""" SUPPORT FOR THE LEGOIZER BELOW """
+
+@persistent
+def handle_legoizer_animation(scene):
+    scn = scene
+    groupsToAdjust = []
+    for group in bpy.data.groups:
+        if group.name.startswith("LEGOizer_") and "_bricks_frame_" in group.name:
+            groupsToAdjust.append(group)
+    for group in groupsToAdjust:
+        frame = int(group.name[(group.name.index("_bricks_frame_") + 14):])
+        onCurF = frame == scn.frame_current
+        brick = group.objects[0]
+        if brick.hide == onCurF:
+            brick.hide = not onCurF
+            brick.hide_render = not onCurF
+
+bpy.app.handlers.render_pre.append(handle_legoizer_animation)
