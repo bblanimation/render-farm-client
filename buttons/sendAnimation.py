@@ -182,11 +182,6 @@ class sendAnimation(Operator):
         self.projectName = bpy.path.display_name_from_filepath(bpy.data.filepath).replace(" ", "_")
         scn = context.scene
 
-        # for testing purposes only (saves unsaved file as 'unsaved_file.blend')
-        if self.projectName == "":
-            self.projectName = "unsaved_file"
-            bpy.ops.wm.save_mainfile(filepath="{tempLocalDir}{projectName}.blend".format(tempLocalDir=scn.tempLocalDir, projectName=self.projectName))
-
         # ensure no other render processes are running
         if getRenderStatus("image") in getRunningStatuses() or getRenderStatus("animation") in getRunningStatuses():
             self.report({"WARNING"}, "Render in progress...")
@@ -194,6 +189,11 @@ class sendAnimation(Operator):
         elif scn.availableServers == 0:
             self.report({"WARNING"}, "No servers available. Try refreshing.")
             return{"CANCELLED"}
+
+        # for testing purposes only (saves unsaved file as 'unsaved_file.blend')
+        if self.projectName == "":
+            self.projectName = "unsaved_file"
+            bpy.ops.wm.save_mainfile(filepath="{tempLocalDir}{projectName}.blend".format(tempLocalDir=scn.tempLocalDir, projectName=self.projectName))
 
         print("\nRunning sendAnimation function...")
 

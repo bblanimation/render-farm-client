@@ -177,6 +177,8 @@ class sendFrame(Operator):
                                         area.spaces.active.image = bpy.data.images[bpy.props.nameAveragedImage]
                                         break
                             self.report({"INFO"}, "Render completed at {num} samples! View the rendered image in your UV/Image_Editor".format(num=str(self.numSamples)))
+                        elif self.numSamples == 0:
+                            self.report({"INFO"}, "No render preview available (0 samples)")
                         else:
                             if bpy.data.images.find(bpy.props.nameAveragedImage) >= 0:
                                 # open preview image in UV/Image_Editor
@@ -217,11 +219,6 @@ class sendFrame(Operator):
             context.area.spaces.active.image = bpy.data.images["Render Result"]
             return{"FINISHED"}
 
-        # for testing purposes only (saves unsaved file as 'unsaved_file.blend')
-        if self.projectName == "":
-            self.projectName = "unsaved_file"
-            bpy.ops.wm.save_mainfile(filepath="{tempLocalDir}{projectName}.blend".format(tempLocalDir=scn.tempLocalDir, projectName=self.projectName))
-
         # ensure no other render processes are running
         if getRenderStatus("image") in getRunningStatuses() or getRenderStatus("animation") in getRunningStatuses():
             self.report({"WARNING"}, "Render in progress...")
@@ -229,6 +226,11 @@ class sendFrame(Operator):
         elif scn.availableServers == 0:
             self.report({"WARNING"}, "No servers available. Try refreshing.")
             return{"CANCELLED"}
+
+        # for testing purposes only (saves unsaved file as 'unsaved_file.blend')
+        if self.projectName == "":
+            self.projectName = "unsaved_file"
+            bpy.ops.wm.save_mainfile(filepath="{tempLocalDir}{projectName}.blend".format(tempLocalDir=scn.tempLocalDir, projectName=self.projectName))
 
         # ensure the job won't break the script
         if not jobIsValid("image", self):
