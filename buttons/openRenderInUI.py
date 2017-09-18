@@ -40,20 +40,36 @@ class openRenderedImageInUI(Operator):
     bl_options = {"REGISTER", "UNDO"}                                           # enable undo for the operator.
 
     def execute(self, context):
-        if bpy.data.images.find(bpy.props.nameAveragedImage) >= 0:
-            # open rendered image in UV/Image_Editor
-            changeContext(context, "IMAGE_EDITOR")
-            for area in context.screen.areas:
-                if area.type == "IMAGE_EDITOR":
-                    area.spaces.active.image = bpy.data.images[bpy.props.nameAveragedImage]
-        elif bpy.props.nameAveragedImage != "":
-            self.report({"ERROR"}, "Image could not be found: '{nameAveragedImage}'".format(nameAveragedImage=bpy.props.nameAveragedImage))
-            return{"CANCELLED"}
-        else:
-            self.report({"WARNING"}, "No rendered images could be found")
+        try:
+            if bpy.data.images.find(bpy.props.nameAveragedImage) >= 0:
+                # open rendered image in UV/Image_Editor
+                changeContext(context, "IMAGE_EDITOR")
+                for area in context.screen.areas:
+                    if area.type == "IMAGE_EDITOR":
+                        area.spaces.active.image = bpy.data.images[bpy.props.nameAveragedImage]
+            elif bpy.props.nameAveragedImage != "":
+                self.report({"ERROR"}, "Image could not be found: '{nameAveragedImage}'".format(nameAveragedImage=bpy.props.nameAveragedImage))
+                return{"CANCELLED"}
+            else:
+                self.report({"WARNING"}, "No rendered images could be found")
+                return{"CANCELLED"}
+
+            return{"FINISHED"}
+        except:
+            self.handle_exception()
             return{"CANCELLED"}
 
-        return{"FINISHED"}
+    def handle_exception(self):
+        errormsg = print_exception('LEGOizer_log')
+        # if max number of exceptions occur within threshold of time, abort!
+        curtime = time.time()
+        print('\n'*5)
+        print('-'*100)
+        print("Something went wrong. Please start an error report with us so we can fix it! (press the 'Report a Bug' button under the 'Render on Servers' dropdown menu of the Render Farm Client)")
+        print('-'*100)
+        print('\n'*5)
+        showErrorMessage("Something went wrong. Please start an error report with us so we can fix it! (press the 'Report a Bug' button under the 'Render on Servers' dropdown menu of the Render Farm Client)", wrap=240)
+
 
 class openRenderedAnimationInUI(Operator):
     """Open rendered animation"""                                               # blender will use this as a tooltip for menu items and buttons.
@@ -63,27 +79,42 @@ class openRenderedAnimationInUI(Operator):
 
 
     def execute(self, context):
-        self.frameRangesDict = buildFrameRangesString(context.scene.frameRanges)
+        try:
+            self.frameRangesDict = buildFrameRangesString(context.scene.frameRanges)
 
-        # change contexts
-        lastAreaType = changeContext(context, "CLIP_EDITOR")
+            # change contexts
+            lastAreaType = changeContext(context, "CLIP_EDITOR")
 
-        # opens first frame of image sequence (blender imports full sequence)
-        openedFile = False
-        self.renderDumpFolder = getRenderDumpFolder()
-        image_sequence_filepath = "{dumpFolder}/".format(dumpFolder=self.renderDumpFolder)
-        for frame in bpy.props.animFrameRange:
-            image_filename = "{fileName}_{frame}{extension}".format(fileName=getNameOutputFiles(), frame=str(frame).zfill(4), extension=bpy.props.animExtension)
-            if os.path.isfile(os.path.join(image_sequence_filepath, image_filename)):
-                bpy.ops.clip.open(directory=image_sequence_filepath, files=[{"name":image_filename}])
-                openedFile = image_filename
-                openedFrame = frame
-                break
-        if openedFile:
-            bpy.ops.clip.reload()
-            bpy.data.movieclips[openedFile].frame_start = frame
-        else:
-            changeContext(context, lastAreaType)
-            self.report({"ERROR"}, "Could not open rendered animation. View files in file browser in the following folder: '{renderDumpFolder}'.".format(renderDumpFolder=self.renderDumpFolder))
+            # opens first frame of image sequence (blender imports full sequence)
+            openedFile = False
+            self.renderDumpFolder = getRenderDumpFolder()
+            image_sequence_filepath = "{dumpFolder}/".format(dumpFolder=self.renderDumpFolder)
+            for frame in bpy.props.animFrameRange:
+                image_filename = "{fileName}_{frame}{extension}".format(fileName=getNameOutputFiles(), frame=str(frame).zfill(4), extension=bpy.props.animExtension)
+                if os.path.isfile(os.path.join(image_sequence_filepath, image_filename)):
+                    bpy.ops.clip.open(directory=image_sequence_filepath, files=[{"name":image_filename}])
+                    openedFile = image_filename
+                    openedFrame = frame
+                    break
+            if openedFile:
+                bpy.ops.clip.reload()
+                bpy.data.movieclips[openedFile].frame_start = frame
+            else:
+                changeContext(context, lastAreaType)
+                self.report({"ERROR"}, "Could not open rendered animation. View files in file browser in the following folder: '{renderDumpFolder}'.".format(renderDumpFolder=self.renderDumpFolder))
 
-        return{"FINISHED"}
+            return{"FINISHED"}
+        except:
+            self.handle_exception()
+            return{"CANCELLED"}
+
+    def handle_exception(self):
+        errormsg = print_exception('LEGOizer_log')
+        # if max number of exceptions occur within threshold of time, abort!
+        curtime = time.time()
+        print('\n'*5)
+        print('-'*100)
+        print("Something went wrong. Please start an error report with us so we can fix it! (press the 'Report a Bug' button under the 'Render on Servers' dropdown menu of the Render Farm Client)")
+        print('-'*100)
+        print('\n'*5)
+        showErrorMessage("Something went wrong. Please start an error report with us so we can fix it! (press the 'Report a Bug' button under the 'Render on Servers' dropdown menu of the Render Farm Client)", wrap=240)

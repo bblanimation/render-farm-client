@@ -30,27 +30,32 @@ scn = bpy.context.scene
 
 @persistent
 def handle_legoizer_animation(scene):
+    print("Adjusting frame")
     groupsToAdjust = {}
     for group in bpy.data.groups:
         if group.name.startswith("LEGOizer_") and "_bricks_frame_" in group.name:
             sourceName = group.name[9:(group.name.index("_bricks_frame_"))]
-            groupsToAdjust[sourceName].append(group)
+            if sourceName not in groupsToAdjust.keys():
+                groupsToAdjust[sourceName] = [group.name]
+            else:
+                groupsToAdjust[sourceName].append(group.name)
     for sourceName in groupsToAdjust:
         groupsToAdjust[sourceName].sort()
-        for i,group in enumerate(groupsToAdjust[sourceName]):
+        for i,gName in enumerate(groupsToAdjust[sourceName]):
+            group = bpy.data.groups.get(gName)
             frame = int(group.name[(group.name.index("_bricks_frame_") + 14):])
             onCurF = frame == scn.frame_current
             beforeFirstF = (i == 0 and scn.frame_current < frame)
             afterLastF = (i == (len(groupsToAdjust[sourceName]) - 1) and scn.frame_current > frame)
-            displayOnCurrentF = onCurF or beforeFirstF or afterLastF
+            displayOnCurF = onCurF or beforeFirstF or afterLastF
             brick = group.objects[0]
             if brick.hide == displayOnCurF:
                 brick.hide = not displayOnCurF
                 brick.hide_render = not displayOnCurF
 
+handle_legoizer_animation(scn)
 bpy.app.handlers.render_pre.append(handle_legoizer_animation)
 bpy.app.handlers.frame_change_pre.append(handle_legoizer_animation)
-handle_legoizer_animation(scn)
 
 """ END SUPPORT FOR THE LEGOIZER """
 

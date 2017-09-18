@@ -81,74 +81,93 @@ class refreshNumAvailableServers(Operator):
             a.tag_redraw()
 
     def modal(self, context, event):
-        if event.type in {"ESC"}:
-            self.report({"INFO"}, "Refresh process cancelled")
-            self.cancel(context)
+        try:
+            if event.type in {"ESC"}:
+                self.report({"INFO"}, "Refresh process cancelled")
+                self.cancel(context)
+                return{"CANCELLED"}
+
+            if event.type == "TIMER":
+                self.process.poll()
+
+                # if python not found on host server
+                if self.process.returncode == 127 and self.state == 2:
+                    self.report({"ERROR"}, "python not installed on host server")
+                    self.cancel(context)
+                    return{"CANCELLED"}
+
+                # if process finished and unknown error thrown
+                if self.process.returncode != 0 and self.process.returncode != None:
+                    handleError(self, "Process {curState}".format(curState=str(self.state-1)))
+                    self.cancel(context)
+                    return{"CANCELLED"}
+
+                # if process finished and no errors
+                if self.process.returncode != None:
+                    # print("Process {curState} finished! (return code: {returnCode})".format(curState=str(self.state-1), returnCode=str(self.process.returncode)))
+
+                    # check number of available servers via host server
+                    if self.state == 1:
+                        bpy.props.needsUpdating = False
+                        self.state += 1
+                        self.process = self.checkNumAvailServers()
+                        return{"PASS_THROUGH"}
+
+                    elif self.state == 2:
+                        self.updateAvailServerInfo()
+                        scn = context.scene
+                        self.report({"INFO"}, "Refresh process completed ({num} servers available)".format(num=str(scn.availableServers)))
+                        return{"FINISHED"}
+                    else:
+                        self.report({"ERROR"}, "ERROR: Current state not recognized.")
+                        return{"FINISHED"}
+
+            return{"PASS_THROUGH"}
+        except:
+            self.handle_exception()
             return{"CANCELLED"}
 
-        if event.type == "TIMER":
-            self.process.poll()
-
-            # if python not found on host server
-            if self.process.returncode == 127 and self.state == 2:
-                self.report({"ERROR"}, "python not installed on host server")
-                self.cancel(context)
-                return{"CANCELLED"}
-
-            # if process finished and unknown error thrown
-            if self.process.returncode != 0 and self.process.returncode != None:
-                handleError(self, "Process {curState}".format(curState=str(self.state-1)))
-                self.cancel(context)
-                return{"CANCELLED"}
-
-            # if process finished and no errors
-            if self.process.returncode != None:
-                # print("Process {curState} finished! (return code: {returnCode})".format(curState=str(self.state-1), returnCode=str(self.process.returncode)))
-
-                # check number of available servers via host server
-                if self.state == 1:
-                    bpy.props.needsUpdating = False
-                    self.state += 1
-                    self.process = self.checkNumAvailServers()
-                    return{"PASS_THROUGH"}
-
-                elif self.state == 2:
-                    self.updateAvailServerInfo()
-                    scn = context.scene
-                    self.report({"INFO"}, "Refresh process completed ({num} servers available)".format(num=str(scn.availableServers)))
-                    return{"FINISHED"}
-                else:
-                    self.report({"ERROR"}, "ERROR: Current state not recognized.")
-                    return{"FINISHED"}
-
-        return{"PASS_THROUGH"}
-
     def execute(self, context):
-        print("\nRunning 'checkNumAvailServers' function...")
-        scn = context.scene
+        try:
+            print("\nRunning 'checkNumAvailServers' function...")
+            scn = context.scene
 
-        # start initial process
-        self.state = 1 # initializes state for modal
-        if bpy.props.needsUpdating or bpy.props.lastServerGroup != scn.serverGroups:
-            bpy.props.lastServerGroup = scn.serverGroups
-            updateStatus = updateServerPrefs()
-            if not updateStatus["valid"]:
-                self.report({"ERROR"}, updateStatus["errorMessage"])
-                return{"CANCELLED"}
-            self.process = copyFiles()
-            bpy.props.lastRemotePath = bpy.props.serverPrefs["path"]
-        else:
-            self.process = self.checkNumAvailServers()
-            self.state += 1
+            # start initial process
+            self.state = 1 # initializes state for modal
+            if bpy.props.needsUpdating or bpy.props.lastServerGroup != scn.serverGroups:
+                bpy.props.lastServerGroup = scn.serverGroups
+                updateStatus = updateServerPrefs()
+                if not updateStatus["valid"]:
+                    self.report({"ERROR"}, updateStatus["errorMessage"])
+                    return{"CANCELLED"}
+                self.process = copyFiles()
+                bpy.props.lastRemotePath = bpy.props.serverPrefs["path"]
+            else:
+                self.process = self.checkNumAvailServers()
+                self.state += 1
 
-        # create timer for modal
-        wm = context.window_manager
-        self._timer = wm.event_timer_add(0.1, context.window)
-        wm.modal_handler_add(self)
+            # create timer for modal
+            wm = context.window_manager
+            self._timer = wm.event_timer_add(0.1, context.window)
+            wm.modal_handler_add(self)
 
-        self.report({"INFO"}, "Refreshing available servers...")
+            self.report({"INFO"}, "Refreshing available servers...")
 
-        return{"RUNNING_MODAL"}
+            return{"RUNNING_MODAL"}
+        except:
+            self.handle_exception()
+            return{"CANCELLED"}
+
+    def handle_exception(self):
+        errormsg = print_exception('LEGOizer_log')
+        # if max number of exceptions occur within threshold of time, abort!
+        curtime = time.time()
+        print('\n'*5)
+        print('-'*100)
+        print("Something went wrong. Please start an error report with us so we can fix it! (press the 'Report a Bug' button under the 'Render on Servers' dropdown menu of the Render Farm Client)")
+        print('-'*100)
+        print('\n'*5)
+        showErrorMessage("Something went wrong. Please start an error report with us so we can fix it! (press the 'Report a Bug' button under the 'Render on Servers' dropdown menu of the Render Farm Client)", wrap=240)
 
     def cancel(self, context):
         wm = context.window_manager

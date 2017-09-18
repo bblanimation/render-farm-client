@@ -43,7 +43,7 @@ def more_menu_options(self, context):
     layout = self.layout
     layout.separator()
     layout.operator("scene.render_frame_on_servers", text="Render Image on Servers", icon='RENDER_STILL')
-    layout.operator("scene.render_animation_on_servers", text="Render Image on Servers", icon='RENDER_ANIMATION')
+    layout.operator("scene.render_animation_on_servers", text="Render Animation on Servers", icon='RENDER_ANIMATION')
 
 # store keymaps here to access after registration
 addon_keymaps = []

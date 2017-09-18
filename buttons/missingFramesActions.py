@@ -40,20 +40,35 @@ class listMissingFrames(Operator):
     bl_options = {"REGISTER", "UNDO"}                                           # enable undo for the operator.
 
     def execute(self, context):
-        scn = context.scene
+        try:
+            scn = context.scene
 
-        # initializes self.frameRangesDict (returns False if frame range invalid)
-        if not setFrameRangesDict(self):
+            # initializes self.frameRangesDict (returns False if frame range invalid)
+            if not setFrameRangesDict(self):
+                return{"FINISHED"}
+
+            # list all missing files from start frame to end frame in render dump folder
+            missingFrames = listMissingFiles(getNameOutputFiles(), self.frameRangesDict["string"])
+            if len(missingFrames) > 0:
+                self.report({"INFO"}, "Missing frames: {missingFrames}".format(missingFrames=missingFrames))
+            else:
+                self.report({"INFO"}, "All frames accounted for!")
+
             return{"FINISHED"}
+        except:
+            self.handle_exception()
+            return{"CANCELLED"}
 
-        # list all missing files from start frame to end frame in render dump folder
-        missingFrames = listMissingFiles(getNameOutputFiles(), self.frameRangesDict["string"])
-        if len(missingFrames) > 0:
-            self.report({"INFO"}, "Missing frames: {missingFrames}".format(missingFrames=missingFrames))
-        else:
-            self.report({"INFO"}, "All frames accounted for!")
-
-        return{"FINISHED"}
+    def handle_exception(self):
+        errormsg = print_exception('LEGOizer_log')
+        # if max number of exceptions occur within threshold of time, abort!
+        curtime = time.time()
+        print('\n'*5)
+        print('-'*100)
+        print("Something went wrong. Please start an error report with us so we can fix it! (press the 'Report a Bug' button under the 'Render on Servers' dropdown menu of the Render Farm Client)")
+        print('-'*100)
+        print('\n'*5)
+        showErrorMessage("Something went wrong. Please start an error report with us so we can fix it! (press the 'Report a Bug' button under the 'Render on Servers' dropdown menu of the Render Farm Client)", wrap=240)
 
 class setToMissingFrames(Operator):
     """Set frame range to frames missing from the render dump folder"""         # blender will use this as a tooltip for menu items and buttons.
@@ -62,13 +77,28 @@ class setToMissingFrames(Operator):
     bl_options = {"REGISTER", "UNDO"}                                           # enable undo for the operator.
 
     def execute(self, context):
-        scn = context.scene
+        try:
+            scn = context.scene
 
-        # initializes self.frameRangesDict (returns False if frame range invalid)
-        if not setFrameRangesDict(self):
+            # initializes self.frameRangesDict (returns False if frame range invalid)
+            if not setFrameRangesDict(self):
+                return{"FINISHED"}
+
+            # list all missing files from start frame to end frame in render dump location
+            scn.frameRanges = listMissingFiles(getNameOutputFiles(), self.frameRangesDict["string"])
+
             return{"FINISHED"}
+        except:
+            self.handle_exception()
+            return{"CANCELLED"}
 
-        # list all missing files from start frame to end frame in render dump location
-        scn.frameRanges = listMissingFiles(getNameOutputFiles(), self.frameRangesDict["string"])
-
-        return{"FINISHED"}
+    def handle_exception(self):
+        errormsg = print_exception('LEGOizer_log')
+        # if max number of exceptions occur within threshold of time, abort!
+        curtime = time.time()
+        print('\n'*5)
+        print('-'*100)
+        print("Something went wrong. Please start an error report with us so we can fix it! (press the 'Report a Bug' button under the 'Render on Servers' dropdown menu of the Render Farm Client)")
+        print('-'*100)
+        print('\n'*5)
+        showErrorMessage("Something went wrong. Please start an error report with us so we can fix it! (press the 'Report a Bug' button under the 'Render on Servers' dropdown menu of the Render Farm Client)", wrap=240)
