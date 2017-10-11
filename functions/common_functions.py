@@ -36,7 +36,7 @@ def bversion():
     bversion = '%03d.%03d.%03d' % (bpy.app.version[0],bpy.app.version[1],bpy.app.version[2])
     return bversion
 
-def stopWatch(text, value):
+def stopWatch(text, value, precision=2):
     '''From seconds to Days;Hours:Minutes;Seconds'''
 
     valueD = (((value/365)/24)/60)
@@ -49,12 +49,10 @@ def stopWatch(text, value):
     Minutes = int(valueM)
 
     valueS = (valueM - Minutes)*60
-    Seconds = int(valueS)
+    Seconds = round(valueS, precision)
 
-    valueMs = (valueS - Seconds)*60
-    Miliseconds = int(valueMs)
-
-    print(str(text) + ": " + str(Days) + ";" + str(Hours) + ":" + str(Minutes) + ";" + str(Seconds) + ";;" + str(Miliseconds))
+    outputString = str(text) + ": " + str(Days) + ";" + str(Hours) + ":" + str(Minutes) + ";" + str(Seconds)
+    print(outputString)
 
 def groupExists(groupName):
     """ check if group exists in blender's memory """
@@ -89,10 +87,12 @@ def uniquify1(seq):
        keys[e] = 1
    return keys.keys()
 
-def redraw_areas(areaType="ALL"):
+def redraw_areas(areaTypes=["ALL"]):
+    areaTypes = confirmList(areaTypes)
     for area in bpy.context.screen.areas:
-        if areaType == "ALL" or area.type == areaType:
-            area.tag_redraw()
+        for areaType in areaTypes:
+            if areaType == "ALL" or area.type == areaType:
+                area.tag_redraw()
 
 def disableRelationshipLines():
     # disable relationship lines
@@ -311,9 +311,9 @@ def writeErrorToFile(errorReportPath, txtName, addonVersion):
     # write error to log text object
     if not os.path.exists(errorReportPath):
         os.makedirs(errorReportPath)
-    fullFilePath = os.path.join(errorReportPath, "LEGOizer_error_report.txt")
+    fullFilePath = os.path.join(errorReportPath, "Rebrickr_error_report.txt")
     f = open(fullFilePath, "w")
-    f.write("\nPlease copy the following form and paste it into a new issue at https://github.com/bblanimation/legoizer/issues")
+    f.write("\nPlease copy the following form and paste it into a new issue at https://github.com/bblanimation/rebrickr/issues")
     f.write("\n\nDon't forget to include a description of your problem! The more information you provide (what you were trying to do, what action directly preceeded the error, etc.), the easier it will be for us to squash the bug.")
     f.write("\n\n### COPY EVERYTHING BELOW THIS LINE ###\n")
     f.write("\nDescription of the Problem:\n")

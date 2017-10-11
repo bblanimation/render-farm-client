@@ -44,6 +44,16 @@ def have_internet():
         conn.close()
         return False
 
+def bashSafeName(string):
+    # protects against file names that would cause problems with bash calls
+    if string.startswith(".") or string.startswith("-"):
+        string = "_" + string[1:]
+    # replaces problematic characters in shell with underscore '_'
+    chars = "!#$&'()*,;<=>?[]^`{|}~: "
+    for char in list(chars):
+        string = string.replace(char, "_")
+    return string
+
 def getFrames(projectName, archiveFiles=False, frameRange=False):
     """ rsync rendered frames from host server to local machine """
     scn = bpy.context.scene
@@ -296,7 +306,7 @@ def getNameOutputFiles():
             scn.nameOutputFiles = scn.nameOutputFiles.replace(char, "_")
         return scn.nameOutputFiles
     else:
-        return bpy.path.display_name_from_filepath(bpy.data.filepath).replace(" ", "_")
+        return bashSafeName(bpy.path.display_name_from_filepath(bpy.data.filepath))
 
 def getNumRenderedFiles(jobType, frameRange=None, fileName=None):
     if jobType == "image":

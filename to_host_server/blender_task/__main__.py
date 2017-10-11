@@ -189,6 +189,10 @@ def main():
             f.write("    scene.cycles.progressive = 'PATH'\n")
             f.write("    scene.cycles.samples = {samples}\n".format(samples=args.samples))
             f.write("    scene.cycles.use_square_samples = False\n")
+            f.write("    try:\n")
+            f.write("        scene.render.layers.active.cycles.use_denoising = False\n")
+            f.write("    except Exception as e:\n")
+            f.write("        print(e)\n")
 
     # Print frame range to be rendered
     frames = json.loads(args.frame_range)

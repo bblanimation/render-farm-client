@@ -216,7 +216,7 @@ class sendFrame(Operator):
 
     def execute(self, context):
         try:
-            self.projectName = bpy.path.display_name_from_filepath(bpy.data.filepath).replace(" ", "_")
+            self.projectName = bashSafeName(bpy.path.display_name_from_filepath(bpy.data.filepath))
             scn = context.scene
 
             if scn.render.engine != "CYCLES":

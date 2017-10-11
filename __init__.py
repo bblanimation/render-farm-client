@@ -31,22 +31,27 @@ Created by Christopher Gearhart
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-# system imports
+# System imports
+#None!!
+
+# Blender imports
 import bpy
 from bpy.types import Operator
 from bpy.props import *
+
+#Rebrickr imports
 from .ui import *
 from .buttons import *
 from .functions.setupServers import *
+
+# Used to store keymaps for addon
+addon_keymaps = []
 
 def more_menu_options(self, context):
     layout = self.layout
     layout.separator()
     layout.operator("scene.render_frame_on_servers", text="Render Image on Servers", icon='RENDER_STILL')
     layout.operator("scene.render_animation_on_servers", text="Render Animation on Servers", icon='RENDER_ANIMATION')
-
-# store keymaps here to access after registration
-addon_keymaps = []
 
 def register():
     bpy.utils.register_module(__name__)
@@ -142,46 +147,59 @@ def register():
 
     # handle the keymap
     wm = bpy.context.window_manager
-    km = wm.keyconfigs.addon.keymaps.new(name='Object Mode', space_type='EMPTY')
-    kmi = km.keymap_items.new("scene.render_frame_on_servers", 'F12', 'PRESS', alt=True)
-    kmi = km.keymap_items.new("scene.render_animation_on_servers", 'F12', 'PRESS', alt=True, shift=True)
-    kmi = km.keymap_items.new("scene.open_rendered_image", 'O', 'PRESS', shift=True)
-    kmi = km.keymap_items.new("scene.open_rendered_animation", 'O', 'PRESS', alt=True, shift=True)
-    kmi = km.keymap_items.new("scene.list_frames", 'M', 'PRESS', shift=True)
-    kmi = km.keymap_items.new("scene.set_to_missing_frames", 'M', 'PRESS', alt=True, shift=True)
-    kmi = km.keymap_items.new("scene.refresh_num_available_servers", 'R', 'PRESS', ctrl=True)
-    kmi = km.keymap_items.new("scene.edit_servers_dict", 'E', 'PRESS', ctrl=True)
-    addon_keymaps.append(km)
+    # Note that in background mode (no GUI available), keyconfigs are not available either, so we have
+    # to check this to avoid nasty errors in background case.
+    kc = wm.keyconfigs.addon
+    if kc:
+        km = kc.keymaps.new(name='Object Mode', space_type='EMPTY')
+        kmi = km.keymap_items.new("scene.render_frame_on_servers", 'F12', 'PRESS', alt=True)
+        kmi = km.keymap_items.new("scene.render_animation_on_servers", 'F12', 'PRESS', alt=True, shift=True)
+        kmi = km.keymap_items.new("scene.open_rendered_image", 'O', 'PRESS', shift=True)
+        kmi = km.keymap_items.new("scene.open_rendered_animation", 'O', 'PRESS', alt=True, shift=True)
+        kmi = km.keymap_items.new("scene.list_frames", 'M', 'PRESS', shift=True)
+        kmi = km.keymap_items.new("scene.set_to_missing_frames", 'M', 'PRESS', alt=True, shift=True)
+        kmi = km.keymap_items.new("scene.refresh_num_available_servers", 'R', 'PRESS', ctrl=True)
+        kmi = km.keymap_items.new("scene.edit_servers_dict", 'E', 'PRESS', ctrl=True)
+        addon_keymaps.append(km)
 
 def unregister():
-    bpy.utils.unregister_module(__name__)
-    bpy.types.INFO_MT_render.remove(more_menu_options)
-    del bpy.types.Scene.showAdvanced
-    del bpy.types.Scene.frameRanges
-    del bpy.types.Scene.tempLocalDir
-    del bpy.types.Scene.renderDumpLoc
-    del bpy.types.Scene.nameOutputFiles
-    del bpy.types.Scene.maxServerLoad
-    del bpy.types.Scene.timeout
-    del bpy.types.Scene.maxSamples
-    del bpy.types.Scene.renderType
-    del bpy.types.Scene.killPython
-    del bpy.types.Scene.renderStatus
-    del bpy.props.serverPrefs
-    del bpy.props.animFrameRange
-    del bpy.props.lastRemotePath
-    del bpy.props.nameAveragedImage
-    del bpy.props.imExtension
-    del bpy.props.animExtension
-    del bpy.props.needsUpdating
-    del bpy.types.Scene.serverGroups
-
+    # handle the keymap
     wm = bpy.context.window_manager
     for km in addon_keymaps:
         wm.keyconfigs.addon.keymaps.remove(km)
-
-    # clear the list
     addon_keymaps.clear()
+
+    Scn = bpy.types.Scene
+
+    del bpy.props.animFrameRange
+    del bpy.props.imFrame
+    del bpy.props.animExtension
+    del bpy.props.nameImOutputFiles
+    del bpy.props.imExtension
+    del bpy.props.nameAveragedImage
+    del bpy.props.needsUpdating
+    del bpy.props.lastRemotePath
+    del Scn.offlineServers
+    del Scn.availableServers
+    del bpy.props.serverPrefs
+    del bpy.props.lastServerGroup
+    del Scn.serverGroups
+    del Scn.renderStatus
+    del Scn.renderType
+    del Scn.maxSamples
+    del Scn.samplesPerFrame
+    del Scn.timeout
+    del Scn.maxServerLoad
+    del Scn.nameOutputFiles
+    del Scn.renderDumpLoc
+    del Scn.tempLocalDir
+    del Scn.frameRanges
+    del Scn.compress
+    del Scn.killPython
+    del Scn.showAdvanced
+
+    bpy.utils.unregister_module(__name__)
+    bpy.types.INFO_MT_render.remove(more_menu_options)
 
 if __name__ == "__main__":
     register()
