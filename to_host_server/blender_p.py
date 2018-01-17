@@ -26,14 +26,14 @@ from bpy.app.handlers import persistent
 
 scn = bpy.context.scene
 
-""" BEGIN SUPPORT FOR THE LEGOIZER """
+""" BEGIN SUPPORT FOR REBRICKR """
 
 @persistent
 def handle_legoizer_animation(scene):
     print("Adjusting frame")
     groupsToAdjust = {}
     for group in bpy.data.groups:
-        if group.name.startswith("LEGOizer_") and "_bricks_frame_" in group.name:
+        if group.name.startswith("Rebrickr") and "_bricks_frame_" in group.name:
             sourceName = group.name[9:(group.name.index("_bricks_frame_"))]
             if sourceName not in groupsToAdjust.keys():
                 groupsToAdjust[sourceName] = [group.name]
@@ -57,7 +57,7 @@ handle_legoizer_animation(scn)
 bpy.app.handlers.render_pre.append(handle_legoizer_animation)
 bpy.app.handlers.frame_change_pre.append(handle_legoizer_animation)
 
-""" END SUPPORT FOR THE LEGOIZER """
+""" END SUPPORT FOR REBRICKR """
 
 randomSeed = random.randint(1, 10000)
 for scene in bpy.data.scenes:

@@ -52,14 +52,14 @@ class renderOnServersPanel(Panel):
         col = layout.column(align=True)
         row = col.row(align=True)
         availableServerString = "Available Servers: {available} / {total}".format(available=str(scn.availableServers),total=str(scn.availableServers + scn.offlineServers))
-        row.operator("scene.refresh_num_available_servers", text=availableServerString, icon="FILE_REFRESH")
+        row.operator("render_farm.refresh_num_available_servers", text=availableServerString, icon="FILE_REFRESH")
 
         # Render Buttons
         row = col.row(align=True)
         row.alignment = "EXPAND"
         row.active = scn.availableServers > 0 or not scn.render.engine == "CYCLES"
-        row.operator("scene.render_frame_on_servers", text="Render", icon="RENDER_STILL")
-        row.operator("scene.render_animation_on_servers", text="Animation", icon="RENDER_ANIMATION")
+        row.operator("render_farm.render_frame_on_servers", text="Render", icon="RENDER_STILL")
+        row.operator("render_farm.render_animation_on_servers", text="Animation", icon="RENDER_ANIMATION")
         col = layout.column(align=True)
         row = col.row(align=True)
         row.prop(scn, "serverGroups")
@@ -77,9 +77,19 @@ class renderOnServersPanel(Panel):
         # display buttons to view render(s)
         row = layout.row(align=True)
         if   "image"   in scn.renderType:
-            row.operator("scene.open_rendered_image", text="View Image", icon="FILE_IMAGE")
+            row.operator("render_farm.open_rendered_image", text="View Image", icon="FILE_IMAGE")
         if "animation" in scn.renderType:
-            row.operator("scene.open_rendered_animation", text="View Animation", icon="FILE_MOVIE")
+            row.operator("render_farm.open_rendered_animation", text="View Animation", icon="FILE_MOVIE")
+
+        if bpy.data.texts.find('Render_Farm_log') >= 0:
+            split = layout.split(align=True, percentage=0.9)
+            col = split.column(align=True)
+            row = col.row(align=True)
+            row.operator("render_farm.report_error", text="Report Error", icon="URL")
+            col = split.column(align=True)
+            row = col.row(align=True)
+            row.operator("render_farm.close_report_error", text="", icon="PANEL_CLOSE")
+
 
 class frameRangePanel(Panel):
     bl_space_type  = "VIEW_3D"
@@ -100,9 +110,9 @@ class frameRangePanel(Panel):
         col = layout.column(align=True)
         col.active = bpy.path.display_name_from_filepath(bpy.data.filepath) != ""
         row = col.row(align=True)
-        row.operator("scene.list_frames", text="List Missing Frames", icon="LONGDISPLAY")
+        row.operator("render_farm.list_frames", text="List Missing Frames", icon="LONGDISPLAY")
         row = col.row(align=True)
-        row.operator("scene.set_to_missing_frames", text="Set to Missing Frames", icon="FILE_PARENT")
+        row.operator("render_farm.set_to_missing_frames", text="Set to Missing Frames", icon="FILE_PARENT")
 
 class serversPanel(Panel):
     bl_space_type  = "VIEW_3D"
@@ -120,7 +130,7 @@ class serversPanel(Panel):
 
         col = layout.column(align=True)
         row = col.row(align=True)
-        row.operator("scene.edit_servers_dict", text="Edit Remote Servers", icon="TEXT")
+        row.operator("render_farm.edit_servers_dict", text="Edit Remote Servers", icon="TEXT")
 
         col = layout.column(align=True)
         row = col.row(align=True)

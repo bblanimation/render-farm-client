@@ -28,7 +28,7 @@ import os
 import subprocess
 import sys
 from .setupServers import *
-from .common_functions import *
+from .common import *
 try:
     import httplib
 except:
@@ -73,9 +73,10 @@ def getFrames(projectName, archiveFiles=False, frameRange=False):
             f.close()
         else:
             includeDict = ""
-        archiveRsyncCommand = "rsync -aqx --rsync-path='mkdir -p {dumpLocation}/backups/ && rsync' --remove-source-files {includeDict} --exclude='{nameOutputFiles}_????.???' --exclude='backups/' '{dumpLocation}/' '{dumpLocation}/backups/';".format(includeDict=includeDict, dumpLocation=dumpLocation, nameOutputFiles=getNameOutputFiles(), imExtension=bpy.props.imExtension)
+        archiveRsyncCommand = "rsync -aqx --rsync-path='mkdir -p {dumpLocation}/backups/ && rsync' --remove-source-files {includeDict} --exclude='{nameOutputFiles}_????.???' --exclude='backups/' '{dumpLocation}/' '{dumpLocation}/backups/';".format(includeDict=includeDict, dumpLocation=dumpLocation.replace(" ", "\\ "), nameOutputFiles=getNameOutputFiles(), imExtension=bpy.props.imExtension)
     else:
-        archiveRsyncCommand = "mkdir -p {dumpLocation};".format(dumpLocation=dumpLocation)
+        archiveRsyncCommand = "mkdir -p {dumpLocation};".format(dumpLocation=dumpLocation.replace(" ", "\\ "))
+    print(archiveRsyncCommand)
 
     # rsync files from host server to local directory
     fetchRsyncCommand = "rsync -ax --progress --remove-source-files --exclude='*.blend' --exclude='*_average.???' -e 'ssh -T -oCompression=no -oStrictHostKeyChecking=no -x' '{login}:{remotePath}{projectName}/results/' '{dumpLocation}/';".format(login=bpy.props.serverPrefs["login"], remotePath=bpy.props.serverPrefs["path"], projectName=projectName, dumpLocation=dumpLocation)

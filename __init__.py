@@ -39,7 +39,7 @@ import bpy
 from bpy.types import Operator
 from bpy.props import *
 
-#Rebrickr imports
+# Render Farm imports
 from .ui import *
 from .buttons import *
 from .functions.setupServers import *
@@ -50,12 +50,15 @@ addon_keymaps = []
 def more_menu_options(self, context):
     layout = self.layout
     layout.separator()
-    layout.operator("scene.render_frame_on_servers", text="Render Image on Servers", icon='RENDER_STILL')
-    layout.operator("scene.render_animation_on_servers", text="Render Animation on Servers", icon='RENDER_ANIMATION')
+    layout.operator("render_farm.render_frame_on_servers", text="Render Image on Servers", icon='RENDER_STILL')
+    layout.operator("render_farm.render_animation_on_servers", text="Render Animation on Servers", icon='RENDER_ANIMATION')
 
 def register():
     bpy.utils.register_module(__name__)
     bpy.types.INFO_MT_render.append(more_menu_options)
+
+    bpy.props.render_farm_module_name = __name__
+    bpy.props.render_farm_version = str(bl_info["version"])[1:-1].replace(", ", ".")
 
     bpy.types.Scene.showAdvanced = BoolProperty(
         name="Show Advanced",
@@ -152,14 +155,14 @@ def register():
     kc = wm.keyconfigs.addon
     if kc:
         km = kc.keymaps.new(name='Object Mode', space_type='EMPTY')
-        kmi = km.keymap_items.new("scene.render_frame_on_servers", 'F12', 'PRESS', alt=True)
-        kmi = km.keymap_items.new("scene.render_animation_on_servers", 'F12', 'PRESS', alt=True, shift=True)
-        kmi = km.keymap_items.new("scene.open_rendered_image", 'O', 'PRESS', shift=True)
-        kmi = km.keymap_items.new("scene.open_rendered_animation", 'O', 'PRESS', alt=True, shift=True)
-        kmi = km.keymap_items.new("scene.list_frames", 'M', 'PRESS', shift=True)
-        kmi = km.keymap_items.new("scene.set_to_missing_frames", 'M', 'PRESS', alt=True, shift=True)
-        kmi = km.keymap_items.new("scene.refresh_num_available_servers", 'R', 'PRESS', ctrl=True)
-        kmi = km.keymap_items.new("scene.edit_servers_dict", 'E', 'PRESS', ctrl=True)
+        kmi = km.keymap_items.new("render_farm.render_frame_on_servers", 'F12', 'PRESS', alt=True)
+        kmi = km.keymap_items.new("render_farm.render_animation_on_servers", 'F12', 'PRESS', alt=True, shift=True)
+        kmi = km.keymap_items.new("render_farm.open_rendered_image", 'O', 'PRESS', shift=True)
+        kmi = km.keymap_items.new("render_farm.open_rendered_animation", 'O', 'PRESS', alt=True, shift=True)
+        kmi = km.keymap_items.new("render_farm.list_frames", 'M', 'PRESS', shift=True)
+        kmi = km.keymap_items.new("render_farm.set_to_missing_frames", 'M', 'PRESS', alt=True, shift=True)
+        kmi = km.keymap_items.new("render_farm.refresh_num_available_servers", 'R', 'PRESS', ctrl=True)
+        kmi = km.keymap_items.new("render_farm.edit_servers_dict", 'E', 'PRESS', ctrl=True)
         addon_keymaps.append(km)
 
 def unregister():

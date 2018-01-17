@@ -35,7 +35,7 @@ from ..functions.jobIsValid import *
 
 class editRemoteServersDict(Operator):
     """Edit the remote servers dictionary in a text editor"""                   # blender will use this as a tooltip for menu items and buttons.
-    bl_idname = "scene.edit_servers_dict"                                       # unique identifier for buttons and menu items to reference.
+    bl_idname = "render_farm.edit_servers_dict"                                       # unique identifier for buttons and menu items to reference.
     bl_label = "Edit Remote Servers"                                            # display name in the interface.
     bl_options = {"REGISTER", "UNDO"}                                           # enable undo for the operator.
 

@@ -35,7 +35,7 @@ from ..functions.jobIsValid import *
 
 class sendAnimation(Operator):
     """Render animation on remote servers"""                                    # blender will use this as a tooltip for menu items and buttons.
-    bl_idname = "scene.render_animation_on_servers"                             # unique identifier for buttons and menu items to reference.
+    bl_idname = "render_farm.render_animation_on_servers"                             # unique identifier for buttons and menu items to reference.
     bl_label = "Render Animation"                                               # display name in the interface.
     bl_options = {"REGISTER", "UNDO"}                                           # enable undo for the operator.
 
@@ -179,7 +179,7 @@ class sendAnimation(Operator):
 
             return{"PASS_THROUGH"}
         except:
-            self.handle_exception()
+            handle_exception()
             return{"CANCELLED"}
 
     def execute(self, context):
@@ -252,19 +252,8 @@ class sendAnimation(Operator):
 
             return{"RUNNING_MODAL"}
         except:
-            self.handle_exception()
+            handle_exception()
             return{"CANCELLED"}
-
-    def handle_exception(self):
-        errormsg = print_exception('LEGOizer_log')
-        # if max number of exceptions occur within threshold of time, abort!
-        curtime = time.time()
-        print('\n'*5)
-        print('-'*100)
-        print("Something went wrong. Please start an error report with us so we can fix it! (press the 'Report a Bug' button under the 'Render on Servers' dropdown menu of the Render Farm Client)")
-        print('-'*100)
-        print('\n'*5)
-        showErrorMessage("Something went wrong. Please start an error report with us so we can fix it! (press the 'Report a Bug' button under the 'Render on Servers' dropdown menu of the Render Farm Client)", wrap=240)
 
     def cancel(self, context):
         print("process cancelled")

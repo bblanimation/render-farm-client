@@ -35,7 +35,7 @@ from ..functions.jobIsValid import *
 
 class openRenderedImageInUI(Operator):
     """Open rendered image"""                                                   # blender will use this as a tooltip for menu items and buttons.
-    bl_idname = "scene.open_rendered_image"                                     # unique identifier for buttons and menu items to reference.
+    bl_idname = "render_farm.open_rendered_image"                                     # unique identifier for buttons and menu items to reference.
     bl_label = "Open Rendered Image"                                            # display name in the interface.
     bl_options = {"REGISTER", "UNDO"}                                           # enable undo for the operator.
 
@@ -56,24 +56,13 @@ class openRenderedImageInUI(Operator):
 
             return{"FINISHED"}
         except:
-            self.handle_exception()
+            handle_exception()
             return{"CANCELLED"}
-
-    def handle_exception(self):
-        errormsg = print_exception('LEGOizer_log')
-        # if max number of exceptions occur within threshold of time, abort!
-        curtime = time.time()
-        print('\n'*5)
-        print('-'*100)
-        print("Something went wrong. Please start an error report with us so we can fix it! (press the 'Report a Bug' button under the 'Render on Servers' dropdown menu of the Render Farm Client)")
-        print('-'*100)
-        print('\n'*5)
-        showErrorMessage("Something went wrong. Please start an error report with us so we can fix it! (press the 'Report a Bug' button under the 'Render on Servers' dropdown menu of the Render Farm Client)", wrap=240)
 
 
 class openRenderedAnimationInUI(Operator):
     """Open rendered animation"""                                               # blender will use this as a tooltip for menu items and buttons.
-    bl_idname = "scene.open_rendered_animation"                                 # unique identifier for buttons and menu items to reference.
+    bl_idname = "render_farm.open_rendered_animation"                                 # unique identifier for buttons and menu items to reference.
     bl_label = "Open Rendered Animation"                                        # display name in the interface.
     bl_options = {"REGISTER", "UNDO"}                                           # enable undo for the operator.
 
@@ -105,16 +94,5 @@ class openRenderedAnimationInUI(Operator):
 
             return{"FINISHED"}
         except:
-            self.handle_exception()
+            handle_exception()
             return{"CANCELLED"}
-
-    def handle_exception(self):
-        errormsg = print_exception('LEGOizer_log')
-        # if max number of exceptions occur within threshold of time, abort!
-        curtime = time.time()
-        print('\n'*5)
-        print('-'*100)
-        print("Something went wrong. Please start an error report with us so we can fix it! (press the 'Report a Bug' button under the 'Render on Servers' dropdown menu of the Render Farm Client)")
-        print('-'*100)
-        print('\n'*5)
-        showErrorMessage("Something went wrong. Please start an error report with us so we can fix it! (press the 'Report a Bug' button under the 'Render on Servers' dropdown menu of the Render Farm Client)", wrap=240)
