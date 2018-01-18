@@ -46,7 +46,7 @@ class editRemoteServersDict(Operator):
             libraryServersPath = os.path.join(getLibraryPath(), "servers")
             bpy.ops.text.open(filepath=os.path.join(libraryServersPath, "remoteServers.txt"))
             self.report({"INFO"}, "Opened 'remoteServers.txt'")
-            scn.needsUpdating = True
+            bpy.props.needsUpdating = True
         except:
             self.report({"ERROR"}, "ERROR: Could not open 'remoteServers.txt'. If the problem persists, try reinstalling the add-on.")
         return{"FINISHED"}

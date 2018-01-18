@@ -110,7 +110,7 @@ class refreshServers(Operator):
 
                     # check number of available servers via host server
                     if self.state == 1:
-                        scn.needsUpdating = False
+                        bpy.props.needsUpdating = False
                         self.state += 1
                         self.process = self.checkNumAvailServers()
                         return{"PASS_THROUGH"}
@@ -132,8 +132,8 @@ class refreshServers(Operator):
     @classmethod
     def refreshServersBlock(cls, statusType=None):
         scn = bpy.context.scene
-        if scn.needsUpdating or scn.lastServerGroup != scn.serverGroups:
-            scn.lastServerGroup = scn.serverGroups
+        if bpy.props.needsUpdating or bpy.props.lastServerGroup != scn.serverGroups:
+            bpy.props.lastServerGroup = scn.serverGroups
             updateStatus = updateServerPrefs()
             if not updateStatus["valid"]:
                 return False
@@ -150,7 +150,7 @@ class refreshServers(Operator):
             return False
 
         cls.updateAvailServerInfo(process)
-        scn.needsUpdating = False
+        bpy.props.needsUpdating = False
         return True
 
     def execute(self, context):
@@ -160,8 +160,8 @@ class refreshServers(Operator):
 
             # start initial process
             self.state = 1 # initializes state for modal
-            if scn.needsUpdating or scn.lastServerGroup != scn.serverGroups:
-                scn.lastServerGroup = scn.serverGroups
+            if bpy.props.needsUpdating or bpy.props.lastServerGroup != scn.serverGroups:
+                bpy.props.lastServerGroup = scn.serverGroups
                 updateStatus = updateServerPrefs()
                 if not updateStatus["valid"]:
                     self.report({"ERROR"}, updateStatus["errorMessage"])

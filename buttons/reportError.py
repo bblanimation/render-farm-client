@@ -50,7 +50,7 @@ class reportError(bpy.types.Operator):
                 bpy.ops.text.open(filepath=os.path.join(libraryServersPath, "Render_Farm_error_report.txt"))
                 bpy.context.space_data.show_word_wrap = True
                 self.report({"INFO"}, "Opened 'Render_Farm_error_report.txt'")
-                scn.needsUpdating = True
+                bpy.props.needsUpdating = True
             except:
                 self.report({"ERROR"}, "ERROR: Could not open 'Render_Farm_error_report.txt'. If the problem persists, try reinstalling the add-on.")
         except:

@@ -138,7 +138,7 @@ class sendFrame(Operator):
 
                         # start render process at current frame
                         elif self.state[i] == 2:
-                            scn.needsUpdating = False
+                            bpy.props.needsUpdating = False
                             jobsPerFrame = scn.maxSamples // self.sampleSize
                             self.processes[i] = renderFrames(str([scn.imFrame]), self.projectName, jobsPerFrame)
                             self.state[i] += 1
@@ -172,7 +172,6 @@ class sendFrame(Operator):
                             self.numSamples = self.sampleSize * self.avDict["numFrames"]
                             if i == 0:
                                 setRenderStatus("image", "Complete!")
-                                print(scn.nameAveragedImage)
                                 if bpy.data.images.find(scn.nameAveragedImage) >= 0:
                                     # open rendered image in any open 'IMAGE_EDITOR' windows
                                     for area in context.screen.areas:
@@ -197,7 +196,6 @@ class sendFrame(Operator):
                                 previewString = "Render preview loaded ({num} samples)".format(num=str(self.numSamples))
                                 self.report({"INFO"}, previewString)
                             scn.imagePreviewAvailable = True
-                            scn.animPreviewAvailable = False
                             if i == 0:
                                 if self.renderCancelled:
                                     setRenderStatus("image", "Cancelled")
@@ -265,11 +263,10 @@ class sendFrame(Operator):
             self.numSamples = 0
             self.avDict = {"array":False, "numFrames":0}
             self.averageIm = None
-            scn.nameImOutputFiles = getNameOutputFiles()
             scn.imFrame = scn.frame_current
             self.state = [1, 0]  # initializes state for modal
-            if scn.needsUpdating or scn.lastServerGroup != scn.serverGroups:
-                scn.lastServerGroup = scn.serverGroups
+            if bpy.props.needsUpdating or bpy.props.lastServerGroup != scn.serverGroups:
+                bpy.props.lastServerGroup = scn.serverGroups
                 updateStatus = updateServerPrefs()
                 if not updateStatus["valid"]:
                     self.report({"ERROR"}, updateStatus["errorMessage"])
@@ -277,6 +274,7 @@ class sendFrame(Operator):
             else:
                 self.state[0] += 1
             self.processes = [copyProjectFile(self.projectName, scn.compress), False]
+            scn.nameImOutputFiles = getNameOutputFiles()
 
             # create timer for modal
             wm = context.window_manager

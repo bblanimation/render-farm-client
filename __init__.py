@@ -140,7 +140,7 @@ def register():
     bpy.props.serverPrefs = {"servers":None, "login":None, "path":None, "hostConnection":None}
     bpy.types.Scene.availableServers = IntProperty(name="Available Servers", default=0)
     bpy.types.Scene.offlineServers = IntProperty(name="Offline Servers", default=0)
-    bpy.types.Scene.needsUpdating = BoolProperty(default=True)
+    bpy.props.needsUpdating = BoolProperty(default=True)
 
     bpy.types.Scene.nameAveragedImage = StringProperty(default="")
     bpy.types.Scene.nameImOutputFiles = StringProperty(default="")
@@ -184,8 +184,8 @@ def unregister():
     del bpy.props.serverPrefs
     del Scn.offlineServers
     del Scn.availableServers
-    del Scn.needsUpdating
-    del Scn.lastServerGroup
+    del bpy.props.needsUpdating
+    del bpy.props.lastServerGroup
     del Scn.serverGroups
     del Scn.animRenderStatus
     del Scn.imageRenderStatus

@@ -138,7 +138,7 @@ class sendAnimation(Operator):
 
                         # start render process from the defined start and end frames
                         elif self.state[i] == 2:
-                            scn.needsUpdating = False
+                            bpy.props.needsUpdating = False
                             self.processes[i] = renderFrames(str(self.expandedFrameRange), self.projectName)
                             setRenderStatus("animation", "Rendering...")
                             self.state[i] += 1
@@ -234,8 +234,8 @@ class sendAnimation(Operator):
             self.numFrames = str(int(scn.frame_end) - int(scn.frame_start))
             self.statusChecked = False
             self.state = [1, 0] # initializes state for modal
-            if scn.needsUpdating or scn.lastServerGroup != scn.serverGroups:
-                scn.lastServerGroup = scn.serverGroups
+            if bpy.props.needsUpdating or bpy.props.lastServerGroup != scn.serverGroups:
+                bpy.props.lastServerGroup = scn.serverGroups
                 updateStatus = updateServerPrefs()
                 if not updateStatus["valid"]:
                     self.report({"ERROR"}, updateStatus["errorMessage"])
