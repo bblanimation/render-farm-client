@@ -38,6 +38,7 @@ class reportError(bpy.types.Operator):
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
+        scn = bpy.context.scene
         try:
             # set up file paths
             libraryServersPath = os.path.join(getLibraryPath(), "error_log")
@@ -49,7 +50,7 @@ class reportError(bpy.types.Operator):
                 bpy.ops.text.open(filepath=os.path.join(libraryServersPath, "Render_Farm_error_report.txt"))
                 bpy.context.space_data.show_word_wrap = True
                 self.report({"INFO"}, "Opened 'Render_Farm_error_report.txt'")
-                bpy.props.needsUpdating = True
+                scn.needsUpdating = True
             except:
                 self.report({"ERROR"}, "ERROR: Could not open 'Render_Farm_error_report.txt'. If the problem persists, try reinstalling the add-on.")
         except:

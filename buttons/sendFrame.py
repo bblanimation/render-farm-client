@@ -29,6 +29,7 @@ import time
 
 from bpy.types import Operator
 from bpy.props import *
+from .refreshServers import *
 from ..functions import *
 from ..functions.averageFrames import *
 from ..functions.jobIsValid import *
@@ -137,9 +138,9 @@ class sendFrame(Operator):
 
                         # start render process at current frame
                         elif self.state[i] == 2:
-                            bpy.props.needsUpdating = False
+                            scn.needsUpdating = False
                             jobsPerFrame = scn.maxSamples // self.sampleSize
-                            self.processes[i] = renderFrames(str([bpy.props.imFrame]), self.projectName, jobsPerFrame)
+                            self.processes[i] = renderFrames(str([scn.imFrame]), self.projectName, jobsPerFrame)
                             self.state[i] += 1
                             setRenderStatus("image", "Rendering...")
                             return{"PASS_THROUGH"}
@@ -157,12 +158,12 @@ class sendFrame(Operator):
                         # average the rendered frames if there are new frames to average
                         elif self.state[i] == 4:
                             # only average if there are new frames to average
-                            numRenderedFiles = getNumRenderedFiles("image", [bpy.props.imFrame], None)
+                            numRenderedFiles = getNumRenderedFiles("image", [scn.imFrame], None)
                             if numRenderedFiles > 0:
                                 averaged = True
-                                aveName = averageFrames(self, bpy.props.nameImOutputFiles)
+                                aveName = averageFrames(self, scn.nameImOutputFiles)
                                 if aveName != None:
-                                    bpy.props.nameAveragedImage = aveName
+                                    scn.nameAveragedImage = aveName
                                 else:
                                     averaged = False
                             else:
@@ -171,11 +172,12 @@ class sendFrame(Operator):
                             self.numSamples = self.sampleSize * self.avDict["numFrames"]
                             if i == 0:
                                 setRenderStatus("image", "Complete!")
-                                if bpy.data.images.find(bpy.props.nameAveragedImage) >= 0:
+                                print(scn.nameAveragedImage)
+                                if bpy.data.images.find(scn.nameAveragedImage) >= 0:
                                     # open rendered image in any open 'IMAGE_EDITOR' windows
                                     for area in context.screen.areas:
                                         if area.type == "IMAGE_EDITOR":
-                                            area.spaces.active.image = bpy.data.images[bpy.props.nameAveragedImage]
+                                            area.spaces.active.image = bpy.data.images[scn.nameAveragedImage]
                                             break
                                 self.report({"INFO"}, "Render completed at {num} samples! View the rendered image in your UV/Image_Editor".format(num=str(self.numSamples)))
                             elif self.numSamples == 0:
@@ -183,19 +185,19 @@ class sendFrame(Operator):
                                 self.previewed = True
                                 self.processes[1] = False
                             else:
-                                if bpy.data.images.find(bpy.props.nameAveragedImage) >= 0:
+                                if bpy.data.images.find(scn.nameAveragedImage) >= 0:
                                     # open preview image in UV/Image_Editor
                                     changeContext(context, "IMAGE_EDITOR")
                                     for area in context.screen.areas:
                                         if area.type == "IMAGE_EDITOR":
-                                            area.spaces.active.image = bpy.data.images[bpy.props.nameAveragedImage]
+                                            area.spaces.active.image = bpy.data.images[scn.nameAveragedImage]
                                             self.previewed = True
                                             break
                                 self.processes[1] = False
                                 previewString = "Render preview loaded ({num} samples)".format(num=str(self.numSamples))
                                 self.report({"INFO"}, previewString)
-                            appendViewable("image")
-                            removeViewable("animation")
+                            scn.imagePreviewAvailable = True
+                            scn.animPreviewAvailable = False
                             if i == 0:
                                 if self.renderCancelled:
                                     setRenderStatus("image", "Cancelled")
@@ -231,13 +233,14 @@ class sendFrame(Operator):
                 self.report({"WARNING"}, "Render in progress...")
                 return{"CANCELLED"}
             elif scn.availableServers == 0:
-                self.report({"WARNING"}, "No servers available. Try refreshing.")
-                return{"CANCELLED"}
+                serversRefreshed = refreshServers.refreshServersBlock(statusType="image")
+                if not serversRefreshed:
+                    self.report({"WARNING"}, "Servers could not be auto-refreshed. Try manual refreshing (Ctrl R).")
+                    return{"CANCELLED"}
 
-            # for testing purposes only (saves unsaved file as 'unsaved_file.blend')
+            # for testing purposes only (saves unsaved file)
             if self.projectName == "":
-                self.projectName = "unsaved_file"
-                bpy.ops.wm.save_mainfile(filepath="{tempLocalDir}{projectName}.blend".format(tempLocalDir=scn.tempLocalDir, projectName=self.projectName))
+                self.projectName = "rf_unsaved_file"
 
             # ensure the job won't break the script
             if not jobIsValid("image", self):
@@ -246,7 +249,7 @@ class sendFrame(Operator):
             print("\nRunning sendFrame function...")
 
             # set the file extension for use with 'open image' button
-            bpy.props.imExtension = scn.render.file_extension
+            scn.imExtension = scn.render.file_extension
 
             # Store current sample size for use in computing render results
             self.sampleSize = scn.samplesPerFrame
@@ -262,16 +265,15 @@ class sendFrame(Operator):
             self.numSamples = 0
             self.avDict = {"array":False, "numFrames":0}
             self.averageIm = None
-            bpy.props.nameImOutputFiles = getNameOutputFiles()
-            bpy.props.imFrame = scn.frame_current
+            scn.nameImOutputFiles = getNameOutputFiles()
+            scn.imFrame = scn.frame_current
             self.state = [1, 0]  # initializes state for modal
-            if bpy.props.needsUpdating or bpy.props.lastServerGroup != scn.serverGroups:
-                bpy.props.lastServerGroup = scn.serverGroups
+            if scn.needsUpdating or scn.lastServerGroup != scn.serverGroups:
+                scn.lastServerGroup = scn.serverGroups
                 updateStatus = updateServerPrefs()
                 if not updateStatus["valid"]:
                     self.report({"ERROR"}, updateStatus["errorMessage"])
                     return{"CANCELLED"}
-                bpy.props.lastRemotePath = bpy.props.serverPrefs["path"]
             else:
                 self.state[0] += 1
             self.processes = [copyProjectFile(self.projectName, scn.compress), False]

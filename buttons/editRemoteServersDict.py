@@ -40,12 +40,13 @@ class editRemoteServersDict(Operator):
     bl_options = {"REGISTER", "UNDO"}                                           # enable undo for the operator.
 
     def execute(self, context):
+        scn = bpy.context.scene
         changeContext(context, "TEXT_EDITOR")
         try:
             libraryServersPath = os.path.join(getLibraryPath(), "servers")
             bpy.ops.text.open(filepath=os.path.join(libraryServersPath, "remoteServers.txt"))
             self.report({"INFO"}, "Opened 'remoteServers.txt'")
-            bpy.props.needsUpdating = True
+            scn.needsUpdating = True
         except:
             self.report({"ERROR"}, "ERROR: Could not open 'remoteServers.txt'. If the problem persists, try reinstalling the add-on.")
         return{"FINISHED"}

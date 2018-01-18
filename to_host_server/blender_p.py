@@ -29,7 +29,7 @@ scn = bpy.context.scene
 """ BEGIN SUPPORT FOR REBRICKR """
 
 @persistent
-def handle_legoizer_animation(scene):
+def handle_rebrickr_animation(scene):
     print("Adjusting frame")
     groupsToAdjust = {}
     for group in bpy.data.groups:
@@ -53,9 +53,9 @@ def handle_legoizer_animation(scene):
                 brick.hide = not displayOnCurF
                 brick.hide_render = not displayOnCurF
 
-handle_legoizer_animation(scn)
-bpy.app.handlers.render_pre.append(handle_legoizer_animation)
-bpy.app.handlers.frame_change_pre.append(handle_legoizer_animation)
+handle_rebrickr_animation(scn)
+bpy.app.handlers.render_pre.append(handle_rebrickr_animation)
+bpy.app.handlers.frame_change_pre.append(handle_rebrickr_animation)
 
 """ END SUPPORT FOR REBRICKR """
 

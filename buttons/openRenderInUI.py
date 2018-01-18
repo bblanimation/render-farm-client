@@ -40,15 +40,16 @@ class openRenderedImageInUI(Operator):
     bl_options = {"REGISTER", "UNDO"}                                           # enable undo for the operator.
 
     def execute(self, context):
+        scn = bpy.context.scene
         try:
-            if bpy.data.images.find(bpy.props.nameAveragedImage) >= 0:
+            if bpy.data.images.find(scn.nameAveragedImage) >= 0:
                 # open rendered image in UV/Image_Editor
                 changeContext(context, "IMAGE_EDITOR")
                 for area in context.screen.areas:
                     if area.type == "IMAGE_EDITOR":
-                        area.spaces.active.image = bpy.data.images[bpy.props.nameAveragedImage]
-            elif bpy.props.nameAveragedImage != "":
-                self.report({"ERROR"}, "Image could not be found: '{nameAveragedImage}'".format(nameAveragedImage=bpy.props.nameAveragedImage))
+                        area.spaces.active.image = bpy.data.images[scn.nameAveragedImage]
+            elif scn.nameAveragedImage != "":
+                self.report({"ERROR"}, "Image could not be found: '{nameAveragedImage}'".format(nameAveragedImage=scn.nameAveragedImage))
                 return{"CANCELLED"}
             else:
                 self.report({"WARNING"}, "No rendered images could be found")
@@ -68,6 +69,7 @@ class openRenderedAnimationInUI(Operator):
 
 
     def execute(self, context):
+        scn = bpy.context.scene
         try:
             self.frameRangesDict = buildFrameRangesString(context.scene.frameRanges)
 
@@ -79,7 +81,7 @@ class openRenderedAnimationInUI(Operator):
             self.renderDumpFolder = getRenderDumpFolder()
             image_sequence_filepath = "{dumpFolder}/".format(dumpFolder=self.renderDumpFolder)
             for frame in bpy.props.animFrameRange:
-                image_filename = "{fileName}_{frame}{extension}".format(fileName=getNameOutputFiles(), frame=str(frame).zfill(4), extension=bpy.props.animExtension)
+                image_filename = "{fileName}_{frame}{extension}".format(fileName=getNameOutputFiles(), frame=str(frame).zfill(4), extension=scn.animExtension)
                 if os.path.isfile(os.path.join(image_sequence_filepath, image_filename)):
                     bpy.ops.clip.open(directory=image_sequence_filepath, files=[{"name":image_filename}])
                     openedFile = image_filename

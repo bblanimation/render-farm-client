@@ -124,8 +124,10 @@ def register():
         min=100, max=9999,
         default=1000)
 
-    bpy.types.Scene.renderType = []
-    bpy.types.Scene.renderStatus = {"animation":"None", "image":"None"}
+    bpy.types.Scene.imagePreviewAvailable = BoolProperty(default=False)
+    bpy.types.Scene.animPreviewAvailable = BoolProperty(default=False)
+    bpy.types.Scene.imageRenderStatus = StringProperty(name="Image Render Status", default="None")
+    bpy.types.Scene.animRenderStatus = StringProperty(name="Image Render Status", default="None")
 
     # Initialize server and login variables
     bpy.types.Scene.serverGroups = EnumProperty(
@@ -134,19 +136,18 @@ def register():
         description="Choose which hosts to use for render processes",
         items=[("All Servers", "All Servers", "Render on all servers")],
         default="All Servers")
-    bpy.props.lastServerGroup = "All Servers"
+    bpy.types.Scene.lastServerGroup = StringProperty(name="Last Server Group", default="All Servers")
     bpy.props.serverPrefs = {"servers":None, "login":None, "path":None, "hostConnection":None}
     bpy.types.Scene.availableServers = IntProperty(name="Available Servers", default=0)
     bpy.types.Scene.offlineServers = IntProperty(name="Offline Servers", default=0)
-    bpy.props.lastRemotePath = None
-    bpy.props.needsUpdating = True
+    bpy.types.Scene.needsUpdating = BoolProperty(default=True)
 
-    bpy.props.nameAveragedImage = ""
-    bpy.props.imExtension = False
-    bpy.props.nameImOutputFiles = ""
-    bpy.props.animExtension = False
-    bpy.props.imFrame = -1
-    bpy.props.animFrameRange = []
+    bpy.types.Scene.nameAveragedImage = StringProperty(default="")
+    bpy.types.Scene.nameImOutputFiles = StringProperty(default="")
+    bpy.types.Scene.imExtension = StringProperty(default="")
+    bpy.types.Scene.animExtension = StringProperty(default="")
+    bpy.types.Scene.imFrame = IntProperty(default=-1)
+    bpy.props.animFrameRange = None
 
     # handle the keymap
     wm = bpy.context.window_manager
@@ -175,20 +176,21 @@ def unregister():
     Scn = bpy.types.Scene
 
     del bpy.props.animFrameRange
-    del bpy.props.imFrame
-    del bpy.props.animExtension
-    del bpy.props.nameImOutputFiles
-    del bpy.props.imExtension
-    del bpy.props.nameAveragedImage
-    del bpy.props.needsUpdating
-    del bpy.props.lastRemotePath
+    del Scn.imFrame
+    del Scn.animExtension
+    del Scn.nameImOutputFiles
+    del Scn.imExtension
+    del Scn.nameAveragedImage
+    del bpy.props.serverPrefs
     del Scn.offlineServers
     del Scn.availableServers
-    del bpy.props.serverPrefs
-    del bpy.props.lastServerGroup
+    del Scn.needsUpdating
+    del Scn.lastServerGroup
     del Scn.serverGroups
-    del Scn.renderStatus
-    del Scn.renderType
+    del Scn.animRenderStatus
+    del Scn.imageRenderStatus
+    del Scn.animPreviewAvailable
+    del Scn.imagePreviewAvailable
     del Scn.maxSamples
     del Scn.samplesPerFrame
     del Scn.timeout

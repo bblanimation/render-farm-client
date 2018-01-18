@@ -26,6 +26,7 @@ from bpy.types import Panel
 from bpy.props import *
 from ..functions import getRenderStatus, have_internet
 from ..functions.setupServers import *
+from .app_handlers import *
 
 class renderOnServersPanel(Panel):
     bl_space_type  = "VIEW_3D"
@@ -57,7 +58,6 @@ class renderOnServersPanel(Panel):
         # Render Buttons
         row = col.row(align=True)
         row.alignment = "EXPAND"
-        row.active = scn.availableServers > 0 or not scn.render.engine == "CYCLES"
         row.operator("render_farm.render_frame_on_servers", text="Render", icon="RENDER_STILL")
         row.operator("render_farm.render_animation_on_servers", text="Animation", icon="RENDER_ANIMATION")
         col = layout.column(align=True)
@@ -76,9 +76,9 @@ class renderOnServersPanel(Panel):
 
         # display buttons to view render(s)
         row = layout.row(align=True)
-        if   "image"   in scn.renderType:
+        if scn.imagePreviewAvailable:
             row.operator("render_farm.open_rendered_image", text="View Image", icon="FILE_IMAGE")
-        if "animation" in scn.renderType:
+        if scn.animPreviewAvailable:
             row.operator("render_farm.open_rendered_animation", text="View Animation", icon="FILE_MOVIE")
 
         if bpy.data.texts.find('Render_Farm_log') >= 0:

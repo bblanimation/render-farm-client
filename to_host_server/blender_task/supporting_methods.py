@@ -72,15 +72,13 @@ def ssh_string(username, hostname, verbose=0):
     return tmpStr
 
 def rsync_files_to_node_string(remoteResultsPath, projectSyncPath, username, hostname, projectPath, verbose=0):
-
-    tmpStr = "rsync -e 'ssh -oStrictHostKeyChecking=no' --rsync-path='mkdir -p {remoteResultsPath} && rsync' -a {projectSyncPath} {username}@{hostname}:{projectPath}/".format(remoteResultsPath=remoteResultsPath, projectSyncPath=projectSyncPath, username=username, hostname=hostname, projectPath=projectPath)
+    tmpStr = "rsync -e 'ssh -oStrictHostKeyChecking=no' --rsync-path='mkdir -p {remoteResultsPath} && rsync' -a {projectSyncPath} {username}@{hostname}:{projectPath}/".format(remoteResultsPath=remoteResultsPath.replace(" ", "\\ "), projectSyncPath=projectSyncPath, username=username, hostname=hostname, projectPath=projectPath)
     if verbose >= 3:
         pflush(tmpStr)
     return tmpStr
 
 def rsync_files_from_node_string(username, hostname, remoteResultsPath, localResultsPath, outputName="", frameString="", verbose=0):
-
-    tmpStr = "rsync -atu -e 'ssh -oStrictHostKeyChecking=no' --include='{outputName}{frameString}.???' --exclude='*' --remove-source-files --rsync-path='mkdir -p {localResultsPath} && rsync' {username}@{hostname}:{remoteResultsPath} {localResultsPath}".format(outputName=outputName, username=username, hostname=hostname, remoteResultsPath=remoteResultsPath, frameString=frameString, localResultsPath=localResultsPath)
+    tmpStr = "rsync -atu -e 'ssh -oStrictHostKeyChecking=no' --include='{outputName}{frameString}.???' --exclude='*' --remove-source-files --rsync-path='mkdir -p {localResultsPath} && rsync' {username}@{hostname}:{remoteResultsPath} {localResultsPath}".format(outputName=outputName, username=username, hostname=hostname, remoteResultsPath=remoteResultsPath, frameString=frameString, localResultsPath=localResultsPath.replace(" ", "\\ "))
     if verbose >= 3:
         pflush(tmpStr)
     return tmpStr

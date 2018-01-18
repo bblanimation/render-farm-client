@@ -22,21 +22,21 @@ Created by Christopher Gearhart
 # system imports
 import bpy
 import math
+from bpy.app.handlers import persistent
 from bpy.types import Panel
 from bpy.props import *
-from ..functions import getRenderStatus, have_internet
+from ..buttons.refreshServers import refreshServers
+from ..functions import *
 from ..functions.setupServers import *
 
-@persistent
-def handle_saving_when_rendering(scene):
-    # TODO: Force end render process or something, instead of 'set_render_status_on_load' below
-    pass
-
-bpy.app.handlers.save_pre.append(handle_saving_when_rendering)
 
 @persistent
-def set_render_status_on_load(scene):
-    scene.renderStatus["image"] = "None"
-    scene.renderStatus["animation"] = "None"
+def verify_render_status_on_load(scene):
+    scn = bpy.context.scene
+    if scn.imageRenderStatus in ["Preparing files...", "Rendering...", "Finishing..."]:
+        scn.imageRenderStatus = "None"
+    if scn.animRenderStatus in ["Preparing files...", "Rendering...", "Finishing..."]:
+        scn.animRenderStatus = "None"
 
-bpy.app.handlers.load_post.append(set_render_status_on_load)
+
+bpy.app.handlers.load_post.append(verify_render_status_on_load)

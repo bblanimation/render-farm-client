@@ -32,8 +32,9 @@ from bpy.props import *
 from ..functions import *
 from ..functions.averageFrames import *
 from ..functions.jobIsValid import *
+from ..functions.common import *
 
-class refreshNumAvailableServers(Operator):
+class refreshServers(Operator):
     """Attempt to connect to all servers through host server"""                 # blender will use this as a tooltip for menu items and buttons.
     bl_idname = "render_farm.refresh_num_available_servers"                           # unique identifier for buttons and menu items to reference.
     bl_label = "Refresh Available Servers"                                      # display name in the interface.
@@ -46,13 +47,15 @@ class refreshNumAvailableServers(Operator):
             return False
         return True
 
-    def checkNumAvailServers(self):
+    @classmethod
+    def checkNumAvailServers(cls):
         scn = bpy.context.scene
         command = "ssh -T -oStrictHostKeyChecking=no -x {login} 'python {remotePath}blender_task -Hv --connection_timeout {timeout} --hosts_file {remotePath}servers.txt'".format(login=bpy.props.serverPrefs["login"], remotePath=bpy.props.serverPrefs["path"], timeout=scn.timeout)
         process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
         return process
 
-    def updateAvailServerInfo(self):
+    @classmethod
+    def updateAvailServerInfo(cls, process):
         scn = bpy.context.scene
 
         available = None
@@ -60,7 +63,7 @@ class refreshNumAvailableServers(Operator):
 
         while available is None:
             try:
-                rl = self.process.stdout.readline()
+                rl = process.stdout.readline()
                 line1 = rl.decode("ASCII").replace("\\n", "")
                 available = json.loads(line1.replace("'", "\""))
             except:
@@ -68,7 +71,7 @@ class refreshNumAvailableServers(Operator):
                 available = None
         while offline is None:
             try:
-                rl = self.process.stdout.readline()
+                rl = process.stdout.readline()
                 line2 = rl.decode("ASCII").replace("\\n", "")
                 offline = json.loads(line2.replace("'", "\""))
             except:
@@ -77,8 +80,7 @@ class refreshNumAvailableServers(Operator):
 
         scn.availableServers = len(available)
         scn.offlineServers = len(offline)
-        for a in bpy.context.screen.areas:
-            a.tag_redraw()
+        tag_redraw_areas()
 
     def modal(self, context, event):
         try:
@@ -108,13 +110,13 @@ class refreshNumAvailableServers(Operator):
 
                     # check number of available servers via host server
                     if self.state == 1:
-                        bpy.props.needsUpdating = False
+                        scn.needsUpdating = False
                         self.state += 1
                         self.process = self.checkNumAvailServers()
                         return{"PASS_THROUGH"}
 
                     elif self.state == 2:
-                        self.updateAvailServerInfo()
+                        self.updateAvailServerInfo(self.process)
                         scn = context.scene
                         self.report({"INFO"}, "Refresh process completed ({num} servers available)".format(num=str(scn.availableServers)))
                         return{"FINISHED"}
@@ -127,6 +129,30 @@ class refreshNumAvailableServers(Operator):
             handle_exception()
             return{"CANCELLED"}
 
+    @classmethod
+    def refreshServersBlock(cls, statusType=None):
+        scn = bpy.context.scene
+        if scn.needsUpdating or scn.lastServerGroup != scn.serverGroups:
+            scn.lastServerGroup = scn.serverGroups
+            updateStatus = updateServerPrefs()
+            if not updateStatus["valid"]:
+                return False
+            process = copyFiles()
+            while process.returncode == None:
+                process.poll()
+            if process.returncode != 0:
+                return False
+
+        process = cls.checkNumAvailServers()
+        while process.returncode == None:
+            process.poll()
+        if process.returncode != 0:
+            return False
+
+        cls.updateAvailServerInfo(process)
+        scn.needsUpdating = False
+        return True
+
     def execute(self, context):
         try:
             print("\nRunning 'checkNumAvailServers' function...")
@@ -134,14 +160,13 @@ class refreshNumAvailableServers(Operator):
 
             # start initial process
             self.state = 1 # initializes state for modal
-            if bpy.props.needsUpdating or bpy.props.lastServerGroup != scn.serverGroups:
-                bpy.props.lastServerGroup = scn.serverGroups
+            if scn.needsUpdating or scn.lastServerGroup != scn.serverGroups:
+                scn.lastServerGroup = scn.serverGroups
                 updateStatus = updateServerPrefs()
                 if not updateStatus["valid"]:
                     self.report({"ERROR"}, updateStatus["errorMessage"])
                     return{"CANCELLED"}
                 self.process = copyFiles()
-                bpy.props.lastRemotePath = bpy.props.serverPrefs["path"]
             else:
                 self.process = self.checkNumAvailServers()
                 self.state += 1

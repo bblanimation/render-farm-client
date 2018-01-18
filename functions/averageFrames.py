@@ -28,7 +28,7 @@ from . import getRenderDumpFolder
 
 def averageFrames(classObject, outputFileName, verbose=0):
     """ Averages final rendered images in blender to present one render result """
-
+    scn = bpy.context.scene
     if verbose >= 1:
         print("Averaging images...")
 
@@ -39,7 +39,7 @@ def averageFrames(classObject, outputFileName, verbose=0):
 
     # get image files to average from 'renderedFramesPath'
     allFiles = os.listdir(renderedFramesPath)
-    inFileName = "{outputFileName}_seed-*_{frame}{extension}".format(outputFileName=outputFileName, frame=str(bpy.props.imFrame).zfill(4), extension=bpy.props.imExtension)
+    inFileName = "{outputFileName}_seed-*_{frame}{extension}".format(outputFileName=outputFileName, frame=str(scn.imFrame).zfill(4), extension=scn.imExtension)
     imListNames = [filename for filename in allFiles if fnmatch.fnmatch(filename, inFileName)]
     imList = [os.path.join(renderedFramesPath, im) for im in imListNames]
     if not imList:
@@ -87,7 +87,7 @@ def averageFrames(classObject, outputFileName, verbose=0):
         print("Averaged successfully!")
 
     # Generate final averaged image and add it to the main database
-    imName = "{outputFileName}_{frame}_average{extension}".format(outputFileName=outputFileName, frame=str(bpy.props.imFrame).zfill(4), extension=bpy.props.imExtension)
+    imName = "{outputFileName}_{frame}_average{extension}".format(outputFileName=outputFileName, frame=str(scn.imFrame).zfill(4), extension=scn.imExtension)
     if bpy.data.images.find(imName) < 0:
         new = bpy.data.images.new(imName, w, h, alpha)
     else:

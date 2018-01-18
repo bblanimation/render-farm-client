@@ -29,6 +29,7 @@ import time
 
 from bpy.types import Operator
 from bpy.props import *
+from .refreshServers import *
 from ..functions import *
 from ..functions.averageFrames import *
 from ..functions.jobIsValid import *
@@ -137,7 +138,7 @@ class sendAnimation(Operator):
 
                         # start render process from the defined start and end frames
                         elif self.state[i] == 2:
-                            bpy.props.needsUpdating = False
+                            scn.needsUpdating = False
                             self.processes[i] = renderFrames(str(self.expandedFrameRange), self.projectName)
                             setRenderStatus("animation", "Rendering...")
                             self.state[i] += 1
@@ -160,7 +161,7 @@ class sendAnimation(Operator):
                             else:
                                 viewString = ""
                             self.report({"INFO"}, "Render completed for {numCompleted}/{numSent} frames{viewString}".format(numCompleted=numCompleted, numSent=len(bpy.props.animFrameRange), viewString=viewString))
-                            appendViewable("animation")
+                            scn.animPreviewAvailable = True
                             if i == 1:
                                 self.processes[1] = False
                                 self.statusChecked = True
@@ -192,13 +193,14 @@ class sendAnimation(Operator):
                 self.report({"WARNING"}, "Render in progress...")
                 return{"CANCELLED"}
             elif scn.availableServers == 0:
-                self.report({"WARNING"}, "No servers available. Try refreshing.")
-                return{"CANCELLED"}
+                serversRefreshed = refreshServers.refreshServersBlock(statusType="animation")
+                if not serversRefreshed:
+                    self.report({"WARNING"}, "Servers could not be auto-refreshed. Try manual refreshing (Ctrl R).")
+                    return{"CANCELLED"}
 
-            # for testing purposes only (saves unsaved file as 'unsaved_file.blend')
+            # for testing purposes only (saves unsaved file)
             if self.projectName == "":
-                self.projectName = "unsaved_file"
-                bpy.ops.wm.save_mainfile(filepath="{tempLocalDir}{projectName}.blend".format(tempLocalDir=scn.tempLocalDir, projectName=self.projectName))
+                self.projectName = "rf_unsaved_file"
 
             print("\nRunning sendAnimation function...")
 
@@ -218,7 +220,7 @@ class sendAnimation(Operator):
                 return{"CANCELLED"}
 
             # set the file extension and frame range for use with 'open animation' button
-            bpy.props.animExtension = bpy.context.scene.render.file_extension
+            scn.animExtension = bpy.context.scene.render.file_extension
             bpy.props.animFrameRange = self.expandedFrameRange
 
             # start initial render process
@@ -232,8 +234,8 @@ class sendAnimation(Operator):
             self.numFrames = str(int(scn.frame_end) - int(scn.frame_start))
             self.statusChecked = False
             self.state = [1, 0] # initializes state for modal
-            if bpy.props.needsUpdating or bpy.props.lastServerGroup != scn.serverGroups:
-                bpy.props.lastServerGroup = scn.serverGroups
+            if scn.needsUpdating or scn.lastServerGroup != scn.serverGroups:
+                scn.lastServerGroup = scn.serverGroups
                 updateStatus = updateServerPrefs()
                 if not updateStatus["valid"]:
                     self.report({"ERROR"}, updateStatus["errorMessage"])
