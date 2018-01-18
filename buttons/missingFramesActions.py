@@ -35,40 +35,49 @@ from ..functions.jobIsValid import *
 
 class listMissingFrames(Operator):
     """List the output files missing from the render dump folder"""             # blender will use this as a tooltip for menu items and buttons.
-    bl_idname = "scene.list_frames"                                              # unique identifier for buttons and menu items to reference.
+    bl_idname = "render_farm.list_frames"                                              # unique identifier for buttons and menu items to reference.
     bl_label = "List Missing Frames"                                            # display name in the interface.
     bl_options = {"REGISTER", "UNDO"}                                           # enable undo for the operator.
 
     def execute(self, context):
-        scn = context.scene
+        try:
+            scn = context.scene
 
-        # initializes self.frameRangesDict (returns False if frame range invalid)
-        if not setFrameRangesDict(self):
+            # initializes self.frameRangesDict (returns False if frame range invalid)
+            if not setFrameRangesDict(self):
+                return{"FINISHED"}
+
+            # list all missing files from start frame to end frame in render dump folder
+            missingFrames = listMissingFiles(getNameOutputFiles(), self.frameRangesDict["string"])
+            if len(missingFrames) > 0:
+                self.report({"INFO"}, "Missing frames: {missingFrames}".format(missingFrames=missingFrames))
+            else:
+                self.report({"INFO"}, "All frames accounted for!")
+
             return{"FINISHED"}
+        except:
+            handle_exception()
+            return{"CANCELLED"}
 
-        # list all missing files from start frame to end frame in render dump folder
-        missingFrames = listMissingFiles(getNameOutputFiles(), self.frameRangesDict["string"])
-        if len(missingFrames) > 0:
-            self.report({"INFO"}, "Missing frames: {missingFrames}".format(missingFrames=missingFrames))
-        else:
-            self.report({"INFO"}, "All frames accounted for!")
-
-        return{"FINISHED"}
 
 class setToMissingFrames(Operator):
     """Set frame range to frames missing from the render dump folder"""         # blender will use this as a tooltip for menu items and buttons.
-    bl_idname = "scene.set_to_missing_frames"                                   # unique identifier for buttons and menu items to reference.
+    bl_idname = "render_farm.set_to_missing_frames"                                   # unique identifier for buttons and menu items to reference.
     bl_label = "Set to Missing Frames"                                          # display name in the interface.
     bl_options = {"REGISTER", "UNDO"}                                           # enable undo for the operator.
 
     def execute(self, context):
-        scn = context.scene
+        try:
+            scn = context.scene
 
-        # initializes self.frameRangesDict (returns False if frame range invalid)
-        if not setFrameRangesDict(self):
+            # initializes self.frameRangesDict (returns False if frame range invalid)
+            if not setFrameRangesDict(self):
+                return{"FINISHED"}
+
+            # list all missing files from start frame to end frame in render dump location
+            scn.frameRanges = listMissingFiles(getNameOutputFiles(), self.frameRangesDict["string"])
+
             return{"FINISHED"}
-
-        # list all missing files from start frame to end frame in render dump location
-        scn.frameRanges = listMissingFiles(getNameOutputFiles(), self.frameRangesDict["string"])
-
-        return{"FINISHED"}
+        except:
+            handle_exception()
+            return{"CANCELLED"}

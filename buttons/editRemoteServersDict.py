@@ -35,17 +35,18 @@ from ..functions.jobIsValid import *
 
 class editRemoteServersDict(Operator):
     """Edit the remote servers dictionary in a text editor"""                   # blender will use this as a tooltip for menu items and buttons.
-    bl_idname = "scene.edit_servers_dict"                                       # unique identifier for buttons and menu items to reference.
+    bl_idname = "render_farm.edit_servers_dict"                                       # unique identifier for buttons and menu items to reference.
     bl_label = "Edit Remote Servers"                                            # display name in the interface.
     bl_options = {"REGISTER", "UNDO"}                                           # enable undo for the operator.
 
     def execute(self, context):
+        scn = bpy.context.scene
         changeContext(context, "TEXT_EDITOR")
         try:
             libraryServersPath = os.path.join(getLibraryPath(), "servers")
             bpy.ops.text.open(filepath=os.path.join(libraryServersPath, "remoteServers.txt"))
             self.report({"INFO"}, "Opened 'remoteServers.txt'")
-            bpy.props.needsUpdating = True
+            scn.needsUpdating = True
         except:
             self.report({"ERROR"}, "ERROR: Could not open 'remoteServers.txt'. If the problem persists, try reinstalling the add-on.")
         return{"FINISHED"}

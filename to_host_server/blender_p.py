@@ -26,33 +26,38 @@ from bpy.app.handlers import persistent
 
 scn = bpy.context.scene
 
-""" BEGIN SUPPORT FOR THE LEGOIZER """
+""" BEGIN SUPPORT FOR REBRICKR """
 
 @persistent
-def handle_legoizer_animation(scene):
+def handle_rebrickr_animation(scene):
+    print("Adjusting frame")
     groupsToAdjust = {}
     for group in bpy.data.groups:
-        if group.name.startswith("LEGOizer_") and "_bricks_frame_" in group.name:
+        if group.name.startswith("Rebrickr") and "_bricks_frame_" in group.name:
             sourceName = group.name[9:(group.name.index("_bricks_frame_"))]
-            groupsToAdjust[sourceName].append(group)
+            if sourceName not in groupsToAdjust.keys():
+                groupsToAdjust[sourceName] = [group.name]
+            else:
+                groupsToAdjust[sourceName].append(group.name)
     for sourceName in groupsToAdjust:
         groupsToAdjust[sourceName].sort()
-        for i,group in enumerate(groupsToAdjust[sourceName]):
+        for i,gName in enumerate(groupsToAdjust[sourceName]):
+            group = bpy.data.groups.get(gName)
             frame = int(group.name[(group.name.index("_bricks_frame_") + 14):])
             onCurF = frame == scn.frame_current
             beforeFirstF = (i == 0 and scn.frame_current < frame)
             afterLastF = (i == (len(groupsToAdjust[sourceName]) - 1) and scn.frame_current > frame)
-            displayOnCurrentF = onCurF or beforeFirstF or afterLastF
+            displayOnCurF = onCurF or beforeFirstF or afterLastF
             brick = group.objects[0]
             if brick.hide == displayOnCurF:
                 brick.hide = not displayOnCurF
                 brick.hide_render = not displayOnCurF
 
-bpy.app.handlers.render_pre.append(handle_legoizer_animation)
-bpy.app.handlers.frame_change_pre.append(handle_legoizer_animation)
-handle_legoizer_animation(scn)
+handle_rebrickr_animation(scn)
+bpy.app.handlers.render_pre.append(handle_rebrickr_animation)
+bpy.app.handlers.frame_change_pre.append(handle_rebrickr_animation)
 
-""" END SUPPORT FOR THE LEGOIZER """
+""" END SUPPORT FOR REBRICKR """
 
 randomSeed = random.randint(1, 10000)
 for scene in bpy.data.scenes:

@@ -31,26 +31,34 @@ Created by Christopher Gearhart
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-# system imports
+# System imports
+#None!!
+
+# Blender imports
 import bpy
 from bpy.types import Operator
 from bpy.props import *
+
+# Render Farm imports
 from .ui import *
 from .buttons import *
 from .functions.setupServers import *
 
+# Used to store keymaps for addon
+addon_keymaps = []
+
 def more_menu_options(self, context):
     layout = self.layout
     layout.separator()
-    layout.operator("scene.render_frame_on_servers", text="Render Image on Servers", icon='RENDER_STILL')
-    layout.operator("scene.render_animation_on_servers", text="Render Image on Servers", icon='RENDER_ANIMATION')
-
-# store keymaps here to access after registration
-addon_keymaps = []
+    layout.operator("render_farm.render_frame_on_servers", text="Render Image on Servers", icon='RENDER_STILL')
+    layout.operator("render_farm.render_animation_on_servers", text="Render Animation on Servers", icon='RENDER_ANIMATION')
 
 def register():
     bpy.utils.register_module(__name__)
     bpy.types.INFO_MT_render.append(more_menu_options)
+
+    bpy.props.render_farm_module_name = __name__
+    bpy.props.render_farm_version = str(bl_info["version"])[1:-1].replace(", ", ".")
 
     bpy.types.Scene.showAdvanced = BoolProperty(
         name="Show Advanced",
@@ -116,8 +124,10 @@ def register():
         min=100, max=9999,
         default=1000)
 
-    bpy.types.Scene.renderType = []
-    bpy.types.Scene.renderStatus = {"animation":"None", "image":"None"}
+    bpy.types.Scene.imagePreviewAvailable = BoolProperty(default=False)
+    bpy.types.Scene.animPreviewAvailable = BoolProperty(default=False)
+    bpy.types.Scene.imageRenderStatus = StringProperty(name="Image Render Status", default="None")
+    bpy.types.Scene.animRenderStatus = StringProperty(name="Image Render Status", default="None")
 
     # Initialize server and login variables
     bpy.types.Scene.serverGroups = EnumProperty(
@@ -126,62 +136,75 @@ def register():
         description="Choose which hosts to use for render processes",
         items=[("All Servers", "All Servers", "Render on all servers")],
         default="All Servers")
-    bpy.props.lastServerGroup = "All Servers"
+    bpy.types.Scene.lastServerGroup = StringProperty(name="Last Server Group", default="All Servers")
     bpy.props.serverPrefs = {"servers":None, "login":None, "path":None, "hostConnection":None}
     bpy.types.Scene.availableServers = IntProperty(name="Available Servers", default=0)
     bpy.types.Scene.offlineServers = IntProperty(name="Offline Servers", default=0)
-    bpy.props.lastRemotePath = None
-    bpy.props.needsUpdating = True
+    bpy.types.Scene.needsUpdating = BoolProperty(default=True)
 
-    bpy.props.nameAveragedImage = ""
-    bpy.props.imExtension = False
-    bpy.props.nameImOutputFiles = ""
-    bpy.props.animExtension = False
-    bpy.props.imFrame = -1
-    bpy.props.animFrameRange = []
+    bpy.types.Scene.nameAveragedImage = StringProperty(default="")
+    bpy.types.Scene.nameImOutputFiles = StringProperty(default="")
+    bpy.types.Scene.imExtension = StringProperty(default="")
+    bpy.types.Scene.animExtension = StringProperty(default="")
+    bpy.types.Scene.imFrame = IntProperty(default=-1)
+    bpy.props.animFrameRange = None
 
     # handle the keymap
     wm = bpy.context.window_manager
-    km = wm.keyconfigs.addon.keymaps.new(name='Object Mode', space_type='EMPTY')
-    kmi = km.keymap_items.new("scene.render_frame_on_servers", 'F12', 'PRESS', alt=True)
-    kmi = km.keymap_items.new("scene.render_animation_on_servers", 'F12', 'PRESS', alt=True, shift=True)
-    kmi = km.keymap_items.new("scene.open_rendered_image", 'O', 'PRESS', shift=True)
-    kmi = km.keymap_items.new("scene.open_rendered_animation", 'O', 'PRESS', alt=True, shift=True)
-    kmi = km.keymap_items.new("scene.list_frames", 'M', 'PRESS', shift=True)
-    kmi = km.keymap_items.new("scene.set_to_missing_frames", 'M', 'PRESS', alt=True, shift=True)
-    kmi = km.keymap_items.new("scene.refresh_num_available_servers", 'R', 'PRESS', ctrl=True)
-    kmi = km.keymap_items.new("scene.edit_servers_dict", 'E', 'PRESS', ctrl=True)
-    addon_keymaps.append(km)
+    # Note that in background mode (no GUI available), keyconfigs are not available either, so we have
+    # to check this to avoid nasty errors in background case.
+    kc = wm.keyconfigs.addon
+    if kc:
+        km = kc.keymaps.new(name='Object Mode', space_type='EMPTY')
+        kmi = km.keymap_items.new("render_farm.render_frame_on_servers", 'F12', 'PRESS', alt=True)
+        kmi = km.keymap_items.new("render_farm.render_animation_on_servers", 'F12', 'PRESS', alt=True, shift=True)
+        kmi = km.keymap_items.new("render_farm.open_rendered_image", 'O', 'PRESS', shift=True)
+        kmi = km.keymap_items.new("render_farm.open_rendered_animation", 'O', 'PRESS', alt=True, shift=True)
+        kmi = km.keymap_items.new("render_farm.list_frames", 'M', 'PRESS', shift=True)
+        kmi = km.keymap_items.new("render_farm.set_to_missing_frames", 'M', 'PRESS', alt=True, shift=True)
+        kmi = km.keymap_items.new("render_farm.refresh_num_available_servers", 'R', 'PRESS', ctrl=True)
+        kmi = km.keymap_items.new("render_farm.edit_servers_dict", 'E', 'PRESS', ctrl=True)
+        addon_keymaps.append(km)
 
 def unregister():
-    bpy.utils.unregister_module(__name__)
-    bpy.types.INFO_MT_render.remove(more_menu_options)
-    del bpy.types.Scene.showAdvanced
-    del bpy.types.Scene.frameRanges
-    del bpy.types.Scene.tempLocalDir
-    del bpy.types.Scene.renderDumpLoc
-    del bpy.types.Scene.nameOutputFiles
-    del bpy.types.Scene.maxServerLoad
-    del bpy.types.Scene.timeout
-    del bpy.types.Scene.maxSamples
-    del bpy.types.Scene.renderType
-    del bpy.types.Scene.killPython
-    del bpy.types.Scene.renderStatus
-    del bpy.props.serverPrefs
-    del bpy.props.animFrameRange
-    del bpy.props.lastRemotePath
-    del bpy.props.nameAveragedImage
-    del bpy.props.imExtension
-    del bpy.props.animExtension
-    del bpy.props.needsUpdating
-    del bpy.types.Scene.serverGroups
-
+    # handle the keymap
     wm = bpy.context.window_manager
     for km in addon_keymaps:
         wm.keyconfigs.addon.keymaps.remove(km)
-
-    # clear the list
     addon_keymaps.clear()
+
+    Scn = bpy.types.Scene
+
+    del bpy.props.animFrameRange
+    del Scn.imFrame
+    del Scn.animExtension
+    del Scn.nameImOutputFiles
+    del Scn.imExtension
+    del Scn.nameAveragedImage
+    del bpy.props.serverPrefs
+    del Scn.offlineServers
+    del Scn.availableServers
+    del Scn.needsUpdating
+    del Scn.lastServerGroup
+    del Scn.serverGroups
+    del Scn.animRenderStatus
+    del Scn.imageRenderStatus
+    del Scn.animPreviewAvailable
+    del Scn.imagePreviewAvailable
+    del Scn.maxSamples
+    del Scn.samplesPerFrame
+    del Scn.timeout
+    del Scn.maxServerLoad
+    del Scn.nameOutputFiles
+    del Scn.renderDumpLoc
+    del Scn.tempLocalDir
+    del Scn.frameRanges
+    del Scn.compress
+    del Scn.killPython
+    del Scn.showAdvanced
+
+    bpy.utils.unregister_module(__name__)
+    bpy.types.INFO_MT_render.remove(more_menu_options)
 
 if __name__ == "__main__":
     register()

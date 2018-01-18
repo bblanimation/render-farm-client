@@ -2,3 +2,5 @@ __pycache__/
 .DS_Store
 servers.txt
 to_host_server/blender_task.zip
+testing/
+error_log/

@@ -19,4 +19,24 @@ Created by Christopher Gearhart
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
-__all__ = ["editRemoteServersDict", "missingFramesActions", "openRenderInUI", "refreshServers", "reportError", "sendAnimation", "sendFrame"]
+# system imports
+import bpy
+import math
+from bpy.app.handlers import persistent
+from bpy.types import Panel
+from bpy.props import *
+from ..buttons.refreshServers import refreshServers
+from ..functions import *
+from ..functions.setupServers import *
+
+
+@persistent
+def verify_render_status_on_load(scene):
+    scn = bpy.context.scene
+    if scn.imageRenderStatus in ["Preparing files...", "Rendering...", "Finishing..."]:
+        scn.imageRenderStatus = "None"
+    if scn.animRenderStatus in ["Preparing files...", "Rendering...", "Finishing..."]:
+        scn.animRenderStatus = "None"
+
+
+bpy.app.handlers.load_post.append(verify_render_status_on_load)

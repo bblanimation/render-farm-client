@@ -35,55 +35,66 @@ from ..functions.jobIsValid import *
 
 class openRenderedImageInUI(Operator):
     """Open rendered image"""                                                   # blender will use this as a tooltip for menu items and buttons.
-    bl_idname = "scene.open_rendered_image"                                     # unique identifier for buttons and menu items to reference.
+    bl_idname = "render_farm.open_rendered_image"                                     # unique identifier for buttons and menu items to reference.
     bl_label = "Open Rendered Image"                                            # display name in the interface.
     bl_options = {"REGISTER", "UNDO"}                                           # enable undo for the operator.
 
     def execute(self, context):
-        if bpy.data.images.find(bpy.props.nameAveragedImage) >= 0:
-            # open rendered image in UV/Image_Editor
-            changeContext(context, "IMAGE_EDITOR")
-            for area in context.screen.areas:
-                if area.type == "IMAGE_EDITOR":
-                    area.spaces.active.image = bpy.data.images[bpy.props.nameAveragedImage]
-        elif bpy.props.nameAveragedImage != "":
-            self.report({"ERROR"}, "Image could not be found: '{nameAveragedImage}'".format(nameAveragedImage=bpy.props.nameAveragedImage))
-            return{"CANCELLED"}
-        else:
-            self.report({"WARNING"}, "No rendered images could be found")
+        scn = bpy.context.scene
+        try:
+            if bpy.data.images.find(scn.nameAveragedImage) >= 0:
+                # open rendered image in UV/Image_Editor
+                changeContext(context, "IMAGE_EDITOR")
+                for area in context.screen.areas:
+                    if area.type == "IMAGE_EDITOR":
+                        area.spaces.active.image = bpy.data.images[scn.nameAveragedImage]
+            elif scn.nameAveragedImage != "":
+                self.report({"ERROR"}, "Image could not be found: '{nameAveragedImage}'".format(nameAveragedImage=scn.nameAveragedImage))
+                return{"CANCELLED"}
+            else:
+                self.report({"WARNING"}, "No rendered images could be found")
+                return{"CANCELLED"}
+
+            return{"FINISHED"}
+        except:
+            handle_exception()
             return{"CANCELLED"}
 
-        return{"FINISHED"}
 
 class openRenderedAnimationInUI(Operator):
     """Open rendered animation"""                                               # blender will use this as a tooltip for menu items and buttons.
-    bl_idname = "scene.open_rendered_animation"                                 # unique identifier for buttons and menu items to reference.
+    bl_idname = "render_farm.open_rendered_animation"                                 # unique identifier for buttons and menu items to reference.
     bl_label = "Open Rendered Animation"                                        # display name in the interface.
     bl_options = {"REGISTER", "UNDO"}                                           # enable undo for the operator.
 
 
     def execute(self, context):
-        self.frameRangesDict = buildFrameRangesString(context.scene.frameRanges)
+        scn = bpy.context.scene
+        try:
+            self.frameRangesDict = buildFrameRangesString(context.scene.frameRanges)
 
-        # change contexts
-        lastAreaType = changeContext(context, "CLIP_EDITOR")
+            # change contexts
+            lastAreaType = changeContext(context, "CLIP_EDITOR")
 
-        # opens first frame of image sequence (blender imports full sequence)
-        openedFile = False
-        self.renderDumpFolder = getRenderDumpFolder()
-        image_sequence_filepath = "{dumpFolder}/".format(dumpFolder=self.renderDumpFolder)
-        for frame in bpy.props.animFrameRange:
-            image_filename = "{fileName}_{frame}{extension}".format(fileName=getNameOutputFiles(), frame=str(frame).zfill(4), extension=bpy.props.animExtension)
-            if os.path.isfile(os.path.join(image_sequence_filepath, image_filename)):
-                bpy.ops.clip.open(directory=image_sequence_filepath, files=[{"name":image_filename}])
-                openedFile = image_filename
-                openedFrame = frame
-                break
-        if openedFile:
-            bpy.ops.clip.reload()
-            bpy.data.movieclips[openedFile].frame_start = frame
-        else:
-            changeContext(context, lastAreaType)
-            self.report({"ERROR"}, "Could not open rendered animation. View files in file browser in the following folder: '{renderDumpFolder}'.".format(renderDumpFolder=self.renderDumpFolder))
+            # opens first frame of image sequence (blender imports full sequence)
+            openedFile = False
+            self.renderDumpFolder = getRenderDumpFolder()
+            image_sequence_filepath = "{dumpFolder}/".format(dumpFolder=self.renderDumpFolder)
+            for frame in bpy.props.animFrameRange:
+                image_filename = "{fileName}_{frame}{extension}".format(fileName=getNameOutputFiles(), frame=str(frame).zfill(4), extension=scn.animExtension)
+                if os.path.isfile(os.path.join(image_sequence_filepath, image_filename)):
+                    bpy.ops.clip.open(directory=image_sequence_filepath, files=[{"name":image_filename}])
+                    openedFile = image_filename
+                    openedFrame = frame
+                    break
+            if openedFile:
+                bpy.ops.clip.reload()
+                bpy.data.movieclips[openedFile].frame_start = frame
+            else:
+                changeContext(context, lastAreaType)
+                self.report({"ERROR"}, "Could not open rendered animation. View files in file browser in the following folder: '{renderDumpFolder}'.".format(renderDumpFolder=self.renderDumpFolder))
 
-        return{"FINISHED"}
+            return{"FINISHED"}
+        except:
+            handle_exception()
+            return{"CANCELLED"}
