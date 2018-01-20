@@ -242,6 +242,11 @@ class sendAnimation(Operator):
                     return{"CANCELLED"}
             else:
                 self.state[0] += 1
+            try:
+                bpy.ops.file.pack_all()
+            except RuntimeError as rte:
+                self.report({"ERROR"}, str(rte))
+                return{"CANCELLED"}
             self.processes = [copyProjectFile(self.projectName, scn.compress), False]
 
             # create timer for modal

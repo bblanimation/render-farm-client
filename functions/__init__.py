@@ -76,10 +76,12 @@ def getFrames(projectName, archiveFiles=False, frameRange=False):
         archiveRsyncCommand = "rsync -aqx --rsync-path='mkdir -p {dumpLocation}/backups/ && rsync' --remove-source-files {includeDict} --exclude='{nameOutputFiles}_????.???' --exclude='backups/' '{dumpLocation}/' '{dumpLocation}/backups/';".format(includeDict=includeDict, dumpLocation=dumpLocation.replace(" ", "\\ "), nameOutputFiles=getNameOutputFiles(), imExtension=scn.imExtension)
     else:
         archiveRsyncCommand = "mkdir -p {dumpLocation};".format(dumpLocation=dumpLocation.replace(" ", "\\ "))
-    print(archiveRsyncCommand)
+
+    # exclude blend files, averaged files, and strange temporary files
+    exclusions =  "--exclude='*.blend' --exclude='*_average.???' --exclude='*.???.*'"
 
     # rsync files from host server to local directory
-    fetchRsyncCommand = "rsync -ax --progress --remove-source-files --exclude='*.blend' --exclude='*_average.???' -e 'ssh -T -oCompression=no -oStrictHostKeyChecking=no -x' '{login}:{remotePath}{projectName}/results/' '{dumpLocation}/';".format(login=bpy.props.serverPrefs["login"], remotePath=bpy.props.serverPrefs["path"], projectName=projectName, dumpLocation=dumpLocation)
+    fetchRsyncCommand = "rsync -ax --progress --remove-source-files {exclusions} -e 'ssh -T -oCompression=no -oStrictHostKeyChecking=no -x' '{login}:{remotePath}{projectName}/results/' '{dumpLocation}/';".format(exclusions=exclusions, login=bpy.props.serverPrefs["login"], remotePath=bpy.props.serverPrefs["path"], projectName=projectName, dumpLocation=dumpLocation)
 
     # run the above processes
     process = subprocess.Popen(archiveRsyncCommand + fetchRsyncCommand, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
@@ -118,7 +120,6 @@ def buildFrameRangesString(frameRanges):
 def copyProjectFile(projectName, compress):
     """ copies project file from local machine to host server """
     scn = bpy.context.scene
-    bpy.ops.file.pack_all()
     saveToPath = "{tempLocalDir}{projectName}.blend".format(tempLocalDir=scn.tempLocalDir, projectName=projectName)
     if projectName == "rf_unsaved_file":
         # saves unsaved file as 'rf_unsaved_file.blend'

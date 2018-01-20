@@ -114,7 +114,7 @@ def register():
 
     bpy.types.Scene.samplesPerFrame = IntProperty(
         name="Samples Per Job",
-        description="Number of samples to render per job when rendering current frame",
+        description="Number of samples to render per job when rendering current frame (try increasing if your image previews are losing light)",
         min=10, max=999,
         default=10)
 
