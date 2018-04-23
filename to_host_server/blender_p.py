@@ -32,6 +32,7 @@ scn = bpy.context.scene
 def handle_bricker_animation(scene):
     print("Adjusting frame")
     groupsToAdjust = {}
+    getFrameNum = lambda n: int(n[n.index("_bricks_f_") + 10:])
     for group in bpy.data.groups:
         if group.name.startswith("Bricker") and "_bricks_f_" in group.name:
             sourceName = group.name[9:(group.name.index("_bricks_f_"))]
@@ -40,13 +41,13 @@ def handle_bricker_animation(scene):
             else:
                 groupsToAdjust[sourceName].append(group.name)
     for sourceName in groupsToAdjust:
-        groupsToAdjust[sourceName].sort()
+        groupsToAdjust[sourceName].sort(key=lambda n: getFrameNum(n))
         for i,gName in enumerate(groupsToAdjust[sourceName]):
             group = bpy.data.groups.get(gName)
-            frame = int(group.name[(group.name.index("_bricks_f_") + 10):])
+            frame = getFrameNum(group.name)
             onCurF = frame == scn.frame_current
-            beforeFirstF = (i == 0 and scn.frame_current < frame)
-            afterLastF = (i == (len(groupsToAdjust[sourceName]) - 1) and scn.frame_current > frame)
+            beforeFirstF = i == 0 and scn.frame_current < frame
+            afterLastF = i == len(groupsToAdjust[sourceName]) - 1 and scn.frame_current > frame
             displayOnCurF = onCurF or beforeFirstF or afterLastF
             brick = group.objects[0]
             if brick.hide == displayOnCurF:
