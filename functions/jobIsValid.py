@@ -40,18 +40,18 @@ def jobIsValid(jobType, classObject):
 
     # verify that a camera exists in the scene
     elif scn.camera is None:
-        jobValidityDict = {"valid":False, "errorType":"ERROR", "errorMessage":"RENDER FAILED: No camera in scene."}
+        jobValidityDict = {"valid":False, "errorType":"WARNING", "errorMessage":"RENDER FAILED: No camera in scene."}
 
     # verify image file format
     unsupportedFormats = ["AVI_JPEG", "AVI_RAW", "FRAMESERVER", "H264", "FFMPEG", "THEORA", "QUICKTIME", "XVID"]
     if not jobValidityDict and scn.render.image_settings.file_format in unsupportedFormats:
-        jobValidityDict = {"valid":False, "errorType":"ERROR", "errorMessage":"RENDER FAILED: Output file format not supported. Supported formats: BMP, PNG, TARGA, JPEG, JPEG 2000, TIFF. (Animation only: IRIS, CINEON, HDR, DPX, OPEN_EXR, OPEN_EXR_MULTILAYER)"}
+        jobValidityDict = {"valid":False, "errorType":"WARNING", "errorMessage":"RENDER FAILED: Output file format not supported. Supported formats: BMP, PNG, TARGA, JPEG, JPEG 2000, TIFF. (Animation only: IRIS, CINEON, HDR, DPX, OPEN_EXR, OPEN_EXR_MULTILAYER)"}
 
     # verify that sampling is high enough to provide expected results
     if jobType == "image" and scn.render.engine == "CYCLES":
         jobsPerFrame = scn.maxSamples // scn.samplesPerFrame
         if jobsPerFrame > 100:
-            jobValidityDict = {"valid":False, "errorType":"ERROR", "errorMessage": "Max Samples / SamplesPerJob > 100. Try increasing samples per frame or lowering max samples."}
+            jobValidityDict = {"valid":False, "errorType":"WARNING", "errorMessage": "Max Samples / SamplesPerJob > 100. Try increasing samples per frame or lowering max samples."}
 
     # verify that the user input for renderDumpLoc is valid and can be created
     try:

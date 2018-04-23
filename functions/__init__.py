@@ -281,7 +281,7 @@ def getRenderDumpFolder():
     # setup the render dump folder based on user input
     if dumpLoc.startswith("//"):
         dumpLoc = os.path.join(bpy.path.abspath("//"), dumpLoc[2:])
-    elif dumpLoc != "":
+    elif dumpLoc != "" and len(dumpLoc) > 2:
         dumpLoc = dumpLoc[2:]
     # if no user input, use default render location
     else:

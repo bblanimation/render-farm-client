@@ -26,15 +26,15 @@ from bpy.app.handlers import persistent
 
 scn = bpy.context.scene
 
-""" BEGIN SUPPORT FOR REBRICKR """
+""" BEGIN SUPPORT FOR BRICKER """
 
 @persistent
-def handle_rebrickr_animation(scene):
+def handle_bricker_animation(scene):
     print("Adjusting frame")
     groupsToAdjust = {}
     for group in bpy.data.groups:
-        if group.name.startswith("Rebrickr") and "_bricks_frame_" in group.name:
-            sourceName = group.name[9:(group.name.index("_bricks_frame_"))]
+        if group.name.startswith("Bricker") and "_bricks_f_" in group.name:
+            sourceName = group.name[9:(group.name.index("_bricks_f_"))]
             if sourceName not in groupsToAdjust.keys():
                 groupsToAdjust[sourceName] = [group.name]
             else:
@@ -43,7 +43,7 @@ def handle_rebrickr_animation(scene):
         groupsToAdjust[sourceName].sort()
         for i,gName in enumerate(groupsToAdjust[sourceName]):
             group = bpy.data.groups.get(gName)
-            frame = int(group.name[(group.name.index("_bricks_frame_") + 14):])
+            frame = int(group.name[(group.name.index("_bricks_f_") + 10):])
             onCurF = frame == scn.frame_current
             beforeFirstF = (i == 0 and scn.frame_current < frame)
             afterLastF = (i == (len(groupsToAdjust[sourceName]) - 1) and scn.frame_current > frame)
@@ -53,11 +53,11 @@ def handle_rebrickr_animation(scene):
                 brick.hide = not displayOnCurF
                 brick.hide_render = not displayOnCurF
 
-handle_rebrickr_animation(scn)
-bpy.app.handlers.render_pre.append(handle_rebrickr_animation)
-bpy.app.handlers.frame_change_pre.append(handle_rebrickr_animation)
+handle_bricker_animation(scn)
+bpy.app.handlers.render_pre.append(handle_bricker_animation)
+bpy.app.handlers.frame_change_pre.append(handle_bricker_animation)
 
-""" END SUPPORT FOR REBRICKR """
+""" END SUPPORT FOR BRICKER """
 
 randomSeed = random.randint(1, 10000)
 for scene in bpy.data.scenes:
