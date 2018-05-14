@@ -21,7 +21,7 @@ Created by Christopher Gearhart
 
 # system imports
 import bpy
-from . import getRenderDumpFolder
+from .general import getRenderDumpPath
 
 def jobIsValid(jobType, classObject):
     """ verifies that the job is valid before sending it to the host server """
@@ -54,10 +54,9 @@ def jobIsValid(jobType, classObject):
             jobValidityDict = {"valid":False, "errorType":"WARNING", "errorMessage": "Max Samples / SamplesPerJob > 100. Try increasing samples per frame or lowering max samples."}
 
     # verify that the user input for renderDumpLoc is valid and can be created
-    try:
-        rdf = getRenderDumpFolder()
-    except:
-        jobValidityDict = {"valid":False, "errorType":"ERROR", "errorMessage":"The folder '{renderDumpFolder}' could not be created on your local machine. Verify your input and write permissions or try another filepath.".format(renderDumpFolder=scn.renderDumpLoc)}
+    rdf, errorMsg = getRenderDumpPath()
+    if errorMsg is not None:
+        jobValidityDict = {"valid":False, "errorType":"ERROR", "errorMessage":errorMsg}
 
     # else, the job is valid
     if not jobValidityDict:

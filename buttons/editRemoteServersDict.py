@@ -30,8 +30,6 @@ import time
 from bpy.types import Operator
 from bpy.props import *
 from ..functions import *
-from ..functions.averageFrames import *
-from ..functions.jobIsValid import *
 
 class editRemoteServersDict(Operator):
     """Edit the remote servers dictionary in a text editor"""                   # blender will use this as a tooltip for menu items and buttons.

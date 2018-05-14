@@ -121,18 +121,10 @@ class JobHost(threading.Thread):
         while True:
             if acc < self.max_on_host:
                 job = self.get_next_job()
-                if job:
-                    # Start jobs in the pool if we are not already past the max running jobs
-                    if job not in self.jobs:
-                        self.started = True
-                        self.jobs[job] = dict()
-                        self.kwargs["jobString"] = job
-                        self.kwargs["hostname"] = self.get_hostname()
-                        self.kwargs["firstTime"] = self.firstTime
-                        job_process=Process(target=self.thread_func,kwargs=self.kwargs)
-                        job_process.start()
-                        self.jobs[job]['process'] = job_process
-                        acc += 1
+                # Start jobs in the pool if we are not already past the max running jobs
+                if job and job not in self.jobs:
+                    self.start_job(job)
+                    acc += 1
             # Check on child processes
             for job_key in self.jobs.keys():
                 job_process=self.jobs[job_key]['process']
@@ -177,13 +169,23 @@ class JobHost(threading.Thread):
         return (self.job_count <= self.max_on_host) and (len(self.jobs_list) > 0)
 
     def can_take_job(self):
-        return self.job_count <= self.max_on_host
+        return self.job_count < self.max_on_host
 
     def get_callback(self):
         return self.callback
 
     def get_error_callback(self):
         return self.error_callback
+
+    def start_job(self, job):
+        self.started = True
+        self.jobs[job] = dict()
+        self.kwargs["jobString"] = job
+        self.kwargs["hostname"] = self.get_hostname()
+        self.kwargs["firstTime"] = self.firstTime
+        job_process=Process(target=self.thread_func,kwargs=self.kwargs)
+        job_process.start()
+        self.jobs[job]['process'] = job_process
 
     def job_complete(self, job=None, exit_status=0):
         self.firstTime = False

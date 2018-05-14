@@ -30,8 +30,6 @@ import time
 from bpy.types import Operator
 from bpy.props import *
 from ..functions import *
-from ..functions.averageFrames import *
-from ..functions.jobIsValid import *
 
 class listMissingFrames(Operator):
     """List the output files missing from the render dump folder"""             # blender will use this as a tooltip for menu items and buttons.
@@ -42,18 +40,12 @@ class listMissingFrames(Operator):
     def execute(self, context):
         try:
             scn = context.scene
-
             # initializes self.frameRangesDict (returns False if frame range invalid)
             if not setFrameRangesDict(self):
                 return{"FINISHED"}
-
             # list all missing files from start frame to end frame in render dump folder
             missingFrames = listMissingFiles(getNameOutputFiles(), self.frameRangesDict["string"])
-            if len(missingFrames) > 0:
-                self.report({"INFO"}, "Missing frames: {missingFrames}".format(missingFrames=missingFrames))
-            else:
-                self.report({"INFO"}, "All frames accounted for!")
-
+            self.report({"INFO"}, "Missing frames: %(missingFrames)s" % locals() if len(missingFrames) > 0 else "All frames accounted for!")
             return{"FINISHED"}
         except:
             handle_exception()
@@ -69,14 +61,11 @@ class setToMissingFrames(Operator):
     def execute(self, context):
         try:
             scn = context.scene
-
             # initializes self.frameRangesDict (returns False if frame range invalid)
             if not setFrameRangesDict(self):
                 return{"FINISHED"}
-
             # list all missing files from start frame to end frame in render dump location
             scn.frameRanges = listMissingFiles(getNameOutputFiles(), self.frameRangesDict["string"])
-
             return{"FINISHED"}
         except:
             handle_exception()

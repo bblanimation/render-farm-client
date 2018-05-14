@@ -24,8 +24,7 @@ import bpy
 import math
 from bpy.types import Panel
 from bpy.props import *
-from ..functions import getRenderStatus, have_internet
-from ..functions.setupServers import *
+from ..functions import *
 from .app_handlers import *
 
 class renderOnServersPanel(Panel):
@@ -139,8 +138,8 @@ class serversPanel(Panel):
         box.prop(scn, "showAdvanced")
         if scn.showAdvanced:
             col = box.column()
-            col.prop(scn, "nameOutputFiles")
-            col.prop(scn, "renderDumpLoc")
+            col.label("Output:")
+            col.prop(scn, "renderDumpLoc", text="")
 
             layout.separator()
 

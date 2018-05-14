@@ -42,7 +42,7 @@ from bpy.props import *
 # Render Farm imports
 from .ui import *
 from .buttons import *
-from .functions.setupServers import *
+from .functions import *
 
 # Used to store keymaps for addon
 addon_keymaps = []
@@ -89,16 +89,10 @@ def register():
 
     bpy.types.Scene.renderDumpLoc = StringProperty(
         name="Output",
-        description="Folder to store output files from Blender (empty folder recommended)",
+        description="Output path for render files (empty folder recommended)",
         maxlen=128,
         default="//render-dump/",
-        subtype="DIR_PATH")
-
-    bpy.types.Scene.nameOutputFiles = StringProperty(
-        name="Name",
-        description="Name output files in 'render_dump' folder (prepended to: '_####')",
-        maxlen=128,
-        default="")
+        subtype="FILE_PATH")
 
     bpy.types.Scene.maxServerLoad = IntProperty(
         name="Max Server Load",
@@ -195,7 +189,6 @@ def unregister():
     del Scn.samplesPerFrame
     del Scn.timeout
     del Scn.maxServerLoad
-    del Scn.nameOutputFiles
     del Scn.renderDumpLoc
     del Scn.tempLocalDir
     del Scn.frameRanges

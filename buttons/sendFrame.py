@@ -31,8 +31,6 @@ from bpy.types import Operator
 from bpy.props import *
 from .refreshServers import *
 from ..functions import *
-from ..functions.averageFrames import *
-from ..functions.jobIsValid import *
 
 class sendFrame(Operator):
     """Render current frame on remote servers"""                                # blender will use this as a tooltip for menu items and buttons.
@@ -111,13 +109,7 @@ class sendFrame(Operator):
                         # handle unidentified errors
                         elif self.processes[i].returncode > 1:
                             setRenderStatus("image", "ERROR")
-
-                            # define self.errorSource string
-                            if not self.state[i] == 3:
-                                self.errorSource = "Processes[{i}] at state {state}".format(i=i, state=str(self.state[i]))
-                            else:
-                                self.errorSource = "blender_task"
-
+                            self.errorSource = "Processes[{i}] at state {state}".format(i=i, state=str(self.state[i])) if self.state[i] != 3 else "blender_task"
                             handleError(self, self.errorSource, i)
                             setRenderStatus("image", "ERROR")
                             self.cancel(context)
@@ -216,9 +208,7 @@ class sendFrame(Operator):
 
     def execute(self, context):
         try:
-            self.projectName = bashSafeName(bpy.path.display_name_from_filepath(bpy.data.filepath))
             scn = context.scene
-
             if scn.render.engine != "CYCLES":
                 self.report({"INFO"}, "Rendering on local machine (switch to cycles to render current frame on remote servers).")
                 context.area.type = "IMAGE_EDITOR"
@@ -231,39 +221,16 @@ class sendFrame(Operator):
                 self.report({"WARNING"}, "Render in progress...")
                 return{"CANCELLED"}
             elif scn.availableServers == 0:
-                serversRefreshed = refreshServers.refreshServersBlock(statusType="image")
+                serversRefreshed = refreshServers.refreshServersBlock()
                 if not serversRefreshed:
                     self.report({"WARNING"}, "Servers could not be auto-refreshed. Try manual refreshing (Ctrl R).")
                     return{"CANCELLED"}
-
-            # for testing purposes only (saves unsaved file)
-            if self.projectName == "":
-                self.projectName = "rf_unsaved_file"
 
             # ensure the job won't break the script
             if not jobIsValid("image", self):
                 return{"CANCELLED"}
 
             print("\nRunning sendFrame function...")
-
-            # set the file extension for use with 'open image' button
-            scn.imExtension = scn.render.file_extension
-
-            # Store current sample size for use in computing render results
-            self.sampleSize = scn.samplesPerFrame
-
-            # start initial render process
-            self.stdout = None
-            self.stderr = None
-            self.shift = False
-            self.renderCancelled = False
-            self.numSuccessFrames = 0
-            self.finishedFrames = 0
-            self.previewed = False
-            self.numSamples = 0
-            self.avDict = {"array":False, "numFrames":0}
-            self.averageIm = None
-            scn.imFrame = scn.frame_current
             self.state = [1, 0]  # initializes state for modal
             if bpy.props.needsUpdating or bpy.props.lastServerGroup != scn.serverGroups:
                 bpy.props.lastServerGroup = scn.serverGroups
@@ -293,6 +260,34 @@ class sendFrame(Operator):
         except:
             handle_exception()
             return{"CANCELLED"}
+
+    def __init__(self):
+        scn = bpy.context.scene
+
+        # set the file extension for use with 'open image' button
+        scn.imExtension = scn.render.file_extension
+
+        # Store current sample size for use in computing render results
+        self.sampleSize = scn.samplesPerFrame
+
+        # start initial render process
+        self.stdout = None
+        self.stderr = None
+        self.shift = False
+        self.renderCancelled = False
+        self.numSuccessFrames = 0
+        self.finishedFrames = 0
+        self.previewed = False
+        self.numSamples = 0
+        self.avDict = {"array":False, "numFrames":0}
+        self.averageIm = None
+        scn.imFrame = scn.frame_current
+        self.projectName = bashSafeName(bpy.path.display_name_from_filepath(bpy.data.filepath))
+
+        # for testing purposes only (saves unsaved file)
+        if self.projectName == "":
+            self.projectName = "rf_unsaved_file"
+
 
     def cancel(self, context):
         print("process cancelled")

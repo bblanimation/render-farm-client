@@ -36,6 +36,7 @@ class JobHostManager():
         self.hosts = dict()
         if not hosts: self.hosts = dict()
         else: self.add_hosts(hosts)
+        self.host_keys = sorted(self.hosts.keys(), reverse=True)
 
         self.hosts_with_jobs = dict()
         self.job_status      = dict()
@@ -55,11 +56,11 @@ class JobHostManager():
         try:
             while not self.jobs_complete() and not self.stop_now:
                 # time.sleep(.25)
-                for aHost in self.hosts.keys():
+                for aHost in self.host_keys:
                     if self.jobs_complete() or self.stop_now:
                         break
                     host = self.hosts[aHost]
-                    while self.host_can_take_job(host=host) and len(self.jobs) > 0:
+                    if self.host_can_take_job(host=host) and len(self.jobs) > 0:
                         # time.sleep(.1)
                         hostname = host.get_hostname()
                         job = self.jobs.pop()
@@ -73,6 +74,9 @@ class JobHostManager():
                             pflush("Running job {job} on host {host}. ({numQueued} jobs remain in queue)".format(job=job, host=hostname, numQueued=numQueued))
                         elif self.verbose >= 2:
                             pflush("Job sent to host '{hostname}' ({numQueued} jobs remain in queue)".format(hostname=hostname, numQueued=numQueued))
+                        # else:
+                        #     pflush("Job sent to host '{hostname}' ({numRemaining} jobs left)".format(hostname=hostname, numRemaining=self.remaining_jobs()))
+                        pflush("Job sent to host '{hostname}' ({numQueued} jobs remain in queue)".format(hostname=hostname, numQueued=numQueued))
             self.stop_all_threads()
         except (KeyboardInterrupt, SystemExit):
             self.stop_all_threads()

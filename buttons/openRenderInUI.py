@@ -30,8 +30,6 @@ import time
 from bpy.types import Operator
 from bpy.props import *
 from ..functions import *
-from ..functions.averageFrames import *
-from ..functions.jobIsValid import *
 
 class openRenderedImageInUI(Operator):
     """Open rendered image"""                                                   # blender will use this as a tooltip for menu items and buttons.
@@ -71,19 +69,14 @@ class openRenderedAnimationInUI(Operator):
     def execute(self, context):
         scn = bpy.context.scene
         try:
-            self.frameRangesDict = buildFrameRangesString(context.scene.frameRanges)
-
             # change contexts
             lastAreaType = changeContext(context, "CLIP_EDITOR")
-
             # opens first frame of image sequence (blender imports full sequence)
             openedFile = False
-            self.renderDumpFolder = getRenderDumpFolder()
-            image_sequence_filepath = "{dumpFolder}/".format(dumpFolder=self.renderDumpFolder)
             for frame in bpy.props.animFrameRange:
                 image_filename = "{fileName}_{frame}{extension}".format(fileName=getNameOutputFiles(), frame=str(frame).zfill(4), extension=scn.animExtension)
-                if os.path.isfile(os.path.join(image_sequence_filepath, image_filename)):
-                    bpy.ops.clip.open(directory=image_sequence_filepath, files=[{"name":image_filename}])
+                if os.path.isfile(os.path.join(self.renderDumpFolder, image_filename)):
+                    bpy.ops.clip.open(directory=self.renderDumpFolder, files=[{"name":image_filename}])
                     openedFile = image_filename
                     openedFrame = frame
                     break
@@ -92,9 +85,13 @@ class openRenderedAnimationInUI(Operator):
                 bpy.data.movieclips[openedFile].frame_start = frame
             else:
                 changeContext(context, lastAreaType)
-                self.report({"ERROR"}, "Could not open rendered animation. View files in file browser in the following folder: '{renderDumpFolder}'.".format(renderDumpFolder=self.renderDumpFolder))
+                self.report({"ERROR"}, "Could not open rendered animation. View files in file browser in the following folder: '{path}'.".format(path=self.renderDumpFolder))
 
             return{"FINISHED"}
         except:
             handle_exception()
             return{"CANCELLED"}
+
+    def __init__(self):
+        self.frameRangesDict = buildFrameRangesString(context.scene.frameRanges)
+        self.renderDumpFolder = getRenderDumpPath()[0]

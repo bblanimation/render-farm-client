@@ -24,7 +24,7 @@ import bpy
 import fnmatch
 import numpy
 import os
-from . import getRenderDumpFolder
+from .general import getRenderDumpPath
 
 def averageFrames(classObject, outputFileName, verbose=0):
     """ Averages final rendered images in blender to present one render result """
@@ -32,16 +32,12 @@ def averageFrames(classObject, outputFileName, verbose=0):
     if verbose >= 1:
         print("Averaging images...")
 
-    # ensure renderedFramesPath has trailing "/"
-    renderedFramesPath = getRenderDumpFolder()
-    if not renderedFramesPath.endswith("/"):
-        renderedFramesPath += "/"
-
-    # get image files to average from 'renderedFramesPath'
-    allFiles = os.listdir(renderedFramesPath)
+    # get image files to average
+    renderPath = getRenderDumpPath()[0]
+    allFiles = os.listdir(renderPath)
     inFileName = "{outputFileName}_seed-*_{frame}{extension}".format(outputFileName=outputFileName, frame=str(scn.imFrame).zfill(4), extension=scn.imExtension)
     imListNames = [filename for filename in allFiles if fnmatch.fnmatch(filename, inFileName)]
-    imList = [os.path.join(renderedFramesPath, im) for im in imListNames]
+    imList = [os.path.join(renderPath, im) for im in imListNames]
     if not imList:
         print("No image files to average")
         return None

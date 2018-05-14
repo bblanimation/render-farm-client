@@ -30,9 +30,6 @@ import time
 from bpy.types import Operator
 from bpy.props import *
 from ..functions import *
-from ..functions.averageFrames import *
-from ..functions.jobIsValid import *
-from ..functions.common import *
 
 class refreshServers(Operator):
     """Attempt to connect to all servers through host server"""                 # blender will use this as a tooltip for menu items and buttons.
@@ -130,7 +127,7 @@ class refreshServers(Operator):
             return{"CANCELLED"}
 
     @classmethod
-    def refreshServersBlock(cls, statusType=None):
+    def refreshServersBlock(cls):
         scn = bpy.context.scene
         if bpy.props.needsUpdating or bpy.props.lastServerGroup != scn.serverGroups:
             bpy.props.lastServerGroup = scn.serverGroups

@@ -31,8 +31,6 @@ from bpy.types import Operator
 from bpy.props import *
 from .refreshServers import *
 from ..functions import *
-from ..functions.averageFrames import *
-from ..functions.jobIsValid import *
 
 class sendAnimation(Operator):
     """Render animation on remote servers"""                                    # blender will use this as a tooltip for menu items and buttons.
@@ -83,7 +81,7 @@ class sendAnimation(Operator):
                 for i in range(numIters):
                     self.processes[i].poll()
 
-                    if self.processes[i].returncode != None:
+                    if self.processes[i].returncode is not None:
                         # handle rsync error of no output files found on server
                         if self.state[i] == 4 and self.processes[i].returncode == 23:
                             if i == 1 and not self.statusChecked:
@@ -111,13 +109,7 @@ class sendAnimation(Operator):
                         # handle unidentified errors
                         elif self.processes[i].returncode > 1:
                             setRenderStatus("animation", "ERROR")
-
-                            # define self.errorSource string
-                            if not self.state[i] == 3:
-                                self.errorSource = "Processes[{i}] at state {state}".format(i=i, state=str(self.state[i]))
-                            else:
-                                self.errorSource = "blender_task"
-
+                            self.errorSource = "Processes[{i}] at state {state}".format(i=i, state=str(self.state[i])) if self.state[i] != 3 else "blender_task"
                             handleError(self, self.errorSource, i)
                             setRenderStatus("animation", "ERROR")
                             self.cancel(context)
@@ -156,10 +148,7 @@ class sendAnimation(Operator):
 
                         elif self.state[i] == 4:
                             numCompleted = getNumRenderedFiles("animation", self.expandedFrameRange, getNameOutputFiles())
-                            if numCompleted > 0:
-                                viewString = " - View rendered frames in render dump folder"
-                            else:
-                                viewString = ""
+                            viewString = " - View rendered frames in render dump folder" if numCompleted > 0 else ""
                             self.report({"INFO"}, "Render completed for {numCompleted}/{numSent} frames{viewString}".format(numCompleted=numCompleted, numSent=len(bpy.props.animFrameRange), viewString=viewString))
                             scn.animPreviewAvailable = True
                             if i == 1:
@@ -185,7 +174,6 @@ class sendAnimation(Operator):
 
     def execute(self, context):
         try:
-            self.projectName = bashSafeName(bpy.path.display_name_from_filepath(bpy.data.filepath))
             scn = context.scene
 
             # ensure no other render processes are running
@@ -193,14 +181,10 @@ class sendAnimation(Operator):
                 self.report({"WARNING"}, "Render in progress...")
                 return{"CANCELLED"}
             elif scn.availableServers == 0:
-                serversRefreshed = refreshServers.refreshServersBlock(statusType="animation")
+                serversRefreshed = refreshServers.refreshServersBlock()
                 if not serversRefreshed:
                     self.report({"WARNING"}, "Servers could not be auto-refreshed. Try manual refreshing (Ctrl R).")
                     return{"CANCELLED"}
-
-            # for testing purposes only (saves unsaved file)
-            if self.projectName == "":
-                self.projectName = "rf_unsaved_file"
 
             print("\nRunning sendAnimation function...")
 
@@ -220,19 +204,10 @@ class sendAnimation(Operator):
                 return{"CANCELLED"}
 
             # set the file extension and frame range for use with 'open animation' button
-            scn.animExtension = bpy.context.scene.render.file_extension
+            scn.animExtension = scn.render.file_extension
             bpy.props.animFrameRange = self.expandedFrameRange
 
             # start initial render process
-            self.stdout = None
-            self.stderr = None
-            self.shift = False
-            self.renderCancelled = False
-            self.numFailedFrames = 0
-            self.startFrame = context.scene.frame_start
-            self.endFrame = context.scene.frame_end
-            self.numFrames = str(int(scn.frame_end) - int(scn.frame_start))
-            self.statusChecked = False
             self.state = [1, 0] # initializes state for modal
             if bpy.props.needsUpdating or bpy.props.lastServerGroup != scn.serverGroups:
                 bpy.props.lastServerGroup = scn.serverGroups
@@ -261,6 +236,25 @@ class sendAnimation(Operator):
         except:
             handle_exception()
             return{"CANCELLED"}
+
+    def __init__(self):
+        scn = bpy.context.scene
+
+        # start initial render process
+        self.stdout = None
+        self.stderr = None
+        self.shift = False
+        self.renderCancelled = False
+        self.numFailedFrames = 0
+        self.startFrame = scn.frame_start
+        self.endFrame = scn.frame_end
+        self.numFrames = str(int(scn.frame_end) - int(scn.frame_start))
+        self.statusChecked = False
+        self.projectName = bashSafeName(bpy.path.display_name_from_filepath(bpy.data.filepath))
+
+        # for testing purposes only (saves unsaved file)
+        if self.projectName == "":
+            self.projectName = "rf_unsaved_file"
 
     def cancel(self, context):
         print("process cancelled")
