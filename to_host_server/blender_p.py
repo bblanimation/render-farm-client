@@ -61,11 +61,20 @@ bpy.app.handlers.frame_change_pre.append(handle_bricker_animation)
 """ END SUPPORT FOR BRICKER """
 
 randomSeed = random.randint(1, 10000)
-for scene in bpy.data.scenes:
-    scene.cycles.seed = randomSeed
-    scene.cycles.transparent_min_bounces = 0
-    scene.cycles.min_bounces = 0
-    scene.cycles.blur_glossy = 0
-    scene.render.use_overwrite = True
-    if scene.cycles.film_transparent:
-        scene.render.image_settings.color_mode = 'RGBA'
+for scn in bpy.data.scenes:
+    scn.cycles.seed = randomSeed
+    scn.cycles.transparent_min_bounces = 0
+    scn.cycles.min_bounces = 0
+    scn.cycles.blur_glossy = 0
+    scn.render.use_overwrite = True
+    if scn.cycles.film_transparent:
+        scn.render.image_settings.color_mode = 'RGBA'
+    # apply performance settings
+    scn.cycles.device = scn.renderDevice
+    scn.render.tile_x = scn.renderTiles[0]
+    scn.render.tile_y = scn.renderTiles[1]
+    typ = scn.cyclesComputeDevice
+    cyclesPrefs = bpy.context.user_preferences.addons['cycles'].preferences
+    devices = [x[0] for x in cyclesPrefs.get_device_types(bpy.context)]
+    if typ >= "DEFAULT":
+        cyclesPrefs.compute_device_type = typ if typ in devices else "NONE"

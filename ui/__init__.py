@@ -144,7 +144,7 @@ class serversPanel(Panel):
             layout.separator()
 
             col = box.column(align=True)
-            col.label(text="Performance:")
+            col.label(text="Distribution:")
             col.prop(scn, "maxServerLoad")
             col.prop(scn, "timeout")
             if scn.render.engine == "CYCLES":
@@ -159,3 +159,15 @@ class serversPanel(Panel):
             # The following is probably unnecessary
             # col = box.row(align=True)
             # col.prop(scn, "tempLocalDir")
+
+            layout.separator()
+
+            col = box.column(align=True)
+            row = col.row()
+            col = row.column(align=True)
+            col.label(text="Device:")
+            col.prop(scn, "renderDevice", text="")
+            col.prop(scn, "cyclesComputeDevice", text="")
+            col = row.column(align=True)
+            col.label(text="Tiles:")
+            col.prop(scn, "renderTiles", text="")

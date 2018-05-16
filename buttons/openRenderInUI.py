@@ -93,5 +93,6 @@ class openRenderedAnimationInUI(Operator):
             return{"CANCELLED"}
 
     def __init__(self):
-        self.frameRangesDict = buildFrameRangesString(context.scene.frameRanges)
+        scn = bpy.context.scene
+        self.frameRangesDict = buildFrameRangesString(scn.frameRanges)
         self.renderDumpFolder = getRenderDumpPath()[0]

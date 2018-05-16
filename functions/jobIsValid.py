@@ -47,12 +47,6 @@ def jobIsValid(jobType, classObject):
     if not jobValidityDict and scn.render.image_settings.file_format in unsupportedFormats:
         jobValidityDict = {"valid":False, "errorType":"WARNING", "errorMessage":"RENDER FAILED: Output file format not supported. Supported formats: BMP, PNG, TARGA, JPEG, JPEG 2000, TIFF. (Animation only: IRIS, CINEON, HDR, DPX, OPEN_EXR, OPEN_EXR_MULTILAYER)"}
 
-    # verify that sampling is high enough to provide expected results
-    if jobType == "image" and scn.render.engine == "CYCLES":
-        jobsPerFrame = scn.maxSamples // scn.samplesPerFrame
-        if jobsPerFrame > 100:
-            jobValidityDict = {"valid":False, "errorType":"WARNING", "errorMessage": "Max Samples / SamplesPerJob > 100. Try increasing samples per frame or lowering max samples."}
-
     # verify that the user input for renderDumpLoc is valid and can be created
     rdf, errorMsg = getRenderDumpPath()
     if errorMsg is not None:

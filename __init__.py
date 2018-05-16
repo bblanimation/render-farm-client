@@ -118,6 +118,27 @@ def register():
         min=100, max=9999,
         default=1000)
 
+    bpy.types.Scene.renderDevice = EnumProperty(
+        name="Device",
+        description="Device to use for remote rendering",
+        items=[("GPU", "GPU Compute", "Use GPU compute device for remote rendering"),
+               ("CPU", "CPU", "Use CPU for remote rendering")],
+        default="CPU")
+    bpy.types.Scene.renderTiles = IntVectorProperty(
+        name="Render Tiles",
+        description="Tile size to use for remote rendering",
+        size=2,
+        subtype="XYZ",
+        default=[32, 32])
+    bpy.types.Scene.cyclesComputeDevice = EnumProperty(
+        name="Cycles Compute Device",
+        description="Cycles compute device for remote rendering",
+        items=[("DEFAULT", "Default", "Use default compute device on remote server"),
+               ("NONE", "None", "Don't use compute device"),
+               ("CUDA", "CUDA", "Use CUDA for remote rendering if available"),
+               ("OPENCL", "OpenCL", "Use OpenCL for remote rendering if available")],
+        default="DEFAULT")
+
     bpy.types.Scene.imagePreviewAvailable = BoolProperty(default=False)
     bpy.types.Scene.animPreviewAvailable = BoolProperty(default=False)
     bpy.types.Scene.imageRenderStatus = StringProperty(name="Image Render Status", default="None")
