@@ -70,11 +70,11 @@ for scn in bpy.data.scenes:
     if scn.cycles.film_transparent:
         scn.render.image_settings.color_mode = 'RGBA'
     # apply performance settings
-    scn.cycles.device = scn.renderDevice
-    scn.render.tile_x = scn.renderTiles[0]
-    scn.render.tile_y = scn.renderTiles[1]
-    typ = scn.cyclesComputeDevice
-    cyclesPrefs = bpy.context.user_preferences.addons['cycles'].preferences
-    devices = [x[0] for x in cyclesPrefs.get_device_types(bpy.context)]
-    if typ >= "DEFAULT":
-        cyclesPrefs.compute_device_type = typ if typ in devices else "NONE"
+    # scn.cycles.device = scn.renderDevice
+    # scn.render.tile_x = scn.renderTiles[0]
+    # scn.render.tile_y = scn.renderTiles[1]
+    # typ = scn.cyclesComputeDevice
+    # cyclesPrefs = bpy.context.user_preferences.addons['cycles'].preferences
+    # devices = [x[0] for x in cyclesPrefs.get_device_types(bpy.context)]
+    # if typ >= "DEFAULT":
+    #     cyclesPrefs.compute_device_type = typ if typ in devices else "NONE"
