@@ -37,8 +37,9 @@ bpy.app.handlers.load_post.append(refresh_servers)
 @persistent
 def verify_render_status_on_load(scene):
     scn = bpy.context.scene
-    scn.imageRenderStatus = "None" if scn.imageRenderStatus in ["Preparing files...", "Rendering...", "Finishing...", "ERROR"] else scn.imageRenderStatus
-    scn.animRenderStatus = "None" if scn.animRenderStatus in ["Preparing files...", "Rendering...", "Finishing...", "ERROR"] else scn.animRenderStatus
+    replaceStatuses = ["Preparing files...", "Rendering...", "Finishing...", "ERROR", "Cancelled"]
+    scn.imageRenderStatus = "None" if scn.imageRenderStatus in replaceStatuses else scn.imageRenderStatus
+    scn.animRenderStatus = "None" if scn.animRenderStatus in replaceStatuses else scn.animRenderStatus
 
 
 bpy.app.handlers.load_post.append(verify_render_status_on_load)

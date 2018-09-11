@@ -68,7 +68,7 @@ def register():
     bpy.types.Scene.killPython = BoolProperty(
         name="Kill Python",
         description="Run 'killall -9 python' on host server after render process cancelled",
-        default=True)
+        default=False)
 
     bpy.types.Scene.compress = BoolProperty(
         name="Compress",

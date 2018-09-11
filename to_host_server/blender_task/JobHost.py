@@ -255,27 +255,32 @@ if __name__ == "__main__":
     # def start_tasks( hostname, jobString, remoteResultsPath, localResultsPath, JobHostObject=None, firstTime=True, frame=False, progress=False, verbose=0):
     testDict1 = {
         'projectName':'test',
-        'projectSyncPath':'/tmp/nwhite/test/toRemote/',
-        'username':'nwhite',
+        'projectSyncPath':'/tmp/renderFarm-cgearhar/test/toRemote/',
+        'username':'cgearhar',
         'verbose':0,
-        'projectPath':'/tmp/nwhite/test',
-        'remoteResultsPath':'/tmp/nwhite/test/results',
-        'localResultsPath':'/tmp/nwhite/test/results'
+        'projectPath':'/tmp/renderFarm-cgearhar/test',
+        'remoteResultsPath':'/tmp/renderFarm-cgearhar/test/results',
+        'localResultsPath':'/tmp/renderFarm-cgearhar/test/results'
     }
-    jobsList = [ "blender -b /tmp/nwhite/test/test.blend -x 1 -o //results/test_####.png -s 1 -e 1 -P  /tmp/nwhite/test/blender_p.py -a > /tmp/nwhite/test/1.out.log",
-                    "blender -b /tmp/nwhite/test/test.blend -x 1 -o //results/test_####.png -s 2 -e 2 -P  /tmp/nwhite/test/blender_p.py -a > /tmp/nwhite/test/2.out.log"]
-    h1 = JobHost(hostname="cse21701", thread_func=start_tasks, kwargs=testDict1, verbose=verbose, callback=callback_func, jobs_list=jobsList,max_on_host=4)
-    h1.add_job("blender -b /tmp/nwhite/test/test.blend -x 1 -o //results/test_####.tga -s 3 -e 3 -P  /tmp/nwhite/test/blender_p.py -a > /tmp/nwhite/test/3.out.log")
-    h1.add_job("blender -b /tmp/nwhite/test/test.blend -x 1 -o //results/test_####.tga -s 4 -e 4 -P  /tmp/nwhite/test/blender_p.py -a > /tmp/nwhite/test/4.out.log")
-    h1.add_job("blender -b /tmp/nwhite/test/test.blend -x 1 -o //results/test_####.png -s 5 -e 5 -P  /tmp/nwhite/test/blender_p.py -a > /tmp/nwhite/test/5.out.log")
-    h1.add_job("blender -b /tmp/nwhite/test/test.blend -x 1 -o //results/test_####.png -s 6 -e 6 -P  /tmp/nwhite/test/blender_p.py -a > /tmp/nwhite/test/6.out.log")
-    h1.add_job("blender -b /tmp/nwhite/test/test.blend -x 1 -o //results/test_####.png -s 7 -e 7 -P  /tmp/nwhite/test/blender_p.py -a > /tmp/nwhite/test/7.out.log")
-    h1.add_job("blender -b /tmp/nwhite/test/test.blend -x 1 -o //results/test_####.png -s 8 -e 8 -P  /tmp/nwhite/test/blender_p.py -a > /tmp/nwhite/test/8.out.log")
+
+    projectPath = "/tmp/renderFarm-cgearhar/test"
+
+    testFilePath = os.path.joins(projectPath, "test.blend")
+
+    jobsList = [ "blender -b %(testFilePath)s -x 1 -o //results/test_####.png -s 1 -e 1 -P  %(projectPath)s/blender_p.py -a > %(projectPath)s/1.out.log" % locals(),
+                    "blender -b %(testFilePath)s -x 1 -o //results/test_####.png -s 2 -e 2 -P  %(projectPath)s/blender_p.py -a > %(projectPath)s/2.out.log" % locals()]
+    h1 = JobHost(hostname="cse21701", thread_func=start_tasks, kwargs=testDict1, verbose=verbose, callback=callback_func, jobs_list=jobsList, max_on_host=2)
+    h1.add_job("blender -b %(testFilePath)s -x 1 -o //results/test_####.tga -s 3 -e 3 -P  %(projectPath)s/blender_p.py -a > %(projectPath)s/3.out.log" % locals())
+    h1.add_job("blender -b %(testFilePath)s -x 1 -o //results/test_####.tga -s 4 -e 4 -P  %(projectPath)s/blender_p.py -a > %(projectPath)s/4.out.log" % locals())
+    h1.add_job("blender -b %(testFilePath)s -x 1 -o //results/test_####.png -s 5 -e 5 -P  %(projectPath)s/blender_p.py -a > %(projectPath)s/5.out.log" % locals())
+    h1.add_job("blender -b %(testFilePath)s -x 1 -o //results/test_####.png -s 6 -e 6 -P  %(projectPath)s/blender_p.py -a > %(projectPath)s/6.out.log" % locals())
+    h1.add_job("blender -b %(testFilePath)s -x 1 -o //results/test_####.png -s 7 -e 7 -P  %(projectPath)s/blender_p.py -a > %(projectPath)s/7.out.log" % locals())
+    h1.add_job("blender -b %(testFilePath)s -x 1 -o //results/test_####.png -s 8 -e 8 -P  %(projectPath)s/blender_p.py -a > %(projectPath)s/8.out.log" % locals())
     h1.print_job_list()
     h1.start()
     try:
         while not( h1.terminate() ):
-            print "some jobs remaining"
+            print("some jobs remaining")
             time.sleep(2)
     except KeyboardInterrupt:
         print "terminating jobs"

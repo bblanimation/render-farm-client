@@ -199,7 +199,7 @@ def intsToFrameRanges(intsList):
     """ turns list of ints to list of frame ranges """
     frameRangesS = ""
     i = 0
-    while i < len(intsList) - 1:
+    while i < len(intsList):
         s = intsList[i] # start index
         e = s           # end index
         while i < len(intsList) - 1 and intsList[i + 1] - intsList[i] == 1:
@@ -399,3 +399,12 @@ def updateServerPrefs():
             items=groupNames,
             default="All Servers")
     return {"valid":True, "errorMessage":None}
+
+
+def setRemoteSettings(scn, rd=None, rt=None):
+    rd = rd or scn.renderDevice
+    rt = rt or list(scn.renderTiles)
+    scn.cycles.device = rd
+    scn.render.tile_x = rt[0]
+    scn.render.tile_y = rt[1]
+    return rd, rt

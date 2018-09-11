@@ -100,6 +100,10 @@ class sendAnimation(Operator):
                                 return{"FINISHED"}
                             else:
                                 pass
+                        # handle network connection error for checking status
+                        elif i == 1 and self.processes[i].returncode == 12 and self.state[i] == 4:
+                            self.report({"WARNING"}, "Network connection error")
+                            break
                         # handle python not found on host error
                         elif self.processes[i].returncode == 127 and self.state[i] == 3:
                             self.report({"ERROR"}, "python and/or rsync not installed on host server")
@@ -222,7 +226,9 @@ class sendAnimation(Operator):
             except RuntimeError as rte:
                 self.report({"ERROR"}, str(rte))
                 return{"CANCELLED"}
+            rd, rt = setRemoteSettings(scn)
             self.processes = [copyProjectFile(self.projectName, scn.compress), False]
+            setRemoteSettings(scn, rd, rt)
 
             # create timer for modal
             wm = context.window_manager
