@@ -30,7 +30,7 @@ class JobHost(threading.Thread):
     def __init__(self, hostname, jobs_list=None, thread_func=None, kwargs=None, callback=None, timeout=.01, print_connection_issue=False, verbose=0, error_callback=None, max_on_host=4, cleanup_when_done=False):
         super(JobHost, self).__init__()
         self.verbose = verbose
-        self.timeout = timeout
+        self.rfc_timeout = timeout
         self.firstTime = True
         self.cleanup_when_done=cleanup_when_done
         self.print_connection_issue = print_connection_issue
@@ -206,7 +206,7 @@ class JobHost(threading.Thread):
 
     def is_telnetable(self):
         try:
-            tn = telnetlib.Telnet(self.hostname, 22, self.timeout)
+            tn = telnetlib.Telnet(self.hostname, 22, self.rfc_timeout)
             self.reachable = True
             return True
         except Exception as e:

@@ -62,7 +62,7 @@ def getFrames(projectName, archiveFiles=False, frameRange=False):
         if frameRange:
             fileStrings = ""
             for frame in frameRange:
-                fileStrings += "{nameOutputFiles}_{frameNum}{animExtension}\n".format(nameOutputFiles=getNameOutputFiles(), frameNum=str(frame).zfill(4), animExtension=scn.animExtension)
+                fileStrings += "{nameOutputFiles}_{frameNum}{animExtension}\n".format(nameOutputFiles=getNameOutputFiles(), frameNum=str(frame).zfill(4), animExtension=scn.rfc_animExtension)
             outFilePath = os.path.join(dumpLocation, "includeList.txt")
             f = open(outFilePath, "w")
             f.write(fileStrings)
@@ -70,7 +70,7 @@ def getFrames(projectName, archiveFiles=False, frameRange=False):
             f.close()
         else:
             includeDict = ""
-        archiveRsyncCommand = "rsync -aqx --rsync-path='mkdir -p {dumpLocation}backups/ && rsync' --remove-source-files {includeDict} --exclude='{nameOutputFiles}_????.???' --exclude='backups/' '{dumpLocation}' '{dumpLocation}backups/';".format(includeDict=includeDict, dumpLocation=dumpLocation.replace(" ", "\\ "), nameOutputFiles=getNameOutputFiles(), imExtension=scn.imExtension)
+        archiveRsyncCommand = "rsync -aqx --rsync-path='mkdir -p {dumpLocation}backups/ && rsync' --remove-source-files {includeDict} --exclude='{nameOutputFiles}_????.???' --exclude='backups/' '{dumpLocation}' '{dumpLocation}backups/';".format(includeDict=includeDict, dumpLocation=dumpLocation.replace(" ", "\\ "), nameOutputFiles=getNameOutputFiles(), imExtension=scn.rfc_imExtension)
     else:
         archiveRsyncCommand = "mkdir -p {dumpLocation};".format(dumpLocation=dumpLocation.replace(" ", "\\ "))
 
@@ -82,7 +82,7 @@ def getFrames(projectName, archiveFiles=False, frameRange=False):
     exclusions =  "--exclude='*.blend' --exclude='*_average.???' --exclude='*.???.*'"
 
     # rsync files from host server to local directory
-    fetchRsyncCommand = "rsync -ax --progress --remove-source-files {exclusions} -e 'ssh -T -oCompression=no -oStrictHostKeyChecking=no -x' '{login}:{remotePath}{projectName}/results/' '{dumpLocation}';".format(exclusions=exclusions, login=bpy.props.serverPrefs["login"], remotePath=bpy.props.serverPrefs["path"], projectName=projectName, dumpLocation=dumpLocation)
+    fetchRsyncCommand = "rsync -ax --progress --remove-source-files {exclusions} -e 'ssh -T -oCompression=no -oStrictHostKeyChecking=no -x' '{login}:{remotePath}{projectName}/results/' '{dumpLocation}';".format(exclusions=exclusions, login=bpy.props.rfc_serverPrefs["login"], remotePath=bpy.props.rfc_serverPrefs["path"], projectName=projectName, dumpLocation=dumpLocation)
 
     # run the above processes
     process = subprocess.Popen(archiveRsyncCommand + fetchRsyncCommand, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
@@ -121,15 +121,15 @@ def buildFrameRangesString(frameRanges):
 def copyProjectFile(projectName, compress):
     """ copies project file from local machine to host server """
     scn = bpy.context.scene
-    saveToPath = "{tempLocalDir}{projectName}.blend".format(tempLocalDir=scn.tempLocalDir, projectName=projectName)
+    saveToPath = "{tempLocalDir}{projectName}.blend".format(tempLocalDir=scn.rfc_tempLocalDir, projectName=projectName)
     if projectName == "rf_unsaved_file":
         # saves unsaved file as 'rf_unsaved_file.blend'
-        bpy.ops.wm.save_mainfile(filepath="{tempLocalDir}rf_unsaved_file.blend".format(tempLocalDir=scn.tempLocalDir), compress=compress)
+        bpy.ops.wm.save_mainfile(filepath="{tempLocalDir}rf_unsaved_file.blend".format(tempLocalDir=scn.rfc_tempLocalDir), compress=compress)
     else:
         bpy.ops.wm.save_as_mainfile(filepath=saveToPath, compress=compress, copy=True)
 
     # copies blender project file to host server
-    rsyncCommand = "rsync --copy-links --progress --rsync-path='mkdir -p {remotePath}{projectName}/toRemote/ && rsync' -qazx --include={projectName}.blend --exclude='*' -e 'ssh -T -oCompression=no -oStrictHostKeyChecking=no -x' '{tempLocalDir}' '{login}:{remotePath}{projectName}/toRemote/'".format(remotePath=bpy.props.serverPrefs["path"].replace(" ", "\\ "), projectName=projectName, tempLocalDir=scn.tempLocalDir, login=bpy.props.serverPrefs["login"])
+    rsyncCommand = "rsync --copy-links --progress --rsync-path='mkdir -p {remotePath}{projectName}/toRemote/ && rsync' -qazx --include={projectName}.blend --exclude='*' -e 'ssh -T -oCompression=no -oStrictHostKeyChecking=no -x' '{tempLocalDir}' '{login}:{remotePath}{projectName}/toRemote/'".format(remotePath=bpy.props.rfc_serverPrefs["path"].replace(" ", "\\ "), projectName=projectName, tempLocalDir=scn.rfc_tempLocalDir, login=bpy.props.rfc_serverPrefs["login"])
     process = subprocess.Popen(rsyncCommand, shell=True)
     return process
 
@@ -137,10 +137,10 @@ def copyFiles():
     """ copies necessary files to host server """
     scn = bpy.context.scene
     # write out the servers file for remote servers
-    writeServersFile(bpy.props.serverPrefs["servers"], scn.serverGroups)
+    writeServersFile(bpy.props.rfc_serverPrefs["servers"], scn.rfc_serverGroups)
 
     # rsync setup files to host server ('servers.txt', 'blender_p.py', 'blender_task' module)
-    rsyncCommand = "rsync -qax -e 'ssh -T -oCompression=no -oStrictHostKeyChecking=no -x' --exclude='*.zip' --rsync-path='mkdir -p {remotePath} && rsync' '{to_host_server}/' '{login}:{remotePath}'".format(remotePath=bpy.props.serverPrefs["path"].replace(" ", "\\ "), to_host_server=os.path.join(getLibraryPath(), "to_host_server"), login=bpy.props.serverPrefs["login"])
+    rsyncCommand = "rsync -qax -e 'ssh -T -oCompression=no -oStrictHostKeyChecking=no -x' --exclude='*.zip' --rsync-path='mkdir -p {remotePath} && rsync' '{to_host_server}/' '{login}:{remotePath}'".format(remotePath=bpy.props.rfc_serverPrefs["path"].replace(" ", "\\ "), to_host_server=os.path.join(getLibraryPath(), "to_host_server"), login=bpy.props.rfc_serverPrefs["login"])
     process = subprocess.Popen(rsyncCommand, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     return process
 
@@ -153,10 +153,10 @@ def renderFrames(frameRange, projectName, jobsPerFrame=False):
 
     if jobsPerFrame:
         extraFlags += " -j {jobsPerFrame}".format(jobsPerFrame=jobsPerFrame)
-        extraFlags += " -s {numImSamples}".format(numImSamples=scn.samplesPerFrame)
+        extraFlags += " -s {numImSamples}".format(numImSamples=scn.rfc_samplesPerFrame)
 
     # runs blender command to render given range from the remote server
-    renderCommand = "ssh -T -oStrictHostKeyChecking=no -x {login} 'python {remotePath}blender_task -v -p -n {projectName} -l {frameRange} --hosts_file {remotePath}servers.txt -R {remotePath} --connection_timeout {t} --max_server_load {maxServerLoad}{extraFlags}'".format(login=bpy.props.serverPrefs["login"], remotePath=bpy.props.serverPrefs["path"], projectName=projectName, frameRange=frameRange.replace(" ", ""), t=scn.timeout, maxServerLoad=str(scn.maxServerLoad), extraFlags=extraFlags)
+    renderCommand = "ssh -T -oStrictHostKeyChecking=no -x {login} 'python {remotePath}blender_task -v -p -n {projectName} -l {frameRange} --hosts_file {remotePath}servers.txt -R {remotePath} --connection_timeout {t} --max_server_load {maxServerLoad}{extraFlags}'".format(login=bpy.props.rfc_serverPrefs["login"], remotePath=bpy.props.rfc_serverPrefs["path"], projectName=projectName, frameRange=frameRange.replace(" ", ""), t=scn.rfc_timeout, maxServerLoad=str(scn.rfc_maxServerLoad), extraFlags=extraFlags)
     process = subprocess.Popen(renderCommand, stderr=subprocess.PIPE, shell=True)
     print("Process sent to remote servers!")
     return process
@@ -164,17 +164,17 @@ def renderFrames(frameRange, projectName, jobsPerFrame=False):
 def setRenderStatus(key, status):
     scn = bpy.context.scene
     if key == "image":
-        scn.imageRenderStatus = status
+        scn.rfc_imageRenderStatus = status
     elif key == "animation":
-        scn.animRenderStatus = status
+        scn.rfc_animRenderStatus = status
     tag_redraw_areas()
 
 def getRenderStatus(key):
     scn = bpy.context.scene
     if key == "image":
-        return scn.imageRenderStatus
+        return scn.rfc_imageRenderStatus
     elif key == "animation":
-        return scn.animRenderStatus
+        return scn.rfc_animRenderStatus
     else:
         return ""
 
@@ -269,18 +269,18 @@ def handleBTError(classObject, i="Not Provided"):
 
 def setFrameRangesDict(classObject):
     scn = bpy.context.scene
-    if scn.frameRanges == "":
-        classObject.frameRangesDict = {"string":"[[{frameStart},{frameEnd}]]".format(frameStart=str(scn.frame_start), frameEnd=str(scn.frame_end))}
+    if scn.rfc_frameRanges == "":
+        classObject.rfc_frameRangesDict = {"string":"[[{frameStart},{frameEnd}]]".format(frameStart=str(scn.frame_start), frameEnd=str(scn.frame_end))}
     else:
-        classObject.frameRangesDict = buildFrameRangesString(scn.frameRanges)
-        if not classObject.frameRangesDict["valid"]:
+        classObject.rfc_frameRangesDict = buildFrameRangesString(scn.rfc_frameRanges)
+        if not classObject.rfc_frameRangesDict["valid"]:
             classObject.report({"ERROR"}, "ERROR: Invalid frame ranges given.")
             return False
     return True
 
 def getRenderDumpPath():
     scn = bpy.context.scene
-    path = scn.renderDumpLoc
+    path = scn.rfc_renderDumpLoc
     lastSlash = path.rfind("/")
     path = path[:len(path) if lastSlash == -1 else lastSlash + 1]
     blendPath = bpy.path.abspath("//") or "/tmp/"
@@ -318,9 +318,9 @@ def getRenderDumpPath():
 def getNameOutputFiles():
     """return nameOutputFiles (defaults to current project name"""
     scn = bpy.context.scene
-    lastSlash = scn.renderDumpLoc.rfind("/")
+    lastSlash = scn.rfc_renderDumpLoc.rfind("/")
     filename = bpy.path.display_name_from_filepath(bpy.data.filepath)
-    n = filename if lastSlash in [-1, len(scn.renderDumpLoc) - 1] else scn.renderDumpLoc[lastSlash + 1:]
+    n = filename if lastSlash in [-1, len(scn.rfc_renderDumpLoc) - 1] else scn.rfc_renderDumpLoc[lastSlash + 1:]
     return bashSafeName(n)
 
 def getRunningStatuses():
@@ -330,7 +330,7 @@ def getNumRenderedFiles(jobType, frameRange=None, fileName=None):
     scn = bpy.context.scene
     dumpPath = getRenderDumpPath()[0]
     if jobType == "image":
-        numRenderedFiles = len([f for f in os.listdir(dumpPath) if "_seed-" in f and f.endswith(str(frameRange[0]) + scn.imExtension)])
+        numRenderedFiles = len([f for f in os.listdir(dumpPath) if "_seed-" in f and f.endswith(str(frameRange[0]) + scn.rfc_imExtension)])
     else:
         renderedFiles = []
         for f in os.listdir(dumpPath):
@@ -338,7 +338,7 @@ def getNumRenderedFiles(jobType, frameRange=None, fileName=None):
                 frameNum = int(f[-8:-4])
             except:
                 continue
-            if frameNum in frameRange and fnmatch.fnmatch(f, "{fileName}_????{extension}".format(fileName=fileName, extension=scn.animExtension)):
+            if frameNum in frameRange and fnmatch.fnmatch(f, "{fileName}_????{extension}".format(fileName=fileName, extension=scn.rfc_animExtension)):
                 renderedFiles.append(f)
         numRenderedFiles = len(renderedFiles)
     return numRenderedFiles
@@ -354,7 +354,7 @@ def cleanupCancelledRender(classObject, context, killPython=True):
             except:
                 pass
     if killPython:
-        subprocess.call("ssh -T -oStrictHostKeyChecking=no -x {login} 'killall -9 python'".format(login=bpy.props.serverPrefs["login"]), shell=True)
+        subprocess.call("ssh -T -oStrictHostKeyChecking=no -x {login} 'killall -9 python'".format(login=bpy.props.rfc_serverPrefs["login"]), shell=True)
 
 def changeContext(context, areaType):
     """ Changes current context and returns previous area type """
@@ -370,25 +370,25 @@ def updateServerPrefs():
         return {"valid":False, "errorMessage":"rsync not installed on local machine."}
 
     # run setupServerPrefs() and store last results to oldServerPrefs
-    oldServerPrefs = bpy.props.serverPrefs
+    oldServerPrefs = bpy.props.rfc_serverPrefs
     newServerPrefs = setupServerPrefs()
     if newServerPrefs["valid"]:
-        bpy.props.serverPrefs = newServerPrefs
+        bpy.props.rfc_serverPrefs = newServerPrefs
     else:
         return newServerPrefs
 
     # verify host server login, built from user entries, correspond to a responsive server, and that defined renderFarm path is writable
-    rc = subprocess.call("ssh -T -oBatchMode=yes -oStrictHostKeyChecking=no -oConnectTimeout=10 -x {login} 'mkdir -p {remotePath}; touch {remotePath}test'".format(login=bpy.props.serverPrefs["login"], remotePath=bpy.props.serverPrefs["path"].replace(" ", "\\ ")), shell=True)
+    rc = subprocess.call("ssh -T -oBatchMode=yes -oStrictHostKeyChecking=no -oConnectTimeout=10 -x {login} 'mkdir -p {remotePath}; touch {remotePath}test'".format(login=bpy.props.rfc_serverPrefs["login"], remotePath=bpy.props.rfc_serverPrefs["path"].replace(" ", "\\ ")), shell=True)
     if rc != 0:
-        return {"valid":False, "errorMessage":"ssh to '{login}' failed (return code: {rc}). Check your settings, ensure ssh keys are setup, and verify your write permissions for '{remotePath}' (see error in terminal)".format(login=bpy.props.serverPrefs["login"], rc=rc, remotePath=bpy.props.serverPrefs["path"])}
+        return {"valid":False, "errorMessage":"ssh to '{login}' failed (return code: {rc}). Check your settings, ensure ssh keys are setup, and verify your write permissions for '{remotePath}' (see error in terminal)".format(login=bpy.props.rfc_serverPrefs["login"], rc=rc, remotePath=bpy.props.rfc_serverPrefs["path"])}
 
-    if bpy.props.serverPrefs != oldServerPrefs:
+    if bpy.props.rfc_serverPrefs != oldServerPrefs:
         # initialize server groups enum property
         groupNames = [("All Servers", "All Servers", "Render on all servers")]
-        for groupName in bpy.props.serverPrefs["servers"]:
+        for groupName in bpy.props.rfc_serverPrefs["servers"]:
             tmpList = [groupName, groupName, "Render only servers in this group"]
             groupNames.append(tuple(tmpList))
-        bpy.types.Scene.serverGroups = bpy.props.EnumProperty(
+        bpy.types.Scene.rfc_serverGroups = bpy.props.EnumProperty(
             attr="serverGroups",
             name="Servers",
             description="Choose which hosts to use for render processes",
@@ -398,9 +398,12 @@ def updateServerPrefs():
 
 
 def setRemoteSettings(scn, rd=None, rt=None):
-    rd = rd or scn.renderDevice
-    rt = rt or list(scn.renderTiles)
+    rd = rd or scn.rfc_renderDevice
+    rt = rt or list(scn.rfc_renderTiles)
     scn.cycles.device = rd
     scn.render.tile_x = rt[0]
     scn.render.tile_y = rt[1]
     return rd, rt
+
+def render_farm_handle_exception():
+    handle_exception(log_name="Render Farm Client log", report_button_loc="View 3D > Tools > Render > Render on Servers > Report Error")

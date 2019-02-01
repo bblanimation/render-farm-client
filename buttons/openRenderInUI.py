@@ -36,14 +36,14 @@ class openRenderedImageInUI(Operator):
     def execute(self, context):
         scn = bpy.context.scene
         try:
-            if bpy.data.images.find(scn.nameAveragedImage) >= 0:
+            if bpy.data.images.find(scn.rfc_nameAveragedImage) >= 0:
                 # open rendered image in UV/Image_Editor
                 changeContext(context, "IMAGE_EDITOR")
                 for area in context.screen.areas:
                     if area.type == "IMAGE_EDITOR":
-                        area.spaces.active.image = bpy.data.images[scn.nameAveragedImage]
-            elif scn.nameAveragedImage != "":
-                self.report({"ERROR"}, "Image could not be found: '{nameAveragedImage}'".format(nameAveragedImage=scn.nameAveragedImage))
+                        area.spaces.active.image = bpy.data.images[scn.rfc_nameAveragedImage]
+            elif scn.rfc_nameAveragedImage != "":
+                self.report({"ERROR"}, "Image could not be found: '{nameAveragedImage}'".format(nameAveragedImage=scn.rfc_nameAveragedImage))
                 return{"CANCELLED"}
             else:
                 self.report({"WARNING"}, "No rendered images could be found")
@@ -51,7 +51,7 @@ class openRenderedImageInUI(Operator):
 
             return{"FINISHED"}
         except:
-            handle_exception()
+            render_farm_handle_exception()
             return{"CANCELLED"}
 
 
@@ -69,8 +69,8 @@ class openRenderedAnimationInUI(Operator):
             lastAreaType = changeContext(context, "CLIP_EDITOR")
             # opens first frame of image sequence (blender imports full sequence)
             openedFile = False
-            for frame in bpy.props.animFrameRange:
-                image_filename = "{fileName}_{frame}{extension}".format(fileName=getNameOutputFiles(), frame=str(frame).zfill(4), extension=scn.animExtension)
+            for frame in bpy.props.rfc_animFrameRange:
+                image_filename = "{fileName}_{frame}{extension}".format(fileName=getNameOutputFiles(), frame=str(frame).zfill(4), extension=scn.rfc_animExtension)
                 if os.path.isfile(os.path.join(self.renderDumpFolder, image_filename)):
                     bpy.ops.clip.open(directory=self.renderDumpFolder, files=[{"name":image_filename}])
                     openedFile = image_filename
@@ -85,10 +85,10 @@ class openRenderedAnimationInUI(Operator):
 
             return{"FINISHED"}
         except:
-            handle_exception()
+            render_farm_handle_exception()
             return{"CANCELLED"}
 
     def __init__(self):
         scn = bpy.context.scene
-        self.frameRangesDict = buildFrameRangesString(scn.frameRanges)
+        self.rfc_frameRangesDict = buildFrameRangesString(scn.rfc_frameRanges)
         self.renderDumpFolder = getRenderDumpPath()[0]

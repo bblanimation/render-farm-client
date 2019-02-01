@@ -38,7 +38,7 @@ class renderOnServersPanel(Panel):
 
         if not have_internet():
             col = layout.column(align=True)
-            col.label("No internet connection")
+            col.label(text="No internet connection")
             return
 
         imRenderStatus = getRenderStatus("image")
@@ -47,7 +47,7 @@ class renderOnServersPanel(Panel):
         # Available Servers Info
         col = layout.column(align=True)
         row = col.row(align=True)
-        availableServerString = "Available Servers: {available} / {total}".format(available=str(scn.availableServers),total=str(scn.availableServers + scn.offlineServers))
+        availableServerString = "Available Servers: {available} / {total}".format(available=str(scn.rfc_availableServers),total=str(scn.rfc_availableServers + scn.rfc_offlineServers))
         row.operator("render_farm.refresh_num_available_servers", text=availableServerString, icon="FILE_REFRESH")
 
         # Render Buttons
@@ -57,23 +57,23 @@ class renderOnServersPanel(Panel):
         row.operator("render_farm.render_animation_on_servers", text="Animation", icon="RENDER_ANIMATION")
         col = layout.column(align=True)
         row = col.row(align=True)
-        row.prop(scn, "serverGroups")
+        row.prop(scn, "rfc_serverGroups")
 
         # Render Status Info
         if imRenderStatus != "None":
             col = layout.column(align=True)
             row = col.row(align=True)
-            row.label("Render Status: {status}".format(status=imRenderStatus))
+            row.label(text="Render Status: {status}".format(status=imRenderStatus))
         elif animRenderStatus != "None":
             col = layout.column(align=True)
             row = col.row(align=True)
-            row.label("Render Status: {status}".format(status=animRenderStatus))
+            row.label(text="Render Status: {status}".format(status=animRenderStatus))
 
         # display buttons to view render(s)
         row = layout.row(align=True)
-        if scn.imagePreviewAvailable:
+        if scn.rfc_imagePreviewAvailable:
             row.operator("render_farm.open_rendered_image", text="View Image", icon="FILE_IMAGE")
-        if scn.animPreviewAvailable:
+        if scn.rfc_animPreviewAvailable:
             row.operator("render_farm.open_rendered_animation", text="View Animation", icon="FILE_MOVIE")
 
         if bpy.data.texts.find('Render_Farm_log') >= 0:
@@ -101,7 +101,7 @@ class frameRangePanel(Panel):
 
         col = layout.column(align=True)
         row = col.row(align=True)
-        row.prop(scn, "frameRanges")
+        row.prop(scn, "rfc_frameRanges")
         col = layout.column(align=True)
         col.active = bpy.path.display_name_from_filepath(bpy.data.filepath) != ""
         row = col.row(align=True)
@@ -131,27 +131,27 @@ class serversPanel(Panel):
         row = col.row(align=True)
 
         box = row.box()
-        box.prop(scn, "showAdvanced")
-        if scn.showAdvanced:
+        box.prop(scn, "rfc_showAdvanced")
+        if scn.rfc_showAdvanced:
             col = box.column()
-            col.label("Output:")
-            col.prop(scn, "renderDumpLoc", text="")
+            col.label(text="Output:")
+            col.prop(scn, "rfc_renderDumpLoc", text="")
 
             layout.separator()
 
             col = box.column(align=True)
             col.label(text="Distribution:")
-            col.prop(scn, "maxServerLoad")
-            col.prop(scn, "timeout")
+            col.prop(scn, "rfc_maxServerLoad")
+            col.prop(scn, "rfc_timeout")
             if scn.render.engine == "CYCLES":
-                col.prop(scn, "samplesPerFrame")
-                col.prop(scn, "maxSamples")
+                col.prop(scn, "rfc_samplesPerFrame")
+                col.prop(scn, "rfc_maxSamples")
 
             layout.separator()
 
             row = col.row(align=True)
-            row.prop(scn, "killPython")
-            row.prop(scn, "compress")
+            row.prop(scn, "rfc_killPython")
+            row.prop(scn, "rfc_compress")
             # The following is probably unnecessary
             # col = box.row(align=True)
             # col.prop(scn, "tempLocalDir")
@@ -162,8 +162,8 @@ class serversPanel(Panel):
             row = col.row()
             col = row.column(align=True)
             col.label(text="Device:")
-            col.prop(scn, "renderDevice", text="")
+            col.prop(scn, "rfc_renderDevice", text="")
             # col.prop(scn, "cyclesComputeDevice", text="")
             col = row.column(align=True)
             col.label(text="Tiles:")
-            col.prop(scn, "renderTiles", text="")
+            col.prop(scn, "rfc_renderTiles", text="")

@@ -43,7 +43,7 @@ class refreshServers(Operator):
     @classmethod
     def checkNumAvailServers(cls):
         scn = bpy.context.scene
-        command = "ssh -T -oStrictHostKeyChecking=no -x {login} 'python {remotePath}blender_task -Hv --connection_timeout {timeout} --hosts_file {remotePath}servers.txt'".format(login=bpy.props.serverPrefs["login"], remotePath=bpy.props.serverPrefs["path"], timeout=scn.timeout)
+        command = "ssh -T -oStrictHostKeyChecking=no -x {login} 'python {remotePath}blender_task -Hv --connection_timeout {timeout} --hosts_file {remotePath}servers.txt'".format(login=bpy.props.rfc_serverPrefs["login"], remotePath=bpy.props.rfc_serverPrefs["path"], timeout=scn.rfc_timeout)
         process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
         return process
 
@@ -71,8 +71,8 @@ class refreshServers(Operator):
                 print(line2, end="")
                 offline = None
 
-        scn.availableServers = len(available)
-        scn.offlineServers = len(offline)
+        scn.rfc_availableServers = len(available)
+        scn.rfc_offlineServers = len(offline)
         tag_redraw_areas()
 
     def modal(self, context, event):
@@ -103,7 +103,7 @@ class refreshServers(Operator):
 
                     # check number of available servers via host server
                     if self.state == 1:
-                        bpy.props.needsUpdating = False
+                        bpy.props.rfc_needsUpdating = False
                         self.state += 1
                         self.process = self.checkNumAvailServers()
                         return{"PASS_THROUGH"}
@@ -111,7 +111,7 @@ class refreshServers(Operator):
                     elif self.state == 2:
                         self.updateAvailServerInfo(self.process)
                         scn = context.scene
-                        self.report({"INFO"}, "Refresh process completed ({num} servers available)".format(num=str(scn.availableServers)))
+                        self.report({"INFO"}, "Refresh process completed ({num} servers available)".format(num=str(scn.rfc_availableServers)))
                         return{"FINISHED"}
                     else:
                         self.report({"ERROR"}, "ERROR: Current state not recognized.")
@@ -119,14 +119,14 @@ class refreshServers(Operator):
 
             return{"PASS_THROUGH"}
         except:
-            handle_exception()
+            render_farm_handle_exception()
             return{"CANCELLED"}
 
     @classmethod
     def refreshServersBlock(cls):
         scn = bpy.context.scene
-        if bpy.props.needsUpdating or bpy.props.lastServerGroup != scn.serverGroups:
-            bpy.props.lastServerGroup = scn.serverGroups
+        if bpy.props.rfc_needsUpdating or bpy.props.rfc_lastServerGroup != scn.rfc_serverGroups:
+            bpy.props.rfc_lastServerGroup = scn.rfc_serverGroups
             updateStatus = updateServerPrefs()
             if not updateStatus["valid"]:
                 return False
@@ -143,7 +143,7 @@ class refreshServers(Operator):
             return False
 
         cls.updateAvailServerInfo(process)
-        bpy.props.needsUpdating = False
+        bpy.props.rfc_needsUpdating = False
         return True
 
     def execute(self, context):
@@ -153,8 +153,8 @@ class refreshServers(Operator):
 
             # start initial process
             self.state = 1 # initializes state for modal
-            if bpy.props.needsUpdating or bpy.props.lastServerGroup != scn.serverGroups:
-                bpy.props.lastServerGroup = scn.serverGroups
+            if bpy.props.rfc_needsUpdating or bpy.props.rfc_lastServerGroup != scn.rfc_serverGroups:
+                bpy.props.rfc_lastServerGroup = scn.rfc_serverGroups
                 updateStatus = updateServerPrefs()
                 if not updateStatus["valid"]:
                     self.report({"ERROR"}, updateStatus["errorMessage"])
@@ -173,7 +173,7 @@ class refreshServers(Operator):
 
             return{"RUNNING_MODAL"}
         except:
-            handle_exception()
+            render_farm_handle_exception()
             return{"CANCELLED"}
 
     def cancel(self, context):

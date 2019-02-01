@@ -32,11 +32,12 @@ bl_info = {
 
 # Blender imports
 import bpy
-from bpy.types import Operator
+from bpy.types import Operator, Scene
 from bpy.props import *
 
 # Render Farm imports
 from .ui import *
+from .lib import *
 from .buttons import *
 from .functions import *
 
@@ -53,80 +54,80 @@ def register():
     bpy.utils.register_module(__name__)
     bpy.types.INFO_MT_render.append(more_menu_options)
 
-    bpy.props.render_farm_module_name = __name__
-    bpy.props.render_farm_version = str(bl_info["version"])[1:-1].replace(", ", ".")
+    bpy.props.rfc_module_name = __name__
+    bpy.props.rfc_version = str(bl_info["version"])[1:-1].replace(", ", ".")
 
-    bpy.types.Scene.showAdvanced = BoolProperty(
+    Scene.rfc_showAdvanced = BoolProperty(
         name="Show Advanced",
         description="Display advanced remote server settings",
         default=False)
 
-    bpy.types.Scene.killPython = BoolProperty(
+    Scene.rfc_killPython = BoolProperty(
         name="Kill Python",
         description="Run 'killall -9 python' on host server after render process cancelled",
         default=False)
 
-    bpy.types.Scene.compress = BoolProperty(
+    Scene.rfc_compress = BoolProperty(
         name="Compress",
         description="Send compressed Blender file to host server (slower local save, faster file transfer)",
         default=True)
 
-    bpy.types.Scene.frameRanges = StringProperty(
+    Scene.rfc_frameRanges = StringProperty(
         name="Frames",
         description="Define frame ranges to render, separated by commas (e.g. '1,3,6-10')",
         default="")
 
-    bpy.types.Scene.tempLocalDir = StringProperty(
+    Scene.rfc_tempLocalDir = StringProperty(
         name="Temp Local Path",
         description="File path on local drive to store temporary project files",
         maxlen=128,
         default="/tmp/",
         subtype="DIR_PATH")
 
-    bpy.types.Scene.renderDumpLoc = StringProperty(
+    Scene.rfc_renderDumpLoc = StringProperty(
         name="Output",
         description="Output path for render files (empty folder recommended)",
         maxlen=128,
         default="//render-dump/",
         subtype="FILE_PATH")
 
-    bpy.types.Scene.maxServerLoad = IntProperty(
+    Scene.rfc_maxServerLoad = IntProperty(
         name="Max Server Load",
         description="Maximum number of frames to be handled at once by each server",
         min=1, max=8,
         default=1)
 
-    bpy.types.Scene.timeout = FloatProperty(
+    Scene.rfc_timeout = FloatProperty(
         name="Timeout",
         description="Time (in seconds) to wait for client servers to respond",
         min=.001, max=1,
         default=.01)
 
-    bpy.types.Scene.samplesPerFrame = IntProperty(
+    Scene.rfc_samplesPerFrame = IntProperty(
         name="Samples Per Job",
         description="Number of samples to render per job when rendering current frame (try increasing if your image previews are losing light)",
         min=10, max=999,
         default=10)
 
-    bpy.types.Scene.maxSamples = IntProperty(
+    Scene.rfc_maxSamples = IntProperty(
         name="Max Samples",
         description="Maximum number of samples to render when rendering current frame",
         min=100, max=9999,
         default=1000)
 
-    bpy.types.Scene.renderDevice = EnumProperty(
+    Scene.rfc_renderDevice = EnumProperty(
         name="Device",
         description="Device to use for remote rendering",
         items=[("GPU", "GPU Compute", "Use GPU compute device for remote rendering"),
                ("CPU", "CPU", "Use CPU for remote rendering")],
         default="CPU")
-    bpy.types.Scene.renderTiles = IntVectorProperty(
+    Scene.rfc_renderTiles = IntVectorProperty(
         name="Render Tiles",
         description="Tile size to use for remote rendering",
         size=2,
         subtype="XYZ",
         default=[32, 32])
-    bpy.types.Scene.cyclesComputeDevice = EnumProperty(
+    Scene.rfc_cyclesComputeDevice = EnumProperty(
         name="Cycles Compute Device",
         description="Cycles compute device for remote rendering",
         items=[("DEFAULT", "Default", "Use default compute device on remote server"),
@@ -135,30 +136,33 @@ def register():
                ("OPENCL", "OpenCL", "Use OpenCL for remote rendering if available")],
         default="DEFAULT")
 
-    bpy.types.Scene.imagePreviewAvailable = BoolProperty(default=False)
-    bpy.types.Scene.animPreviewAvailable = BoolProperty(default=False)
-    bpy.types.Scene.imageRenderStatus = StringProperty(name="Image Render Status", default="None")
-    bpy.types.Scene.animRenderStatus = StringProperty(name="Image Render Status", default="None")
+    Scene.rfc_imagePreviewAvailable = BoolProperty(default=False)
+    Scene.rfc_animPreviewAvailable = BoolProperty(default=False)
+    Scene.rfc_imageRenderStatus = StringProperty(name="Image Render Status", default="None")
+    Scene.rfc_animRenderStatus = StringProperty(name="Image Render Status", default="None")
 
     # Initialize server and login variables
-    bpy.types.Scene.serverGroups = EnumProperty(
+    Scene.rfc_serverGroups = EnumProperty(
         attr="serverGroups",
         name="Servers",
         description="Choose which hosts to use for render processes",
         items=[("All Servers", "All Servers", "Render on all servers")],
         default="All Servers")
-    bpy.types.Scene.lastServerGroup = StringProperty(name="Last Server Group", default="All Servers")
-    bpy.props.serverPrefs = {"servers":None, "login":None, "path":None, "hostConnection":None}
-    bpy.types.Scene.availableServers = IntProperty(name="Available Servers", default=0)
-    bpy.types.Scene.offlineServers = IntProperty(name="Offline Servers", default=0)
-    bpy.props.needsUpdating = BoolProperty(default=True)
+    Scene.rfc_lastServerGroup = StringProperty(name="Last Server Group", default="All Servers")
+    bpy.props.rfc_serverPrefs = {"servers":None, "login":None, "path":None, "hostConnection":None}
+    Scene.rfc_availableServers = IntProperty(name="Available Servers", default=0)
+    Scene.rfc_offlineServers = IntProperty(name="Offline Servers", default=0)
+    bpy.props.rfc_needsUpdating = BoolProperty(default=True)
 
-    bpy.types.Scene.nameAveragedImage = StringProperty(default="")
-    bpy.types.Scene.nameImOutputFiles = StringProperty(default="")
-    bpy.types.Scene.imExtension = StringProperty(default="")
-    bpy.types.Scene.animExtension = StringProperty(default="")
-    bpy.types.Scene.imFrame = IntProperty(default=-1)
-    bpy.props.animFrameRange = None
+    Scene.rfc_nameAveragedImage = StringProperty(default="")
+    Scene.rfc_nameImOutputFiles = StringProperty(default="")
+    Scene.rfc_imExtension = StringProperty(default="")
+    Scene.rfc_animExtension = StringProperty(default="")
+    Scene.rfc_imFrame = IntProperty(default=-1)
+    bpy.props.rfc_animFrameRange = None
+
+    bpy.app.handlers.load_post.append(refresh_servers)
+    bpy.app.handlers.load_post.append(verify_render_status_on_load)
 
     # handle the keymap
     wm = bpy.context.window_manager
@@ -184,34 +188,35 @@ def unregister():
         wm.keyconfigs.addon.keymaps.remove(km)
     addon_keymaps.clear()
 
-    Scn = bpy.types.Scene
+    bpy.app.handlers.load_post.remove(refresh_servers)
+    bpy.app.handlers.load_post.remove(verify_render_status_on_load)
 
-    del bpy.props.animFrameRange
-    del Scn.imFrame
-    del Scn.animExtension
-    del Scn.nameImOutputFiles
-    del Scn.imExtension
-    del Scn.nameAveragedImage
-    del bpy.props.serverPrefs
-    del Scn.offlineServers
-    del Scn.availableServers
-    del bpy.props.needsUpdating
-    del bpy.props.lastServerGroup
-    del Scn.serverGroups
-    del Scn.animRenderStatus
-    del Scn.imageRenderStatus
-    del Scn.animPreviewAvailable
-    del Scn.imagePreviewAvailable
-    del Scn.maxSamples
-    del Scn.samplesPerFrame
-    del Scn.timeout
-    del Scn.maxServerLoad
-    del Scn.renderDumpLoc
-    del Scn.tempLocalDir
-    del Scn.frameRanges
-    del Scn.compress
-    del Scn.killPython
-    del Scn.showAdvanced
+    del bpy.props.rfc_animFrameRange
+    del Scene.rfc_imFrame
+    del Scene.rfc_animExtension
+    del Scene.rfc_nameImOutputFiles
+    del Scene.rfc_imExtension
+    del Scene.rfc_nameAveragedImage
+    del bpy.props.rfc_serverPrefs
+    del Scene.rfc_offlineServers
+    del Scene.rfc_availableServers
+    del bpy.props.rfc_needsUpdating
+    del bpy.props.rfc_lastServerGroup
+    del Scene.rfc_serverGroups
+    del Scene.rfc_animRenderStatus
+    del Scene.rfc_imageRenderStatus
+    del Scene.rfc_animPreviewAvailable
+    del Scene.rfc_imagePreviewAvailable
+    del Scene.rfc_maxSamples
+    del Scene.rfc_samplesPerFrame
+    del Scene.rfc_timeout
+    del Scene.rfc_maxServerLoad
+    del Scene.rfc_renderDumpLoc
+    del Scene.rfc_tempLocalDir
+    del Scene.rfc_frameRanges
+    del Scene.rfc_compress
+    del Scene.rfc_killPython
+    del Scene.rfc_showAdvanced
 
     bpy.utils.unregister_module(__name__)
     bpy.types.INFO_MT_render.remove(more_menu_options)

@@ -24,18 +24,12 @@ from ..functions import *
 
 
 @persistent
-def refresh_servers(scene):
+def refresh_servers(scn):
     updateServerPrefs()
-
-bpy.app.handlers.load_post.append(refresh_servers)
 
 
 @persistent
-def verify_render_status_on_load(scene):
-    scn = bpy.context.scene
+def verify_render_status_on_load(scn):
     replaceStatuses = ["Preparing files...", "Rendering...", "Finishing...", "ERROR", "Cancelled"]
-    scn.imageRenderStatus = "None" if scn.imageRenderStatus in replaceStatuses else scn.imageRenderStatus
-    scn.animRenderStatus = "None" if scn.animRenderStatus in replaceStatuses else scn.animRenderStatus
-
-
-bpy.app.handlers.load_post.append(verify_render_status_on_load)
+    scn.rfc_imageRenderStatus = "None" if scn.rfc_imageRenderStatus in replaceStatuses else scn.rfc_imageRenderStatus
+    scn.rfc_animRenderStatus = "None" if scn.rfc_animRenderStatus in replaceStatuses else scn.rfc_animRenderStatus

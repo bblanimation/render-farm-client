@@ -130,7 +130,7 @@ class sendAnimation(Operator):
 
                         # start render process from the defined start and end frames
                         elif self.state[i] == 2:
-                            bpy.props.needsUpdating = False
+                            bpy.props.rfc_needsUpdating = False
                             self.processes[i] = renderFrames(str(self.expandedFrameRange), self.projectName)
                             setRenderStatus("animation", "Rendering...")
                             self.state[i] += 1
@@ -149,8 +149,8 @@ class sendAnimation(Operator):
                         elif self.state[i] == 4:
                             numCompleted = getNumRenderedFiles("animation", self.expandedFrameRange, getNameOutputFiles())
                             viewString = " - View rendered frames in render dump folder" if numCompleted > 0 else ""
-                            self.report({"INFO"}, "Render completed for {numCompleted}/{numSent} frames{viewString}".format(numCompleted=numCompleted, numSent=len(bpy.props.animFrameRange), viewString=viewString))
-                            scn.animPreviewAvailable = True
+                            self.report({"INFO"}, "Render completed for {numCompleted}/{numSent} frames{viewString}".format(numCompleted=numCompleted, numSent=len(bpy.props.rfc_animFrameRange), viewString=viewString))
+                            scn.rfc_animPreviewAvailable = True
                             if i == 1:
                                 self.processes[1] = False
                                 self.statusChecked = True
@@ -169,7 +169,7 @@ class sendAnimation(Operator):
 
             return{"PASS_THROUGH"}
         except:
-            handle_exception()
+            render_farm_handle_exception()
             return{"CANCELLED"}
 
     def execute(self, context):
@@ -180,7 +180,7 @@ class sendAnimation(Operator):
             if getRenderStatus("image") in getRunningStatuses() or getRenderStatus("animation") in getRunningStatuses():
                 self.report({"WARNING"}, "Render in progress...")
                 return{"CANCELLED"}
-            elif scn.availableServers == 0:
+            elif scn.rfc_availableServers == 0:
                 serversRefreshed = refreshServers.refreshServersBlock()
                 if not serversRefreshed:
                     self.report({"WARNING"}, "Servers could not be auto-refreshed. Try manual refreshing (Ctrl R).")
@@ -192,25 +192,25 @@ class sendAnimation(Operator):
             if not jobIsValid("animation", self):
                 return{"CANCELLED"}
 
-            # initializes self.frameRangesDict (returns reports error if frame range is invalid)
+            # initializes self.rfc_frameRangesDict (returns reports error if frame range is invalid)
             if not setFrameRangesDict(self):
                 setRenderStatus("animation", "ERROR")
                 return{"CANCELLED"}
             # store expanded results in 'expandedFrameRange'
-            self.expandedFrameRange = expandFrames(json.loads(self.frameRangesDict["string"]))
+            self.expandedFrameRange = expandFrames(json.loads(self.rfc_frameRangesDict["string"]))
             # restrict length of frame range string to 50000 characters
             if len(str(self.expandedFrameRange)) > 75000:
                 self.report({"ERROR"}, "ERROR: Frame range too large (maximum character count after conversion to ints list: 75000)")
                 return{"CANCELLED"}
 
             # set the file extension and frame range for use with 'open animation' button
-            scn.animExtension = scn.render.file_extension
-            bpy.props.animFrameRange = self.expandedFrameRange
+            scn.rfc_animExtension = scn.render.file_extension
+            bpy.props.rfc_animFrameRange = self.expandedFrameRange
 
             # start initial render process
             self.state = [1, 0] # initializes state for modal
-            if bpy.props.needsUpdating or bpy.props.lastServerGroup != scn.serverGroups:
-                bpy.props.lastServerGroup = scn.serverGroups
+            if bpy.props.rfc_needsUpdating or bpy.props.rfc_lastServerGroup != scn.rfc_serverGroups:
+                bpy.props.rfc_lastServerGroup = scn.rfc_serverGroups
                 updateStatus = updateServerPrefs()
                 if not updateStatus["valid"]:
                     self.report({"ERROR"}, updateStatus["errorMessage"])
@@ -223,7 +223,7 @@ class sendAnimation(Operator):
                 self.report({"ERROR"}, str(rte))
                 return{"CANCELLED"}
             rd, rt = setRemoteSettings(scn)
-            self.processes = [copyProjectFile(self.projectName, scn.compress), False]
+            self.processes = [copyProjectFile(self.projectName, scn.rfc_compress), False]
             setRemoteSettings(scn, rd, rt)
 
             # create timer for modal
@@ -236,7 +236,7 @@ class sendAnimation(Operator):
 
             return{"RUNNING_MODAL"}
         except:
-            handle_exception()
+            render_farm_handle_exception()
             return{"CANCELLED"}
 
     def __init__(self):
@@ -260,4 +260,4 @@ class sendAnimation(Operator):
 
     def cancel(self, context):
         print("process cancelled")
-        cleanupCancelledRender(self, context, bpy.types.Scene.killPython)
+        cleanupCancelledRender(self, context, bpy.types.Scene.rfc_killPython)

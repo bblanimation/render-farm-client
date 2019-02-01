@@ -58,9 +58,9 @@ def jobIsValid(jobType, classObject):
     # else alert user that render job has started
     else:
         if jobType == "image":
-            classObject.report({"INFO"}, "Rendering current frame on {numAvailable} servers (Preview with 'SHIFT + P')".format(numAvailable=str(scn.availableServers)))
+            classObject.report({"INFO"}, "Rendering current frame on {numAvailable} servers (Preview with 'SHIFT + P')".format(numAvailable=str(scn.rfc_availableServers)))
         else:
-            classObject.report({"INFO"}, "Rendering animation on {numAvailable} servers (Check status with 'SHIFT + P')".format(numAvailable=str(scn.availableServers)))
+            classObject.report({"INFO"}, "Rendering animation on {numAvailable} servers (Check status with 'SHIFT + P')".format(numAvailable=str(scn.rfc_availableServers)))
 
     # if job is invalid, return false
     if not jobValidityDict["valid"]:

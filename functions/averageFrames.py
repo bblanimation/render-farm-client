@@ -31,7 +31,7 @@ def averageFrames(classObject, outputFileName, verbose=0):
     # get image files to average
     renderPath = getRenderDumpPath()[0]
     allFiles = os.listdir(renderPath)
-    inFileName = "{outputFileName}_seed-*_{frame}{extension}".format(outputFileName=outputFileName, frame=str(scn.imFrame).zfill(4), extension=scn.imExtension)
+    inFileName = "{outputFileName}_seed-*_{frame}{extension}".format(outputFileName=outputFileName, frame=str(scn.rfc_imFrame).zfill(4), extension=scn.rfc_imExtension)
     imListNames = [filename for filename in allFiles if fnmatch.fnmatch(filename, inFileName)]
     imList = [os.path.join(renderPath, im) for im in imListNames]
     if not imList:
@@ -79,7 +79,7 @@ def averageFrames(classObject, outputFileName, verbose=0):
         print("Averaged successfully!")
 
     # Generate final averaged image and add it to the main database
-    imName = "{outputFileName}_{frame}_average{extension}".format(outputFileName=outputFileName, frame=str(scn.imFrame).zfill(4), extension=scn.imExtension)
+    imName = "{outputFileName}_{frame}_average{extension}".format(outputFileName=outputFileName, frame=str(scn.rfc_imFrame).zfill(4), extension=scn.rfc_imExtension)
     if bpy.data.images.find(imName) < 0:
         new = bpy.data.images.new(imName, w, h, alpha)
     else:

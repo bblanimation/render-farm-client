@@ -15,17 +15,17 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-# system imports
+# System imports
 import bpy
 import json
 import os
+from os.path import dirname, abspath
 
 def getLibraryPath():
     # Full path to module directory
     addons = bpy.context.user_preferences.addons
 
-    functionsPath = os.path.dirname(os.path.abspath(__file__))
-    libraryPath = functionsPath[:-10]
+    libraryPath = dirname(dirname(abspath(__file__)))
 
     if not os.path.exists(libraryPath):
         raise NameError("Did not find addon from path {}".format(libraryPath))
@@ -61,8 +61,8 @@ def invalidEntry(field):
 
 def setupServerPrefs():
     # variable definitions
-    libraryServersPath = os.path.join(getLibraryPath(), "servers")
-    serverFile = open(os.path.join(libraryServersPath, "remoteServers.txt"),"r")
+    libraryServersPath = os.path.join(getLibraryPath(), "servers", "remoteServers.txt")
+    serverFile = open(libraryServersPath,"r")
 
     # set SSH login information for host server
     try:
