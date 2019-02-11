@@ -517,7 +517,7 @@ def showErrorMessage(message, wrap=80):
 
     def draw(self,context):
         for line in lines:
-            self.layout.label(line)
+            self.layout.label(text=line)
 
     bpy.context.window_manager.popup_menu(draw, title="Error Message", icon="ERROR")
     return

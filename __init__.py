@@ -41,7 +41,7 @@ from .lib import *
 from .buttons import *
 from .functions import *
 
-# Used to store keymaps for addon
+# store keymaps here to access after registration
 addon_keymaps = []
 
 def more_menu_options(self, context):
@@ -148,7 +148,7 @@ def register():
         description="Choose which hosts to use for render processes",
         items=[("All Servers", "All Servers", "Render on all servers")],
         default="All Servers")
-    Scene.rfc_lastServerGroup = StringProperty(name="Last Server Group", default="All Servers")
+    bpy.props.rfc_lastServerGroup = StringProperty(name="Last Server Group", default="All Servers")
     bpy.props.rfc_serverPrefs = {"servers":None, "login":None, "path":None, "hostConnection":None}
     Scene.rfc_availableServers = IntProperty(name="Available Servers", default=0)
     Scene.rfc_offlineServers = IntProperty(name="Offline Servers", default=0)
@@ -161,33 +161,25 @@ def register():
     Scene.rfc_imFrame = IntProperty(default=-1)
     bpy.props.rfc_animFrameRange = None
 
+    # register app handlers
     bpy.app.handlers.load_post.append(refresh_servers)
     bpy.app.handlers.load_post.append(verify_render_status_on_load)
 
-    # handle the keymap
+    # handle the keymaps
     wm = bpy.context.window_manager
-    # Note that in background mode (no GUI available), keyconfigs are not available either, so we have
-    # to check this to avoid nasty errors in background case.
-    kc = wm.keyconfigs.addon
-    if kc:
-        km = kc.keymaps.new(name='Object Mode', space_type='EMPTY')
-        kmi = km.keymap_items.new("render_farm.render_frame_on_servers", 'F12', 'PRESS', alt=True)
-        kmi = km.keymap_items.new("render_farm.render_animation_on_servers", 'F12', 'PRESS', alt=True, shift=True)
-        kmi = km.keymap_items.new("render_farm.open_rendered_image", 'O', 'PRESS', shift=True)
-        kmi = km.keymap_items.new("render_farm.open_rendered_animation", 'O', 'PRESS', alt=True, shift=True)
-        kmi = km.keymap_items.new("render_farm.list_frames", 'M', 'PRESS', shift=True)
-        kmi = km.keymap_items.new("render_farm.set_to_missing_frames", 'M', 'PRESS', alt=True, shift=True)
-        kmi = km.keymap_items.new("render_farm.refresh_num_available_servers", 'R', 'PRESS', ctrl=True)
-        kmi = km.keymap_items.new("render_farm.edit_servers_dict", 'E', 'PRESS', ctrl=True)
+    if wm.keyconfigs.addon: # check this to avoid errors in background case
+        km = wm.keyconfigs.addon.keymaps.new(name='Object Mode', space_type='EMPTY')
+        keymaps.addKeymaps(km)
         addon_keymaps.append(km)
 
 def unregister():
-    # handle the keymap
+    # handle the keymaps
     wm = bpy.context.window_manager
     for km in addon_keymaps:
         wm.keyconfigs.addon.keymaps.remove(km)
     addon_keymaps.clear()
 
+    # unregister app handlers
     bpy.app.handlers.load_post.remove(refresh_servers)
     bpy.app.handlers.load_post.remove(verify_render_status_on_load)
 
@@ -218,8 +210,8 @@ def unregister():
     del Scene.rfc_killPython
     del Scene.rfc_showAdvanced
 
-    bpy.utils.unregister_module(__name__)
     bpy.types.INFO_MT_render.remove(more_menu_options)
+    bpy.utils.unregister_module(__name__)
 
 if __name__ == "__main__":
     register()

@@ -15,20 +15,25 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-# system imports
-import bpy
+# System imports
 import fnmatch
 import itertools
 import operator
 import os
+import time
 import subprocess
 import sys
-from .setupServers import *
-from .common import *
 try:
     import httplib
 except:
     import http.client as httplib
+
+# Blender imports
+import bpy
+
+# Addon imports
+from .setupServers import *
+from .common import *
 
 def have_internet():
     conn = httplib.HTTPConnection("www.google.com", timeout=5)
@@ -378,9 +383,10 @@ def updateServerPrefs():
         return newServerPrefs
 
     # verify host server login, built from user entries, correspond to a responsive server, and that defined renderFarm path is writable
-    rc = subprocess.call("ssh -T -oBatchMode=yes -oStrictHostKeyChecking=no -oConnectTimeout=10 -x {login} 'mkdir -p {remotePath}; touch {remotePath}test'".format(login=bpy.props.rfc_serverPrefs["login"], remotePath=bpy.props.rfc_serverPrefs["path"].replace(" ", "\\ ")), shell=True)
+    checkConnectionCommand = "ssh -T -oBatchMode=yes -oStrictHostKeyChecking=no -oConnectTimeout=10 -x {login} 'mkdir -p {remotePath}; touch {remotePath}test'".format(login=bpy.props.rfc_serverPrefs["login"], remotePath=bpy.props.rfc_serverPrefs["path"].replace(" ", "\\ "))
+    rc = subprocess.call(checkConnectionCommand, shell=True)
     if rc != 0:
-        return {"valid":False, "errorMessage":"ssh to '{login}' failed (return code: {rc}). Check your settings, ensure ssh keys are setup, and verify your write permissions for '{remotePath}' (see error in terminal)".format(login=bpy.props.rfc_serverPrefs["login"], rc=rc, remotePath=bpy.props.rfc_serverPrefs["path"])}
+        return {"valid":False, "errorMessage":"ssh to '{login}' failed (return code: {rc}). Check your settings, ensure ssh keys are setup, and verify your write permissions for '{remotePath}' on remote server (see error in terminal)".format(login=bpy.props.rfc_serverPrefs["login"], rc=rc, remotePath=bpy.props.rfc_serverPrefs["path"])}
 
     if bpy.props.rfc_serverPrefs != oldServerPrefs:
         # initialize server groups enum property

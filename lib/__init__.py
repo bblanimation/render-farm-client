@@ -18,4 +18,4 @@
 
 # from .preferences import *
 from .reportError import *
-# from .keymaps import *
+from .keymaps import *
