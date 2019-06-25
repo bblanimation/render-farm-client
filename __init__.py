@@ -19,7 +19,7 @@ bl_info = {
     "name"        : "Render Farm Client",
     "author"      : "Christopher Gearhart <chris@bblanimation.com>",
     "version"     : (0, 7, 5),
-    "blender"     : (2, 78, 0),
+    "blender"     : (2, 80, 0),
     "description" : "Render your scene on a custom server farm with this addon.",
     "location"    : "View3D > Tools > Render",
     "warning"     : "Relatively stable but still work in progress",
@@ -34,12 +34,14 @@ bl_info = {
 import bpy
 from bpy.types import Operator, Scene
 from bpy.props import *
+from bpy.utils import register_class, unregister_class
 
 # Render Farm imports
 from .ui import *
-from .lib import *
+from .lib import keymaps, preferences, classesToRegister
 from .buttons import *
 from .functions import *
+from . import addon_updater_ops
 
 # store keymaps here to access after registration
 addon_keymaps = []
@@ -51,8 +53,12 @@ def more_menu_options(self, context):
     layout.operator("render_farm.render_animation_on_servers", text="Render Animation on Servers", icon='RENDER_ANIMATION')
 
 def register():
-    bpy.utils.register_module(__name__)
-    bpy.types.INFO_MT_render.append(more_menu_options)
+    for cls in classesToRegister.classes:
+        make_annotations(cls)
+        bpy.utils.register_class(cls)
+
+    if not b280():
+        bpy.types.INFO_MT_render.append(more_menu_options)
 
     bpy.props.rfc_module_name = __name__
     bpy.props.rfc_version = str(bl_info["version"])[1:-1].replace(", ", ".")

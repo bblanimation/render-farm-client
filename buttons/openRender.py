@@ -27,9 +27,9 @@ from bpy.types import Operator
 from bpy.props import *
 from ..functions import *
 
-class openRenderedImageInUI(Operator):
+class RFC_OT_open_rendered_image(Operator):
     """Open rendered image"""                                                   # blender will use this as a tooltip for menu items and buttons.
-    bl_idname = "render_farm.open_rendered_image"                                     # unique identifier for buttons and menu items to reference.
+    bl_idname = "render_farm_client.open_rendered_image"                                     # unique identifier for buttons and menu items to reference.
     bl_label = "Open Rendered Image"                                            # display name in the interface.
     bl_options = {"REGISTER", "UNDO"}                                           # enable undo for the operator.
 
@@ -55,9 +55,9 @@ class openRenderedImageInUI(Operator):
             return{"CANCELLED"}
 
 
-class openRenderedAnimationInUI(Operator):
+class RFC_OT_open_rendered_animation(Operator):
     """Open rendered animation"""                                               # blender will use this as a tooltip for menu items and buttons.
-    bl_idname = "render_farm.open_rendered_animation"                                 # unique identifier for buttons and menu items to reference.
+    bl_idname = "render_farm_client.open_rendered_animation"                                 # unique identifier for buttons and menu items to reference.
     bl_label = "Open Rendered Animation"                                        # display name in the interface.
     bl_options = {"REGISTER", "UNDO"}                                           # enable undo for the operator.
 

@@ -27,9 +27,9 @@ from bpy.types import Operator
 from bpy.props import *
 from ..functions import *
 
-class listMissingFrames(Operator):
+class RFC_OT_list_frames(Operator):
     """List the output files missing from the render dump folder"""             # blender will use this as a tooltip for menu items and buttons.
-    bl_idname = "render_farm.list_frames"                                       # unique identifier for buttons and menu items to reference.
+    bl_idname = "render_farm_client.list_frames"                                # unique identifier for buttons and menu items to reference.
     bl_label = "List Missing Frames"                                            # display name in the interface.
     bl_options = {"REGISTER"}                                                   # enable undo for the operator.
 
@@ -48,9 +48,9 @@ class listMissingFrames(Operator):
             return{"CANCELLED"}
 
 
-class setToMissingFrames(Operator):
+class RFC_OT_set_to_missing_frames(Operator):
     """Set frame range to frames missing from the render dump folder"""         # blender will use this as a tooltip for menu items and buttons.
-    bl_idname = "render_farm.set_to_missing_frames"                             # unique identifier for buttons and menu items to reference.
+    bl_idname = "render_farm_client.set_to_missing_frames"                             # unique identifier for buttons and menu items to reference.
     bl_label = "Set to Missing Frames"                                          # display name in the interface.
     bl_options = {"REGISTER", "UNDO"}                                           # enable undo for the operator.
 

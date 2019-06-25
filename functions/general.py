@@ -145,7 +145,7 @@ def copyFiles():
     writeServersFile(bpy.props.rfc_serverPrefs["servers"], scn.rfc_serverGroups)
 
     # rsync setup files to host server ('servers.txt', 'blender_p.py', 'blender_task' module)
-    rsyncCommand = "rsync -qax -e 'ssh -T -oCompression=no -oStrictHostKeyChecking=no -x' --exclude='*.zip' --rsync-path='mkdir -p {remotePath} && rsync' '{to_host_server}/' '{login}:{remotePath}'".format(remotePath=bpy.props.rfc_serverPrefs["path"].replace(" ", "\\ "), to_host_server=os.path.join(getLibraryPath(), "to_host_server"), login=bpy.props.rfc_serverPrefs["login"])
+    rsyncCommand = "rsync -qax -e 'ssh -T -oCompression=no -oStrictHostKeyChecking=no -x' --exclude='*.zip' --rsync-path='mkdir -p {remotePath} && rsync' '{to_host_server}/' '{login}:{remotePath}'".format(remotePath=bpy.props.rfc_serverPrefs["path"].replace(" ", "\\ "), to_host_server=os.path.join(getLibraryPath(), "lib", "to_host_server"), login=bpy.props.rfc_serverPrefs["login"])
     process = subprocess.Popen(rsyncCommand, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     return process
 

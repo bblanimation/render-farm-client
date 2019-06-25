@@ -15,4 +15,4 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-__all__ = ["editRemoteServersDict", "missingFramesActions", "openRenderInUI", "refreshServers", "sendAnimation", "sendFrame"]
+__all__ = ["editServers", "missingFramesActions", "openRender", "refreshServers", "renderAnimation", "renderFrame"]

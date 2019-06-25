@@ -21,9 +21,12 @@ import json
 import os
 from os.path import dirname, abspath
 
+# addon imports
+from .common import *
+
 def getLibraryPath():
     # Full path to module directory
-    addons = bpy.context.user_preferences.addons
+    addons = get_preferences().addons
 
     libraryPath = dirname(dirname(abspath(__file__)))
 
@@ -61,7 +64,7 @@ def invalidEntry(field):
 
 def setupServerPrefs():
     # variable definitions
-    libraryServersPath = os.path.join(getLibraryPath(), "servers", "remoteServers.txt")
+    libraryServersPath = os.path.join(getLibraryPath(), "lib", "remoteServers.txt")
     serverFile = open(libraryServersPath,"r")
 
     # set SSH login information for host server
@@ -112,7 +115,7 @@ def setupServerPrefs():
     return {"valid":True, "servers":servers, "login":login, "path":path, "hostConnection":hostConnection}
 
 def writeServersFile(serverDict, serverGroups):
-    f = open(os.path.join(getLibraryPath(), "to_host_server", "servers.txt"), "w")
+    f = open(os.path.join(getLibraryPath(), "lib", "to_host_server", "servers.txt"), "w")
 
     # define dictionary 'serversToUse'
     if serverGroups == "All Servers":

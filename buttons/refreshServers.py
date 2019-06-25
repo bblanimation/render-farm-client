@@ -27,9 +27,9 @@ from bpy.types import Operator
 from bpy.props import *
 from ..functions import *
 
-class refreshServers(Operator):
+class RFC_OT_refresh_available_servers(Operator):
     """Attempt to connect to all servers through host server"""                 # blender will use this as a tooltip for menu items and buttons.
-    bl_idname = "render_farm.refresh_num_available_servers"                           # unique identifier for buttons and menu items to reference.
+    bl_idname = "render_farm_client.refresh_available_servers"                         # unique identifier for buttons and menu items to reference.
     bl_label = "Refresh Available Servers"                                      # display name in the interface.
     bl_options = {"REGISTER", "UNDO"}                                           # enable undo for the operator.
 

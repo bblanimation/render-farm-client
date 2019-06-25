@@ -28,9 +28,9 @@ from bpy.props import *
 from .refreshServers import *
 from ..functions import *
 
-class sendFrame(Operator):
+class RFC_OT_render_frame(Operator):
     """Render current frame on remote servers"""                                # blender will use this as a tooltip for menu items and buttons.
-    bl_idname = "render_farm.render_frame_on_servers"                                 # unique identifier for buttons and menu items to reference.
+    bl_idname = "render_farm_client.render_frame"                               # unique identifier for buttons and menu items to reference.
     bl_label = "Render Current Frame"                                           # display name in the interface.
     bl_options = {"REGISTER", "UNDO"}                                           # enable undo for the operator.
 
@@ -223,7 +223,7 @@ class sendFrame(Operator):
                 self.report({"WARNING"}, "Render in progress...")
                 return{"CANCELLED"}
             elif scn.rfc_availableServers == 0:
-                serversRefreshed = refreshServers.refreshServersBlock()
+                serversRefreshed = RFC_OT_refresh_available_servers.refreshServersBlock()
                 if not serversRefreshed:
                     self.report({"WARNING"}, "Servers could not be auto-refreshed. Try manual refreshing (Ctrl R).")
                     return{"CANCELLED"}

@@ -27,17 +27,21 @@ from bpy.types import Operator
 from bpy.props import *
 from ..functions import *
 
-class editRemoteServersDict(Operator):
+class RFC_OT_edit_servers_dict(Operator):
     """Edit the remote servers dictionary in a text editor"""                   # blender will use this as a tooltip for menu items and buttons.
-    bl_idname = "render_farm.edit_servers_dict"                                       # unique identifier for buttons and menu items to reference.
+    bl_idname = "render_farm_client.edit_servers_dict"                          # unique identifier for buttons and menu items to reference.
     bl_label = "Edit Remote Servers"                                            # display name in the interface.
     bl_options = {"REGISTER", "UNDO"}                                           # enable undo for the operator.
 
     def execute(self, context):
         scn = bpy.context.scene
+        # Call user prefs window
+        bpy.ops.screen.userpref_show("INVOKE_DEFAULT")
+
+        # Change area type
         changeContext(context, "TEXT_EDITOR")
         try:
-            libraryServersPath = os.path.join(getLibraryPath(), "servers", "remoteServers.txt")
+            libraryServersPath = os.path.join(getLibraryPath(), "lib", "remoteServers.txt")
             bpy.ops.text.open(filepath=libraryServersPath)
             self.report({"INFO"}, "Opened 'remoteServers.txt'")
             bpy.props.rfc_needsUpdating = True
