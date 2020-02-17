@@ -197,7 +197,7 @@ class RFC_OT_render_animation(Operator):
                 setRenderStatus("animation", "ERROR")
                 return{"CANCELLED"}
             # store expanded results in 'expandedFrameRange'
-            self.expandedFrameRange = expandFrames(json.loads(self.rfc_frameRangesDict["string"]))
+            self.expandedFrameRange = expand_frames(json.loads(self.rfc_frameRangesDict["string"]))
             # restrict length of frame range string to 50000 characters
             if len(str(self.expandedFrameRange)) > 75000:
                 self.report({"ERROR"}, "ERROR: Frame range too large (maximum character count after conversion to ints list: 75000)")

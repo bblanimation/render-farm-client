@@ -20,7 +20,7 @@ import bpy
 import fnmatch
 import numpy
 import os
-from .general import getRenderDumpPath
+from .general import get_render_dump_path
 
 def averageFrames(classObject, outputFileName, verbose=0):
     """ Averages final rendered images in blender to present one render result """
@@ -29,7 +29,7 @@ def averageFrames(classObject, outputFileName, verbose=0):
         print("Averaging images...")
 
     # get image files to average
-    renderPath = getRenderDumpPath()[0]
+    renderPath = get_render_dump_path()[0]
     allFiles = os.listdir(renderPath)
     inFileName = "{outputFileName}_seed-*_{frame}{extension}".format(outputFileName=outputFileName, frame=str(scn.rfc_imFrame).zfill(4), extension=scn.rfc_imExtension)
     imListNames = [filename for filename in allFiles if fnmatch.fnmatch(filename, inFileName)]

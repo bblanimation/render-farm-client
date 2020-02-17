@@ -35,6 +35,7 @@ import bpy
 from .setupServers import *
 from .common import *
 
+
 def have_internet():
     conn = httplib.HTTPConnection("www.google.com", timeout=5)
     try:
@@ -44,6 +45,7 @@ def have_internet():
     except:
         conn.close()
         return False
+
 
 def bashSafeName(string):
     # protects against file names that would cause problems with bash calls
@@ -55,11 +57,12 @@ def bashSafeName(string):
         string = string.replace(char, "_")
     return string
 
+
 def getFrames(projectName, archiveFiles=False, frameRange=False):
     """ rsync rendered frames from host server to local machine """
     scn = bpy.context.scene
     basePath = bpy.path.abspath("//")
-    dumpLocation = getRenderDumpPath()[0]
+    dumpLocation = get_render_dump_path()[0]
     outFilePath = None
 
     if archiveFiles:
@@ -93,6 +96,7 @@ def getFrames(projectName, archiveFiles=False, frameRange=False):
     process = subprocess.Popen(archiveRsyncCommand + fetchRsyncCommand, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     return process
 
+
 def buildFrameRangesString(frameRanges):
     """ builds frame range list of lists/ints from user-entered frameRanges string """
     frameRangeList = frameRanges.replace(" ", "").split(",")
@@ -123,6 +127,7 @@ def buildFrameRangesString(frameRanges):
                 return invalidDict
     return {"valid":True, "string":str(newFrameRangeList).replace(" ", "")}
 
+
 def copyProjectFile(projectName, compress):
     """ copies project file from local machine to host server """
     scn = bpy.context.scene
@@ -138,6 +143,7 @@ def copyProjectFile(projectName, compress):
     process = subprocess.Popen(rsyncCommand, shell=True)
     return process
 
+
 def copyFiles():
     """ copies necessary files to host server """
     scn = bpy.context.scene
@@ -148,6 +154,7 @@ def copyFiles():
     rsyncCommand = "rsync -qax -e 'ssh -T -oCompression=no -oStrictHostKeyChecking=no -x' --exclude='*.zip' --rsync-path='mkdir -p {remotePath} && rsync' '{to_host_server}/' '{login}:{remotePath}'".format(remotePath=bpy.props.rfc_serverPrefs["path"].replace(" ", "\\ "), to_host_server=os.path.join(getLibraryPath(), "lib", "to_host_server"), login=bpy.props.rfc_serverPrefs["login"])
     process = subprocess.Popen(rsyncCommand, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     return process
+
 
 def renderFrames(frameRange, projectName, jobsPerFrame=False):
     """ calls 'blender_task' on host server """
@@ -166,6 +173,7 @@ def renderFrames(frameRange, projectName, jobsPerFrame=False):
     print("Process sent to remote servers!")
     return process
 
+
 def setRenderStatus(key, status):
     scn = bpy.context.scene
     if key == "image":
@@ -173,6 +181,7 @@ def setRenderStatus(key, status):
     elif key == "animation":
         scn.rfc_animRenderStatus = status
     tag_redraw_areas()
+
 
 def getRenderStatus(key):
     scn = bpy.context.scene
@@ -183,59 +192,6 @@ def getRenderStatus(key):
     else:
         return ""
 
-def expandFrames(frame_range):
-    """ Helper function takes frame range string and returns list with frame ranges expanded """
-    frames = []
-    for i in frame_range:
-        if type(i) == list:
-            frames += range(i[0], i[1]+1)
-        elif type(i) == int:
-            frames.append(i)
-        else:
-            sys.stderr.write("Unknown type in frames list")
-
-    return list(set(frames))
-
-def intsToFrameRanges(intsList):
-    """ turns list of ints to list of frame ranges """
-    frameRangesS = ""
-    i = 0
-    while i < len(intsList):
-        s = intsList[i] # start index
-        e = s           # end index
-        while i < len(intsList) - 1 and intsList[i + 1] - intsList[i] == 1:
-            e += 1
-            i += 1
-        frameRangesS += "{s},".format(s=s) if s == e else "{s}-{e},".format(s=s, e=e)
-        i += 1
-    return frameRangesS[:-1]
-
-def listMissingFiles(filename, frameRange):
-    """ lists all missing files from local render dump directory """
-    dumpFolder = getRenderDumpPath()[0]
-    compList = expandFrames(json.loads(frameRange))
-    if not os.path.exists(dumpFolder):
-        errorMsg = "The folder does not exist: {path}".format(path=dumpFolder)
-        sys.stderr.write(errorMsg)
-        print(errorMsg)
-        return str(compList)[1:-1]
-    try:
-        allFiles = os.listdir(dumpFolder)
-    except:
-        errorMsg = "Error listing directory {path}".format(path=dumpFolder)
-        sys.stderr.write(errorMsg)
-        print(errorMsg)
-        return str(compList)[1:-1]
-    imList = []
-    for f in allFiles:
-        if "_average." not in f and not fnmatch.fnmatch(f, "*_seed-*_????.???") and f[:len(filename)] == filename:
-            imList.append(int(f[len(filename)+1:len(filename)+5]))
-    # compare lists to determine which frames are missing from imlist
-    missingF = [i for i in compList if i not in imList]
-    # convert list of ints to string with frame ranges
-    missingFR = intsToFrameRanges(missingF)
-    # return the list of missing frames as string, omitting the open and close brackets
-    return missingFR
 
 def handleError(classObject, errorSource, i="Not Provided"):
     errorMessage = False
@@ -257,6 +213,7 @@ def handleError(classObject, errorSource, i="Not Provided"):
 
     classObject.report({"ERROR"}, "%(errorSource)s gave return code %(rCode)s. %(errorMessage)s" % locals())
 
+
 def handleBTError(classObject, i="Not Provided"):
     if i == "Not Provided":
         classObject.stderr = classObject.process.stderr.readlines()
@@ -272,6 +229,7 @@ def handleBTError(classObject, i="Not Provided"):
         sys.stderr.write(line)
     errorMsg = classObject.stderr[-1].decode("ASCII")
 
+
 def setFrameRangesDict(classObject):
     scn = bpy.context.scene
     if scn.rfc_frameRanges == "":
@@ -283,7 +241,8 @@ def setFrameRangesDict(classObject):
             return False
     return True
 
-def getRenderDumpPath():
+
+def get_render_dump_path():
     scn = bpy.context.scene
     path = scn.rfc_renderDumpLoc
     lastSlash = path.rfind("/")
@@ -320,6 +279,7 @@ def getRenderDumpPath():
         return path, "Blender does not have write permissions for the following path: '%(path)s'" % locals()
     return path, None
 
+
 def getNameOutputFiles():
     """return nameOutputFiles (defaults to current project name"""
     scn = bpy.context.scene
@@ -328,12 +288,14 @@ def getNameOutputFiles():
     n = filename if lastSlash in [-1, len(scn.rfc_renderDumpLoc) - 1] else scn.rfc_renderDumpLoc[lastSlash + 1:]
     return bashSafeName(n)
 
+
 def getRunningStatuses():
     return ["Rendering...", "Preparing files...", "Finishing..."]
 
+
 def getNumRenderedFiles(jobType, frameRange=None, fileName=None):
     scn = bpy.context.scene
-    dumpPath = getRenderDumpPath()[0]
+    dumpPath = get_render_dump_path()[0]
     if jobType == "image":
         numRenderedFiles = len([f for f in os.listdir(dumpPath) if "_seed-" in f and f.endswith(str(frameRange[0]) + scn.rfc_imExtension)])
     else:
@@ -348,6 +310,7 @@ def getNumRenderedFiles(jobType, frameRange=None, fileName=None):
         numRenderedFiles = len(renderedFiles)
     return numRenderedFiles
 
+
 def cleanupCancelledRender(classObject, context, killPython=True):
     """ Kills running processes when render job cancelled """
     wm = context.window_manager
@@ -361,11 +324,13 @@ def cleanupCancelledRender(classObject, context, killPython=True):
     if killPython:
         subprocess.call("ssh -T -oStrictHostKeyChecking=no -x {login} 'killall -9 python'".format(login=bpy.props.rfc_serverPrefs["login"]), shell=True)
 
+
 def changeContext(context, areaType):
     """ Changes current context and returns previous area type """
     lastAreaType = context.area.type
     context.area.type = areaType
     return lastAreaType
+
 
 def updateServerPrefs():
     scn = bpy.context.scene
@@ -410,6 +375,7 @@ def setRemoteSettings(scn, rd=None, rt=None):
     scn.render.tile_x = rt[0]
     scn.render.tile_y = rt[1]
     return rd, rt
+
 
 def render_farm_handle_exception():
     handle_exception(log_name="Render Farm Client log", report_button_loc="View 3D > Tools > Render > Render on Servers > Report Error")

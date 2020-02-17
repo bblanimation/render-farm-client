@@ -17,6 +17,7 @@
 
 from .averageFrames import *
 from .common import *
+from .frame_ranges import *
 from .general import *
 from .jobIsValid import *
 from .setupServers import *

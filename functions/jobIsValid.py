@@ -17,7 +17,7 @@
 
 # system imports
 import bpy
-from .general import getRenderDumpPath
+from .general import get_render_dump_path
 
 def jobIsValid(jobType, classObject):
     """ verifies that the job is valid before sending it to the host server """
@@ -44,7 +44,7 @@ def jobIsValid(jobType, classObject):
         jobValidityDict = {"valid":False, "errorType":"WARNING", "errorMessage":"RENDER FAILED: Output file format not supported. Supported formats: BMP, PNG, TARGA, JPEG, JPEG 2000, TIFF. (Animation only: IRIS, CINEON, HDR, DPX, OPEN_EXR, OPEN_EXR_MULTILAYER)"}
 
     # verify that the user input for renderDumpLoc is valid and can be created
-    rdf, errorMsg = getRenderDumpPath()
+    rdf, errorMsg = get_render_dump_path()
     if errorMsg is not None:
         jobValidityDict = {"valid":False, "errorType":"ERROR", "errorMessage":errorMsg}
 

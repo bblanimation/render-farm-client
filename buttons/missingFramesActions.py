@@ -40,7 +40,7 @@ class RFC_OT_list_frames(Operator):
             if not setFrameRangesDict(self):
                 return{"FINISHED"}
             # list all missing files from start frame to end frame in render dump folder
-            missingFrames = listMissingFiles(getNameOutputFiles(), self.rfc_frameRangesDict["string"])
+            missingFrames = listMissingFrames(getNameOutputFiles(), json.loads(self.rfc_frameRangesDict["string"]))
             self.report({"INFO"}, "Missing frames: %(missingFrames)s" % locals() if len(missingFrames) > 0 else "All frames accounted for!")
             return{"FINISHED"}
         except:
@@ -61,7 +61,7 @@ class RFC_OT_set_to_missing_frames(Operator):
             if not setFrameRangesDict(self):
                 return{"FINISHED"}
             # list all missing files from start frame to end frame in render dump location
-            scn.rfc_frameRanges = listMissingFiles(getNameOutputFiles(), self.rfc_frameRangesDict["string"])
+            scn.rfc_frameRanges = listMissingFrames(getNameOutputFiles(), json.loads(self.rfc_frameRangesDict["string"]))
             return{"FINISHED"}
         except:
             render_farm_handle_exception()

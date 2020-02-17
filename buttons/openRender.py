@@ -91,4 +91,4 @@ class RFC_OT_open_rendered_animation(Operator):
     def __init__(self):
         scn = bpy.context.scene
         self.rfc_frameRangesDict = buildFrameRangesString(scn.rfc_frameRanges)
-        self.renderDumpFolder = getRenderDumpPath()[0]
+        self.renderDumpFolder = get_render_dump_path()[0]
