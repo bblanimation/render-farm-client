@@ -24,7 +24,7 @@ import bpy
 from bpy.app.handlers import persistent
 from bpy.props import *
 
-# Addon imports
+# Module imports
 from ..functions import *
 
 

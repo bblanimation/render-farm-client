@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-# system imports
+# System imports
 import bpy
 from .general import get_render_dump_path
 

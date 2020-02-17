@@ -21,7 +21,7 @@ import json
 import os
 from os.path import dirname, abspath
 
-# addon imports
+# Module imports
 from .common import *
 
 def getLibraryPath():

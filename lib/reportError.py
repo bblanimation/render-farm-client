@@ -24,7 +24,7 @@ import bpy
 import addon_utils
 from bpy.props import StringProperty
 
-# Addon imports
+# Module imports
 from ..functions import *
 
 # define addon name (must match name in bl_info)

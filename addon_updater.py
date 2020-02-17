@@ -35,7 +35,7 @@ import threading
 import fnmatch
 from datetime import datetime, timedelta
 
-# blender imports, used in limited cases
+# Blender imports, used in limited cases
 import bpy
 import addon_utils
 

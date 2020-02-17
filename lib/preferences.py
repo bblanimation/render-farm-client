@@ -20,7 +20,7 @@ import bpy
 from bpy.types import AddonPreferences
 from bpy.props import *
 
-# Addon imports
+# Module imports
 from .. import addon_updater_ops
 from ..functions.common import *
 
